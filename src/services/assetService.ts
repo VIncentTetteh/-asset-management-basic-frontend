@@ -1,9 +1,19 @@
 import api from "@/lib/axios";
 import { Asset, AssetDto } from "@/types";
 
+export interface AssetFilterParams {
+    departmentId?: string;
+    status?: string;
+    assignedUserId?: string;
+    locationId?: string;
+    page?: number;
+    size?: number;
+    sort?: string;
+}
+
 export const assetService = {
-    getAll: async () => {
-        const response = await api.get<Asset[]>("/assets");
+    getAll: async (params?: AssetFilterParams) => {
+        const response = await api.get<Asset[]>("/assets", { params });
         return response.data;
     },
 

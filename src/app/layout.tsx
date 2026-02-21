@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Navbar } from "@/components/Navbar";
+import { Sidebar } from "@/components/Sidebar";
 import { Toaster } from "react-hot-toast";
+import { AppLayoutClient } from "@/components/AppLayoutClient";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Asset Management System",
-  description: "Manage organisations, departments, and assets.",
+  title: "Enterprise Asset Management",
+  description: "Enterprise multi-tenancy asset management platform.",
 };
 
 export default function RootLayout({
@@ -16,16 +17,16 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Simple check for auth routes to not show sidebar
+  // (In a real app, middleware or a separate layout group for (auth) would be better)
+
   return (
     <html lang="en">
       <body className={inter.className}>
-        <div className="min-h-screen bg-slate-50">
-          <Navbar />
-          <main className="container mx-auto px-4 py-8">
-            {children}
-          </main>
-          <Toaster position="top-right" />
-        </div>
+        <AppLayoutClient>
+          {children}
+        </AppLayoutClient>
+        <Toaster position="top-right" />
       </body>
     </html>
   );

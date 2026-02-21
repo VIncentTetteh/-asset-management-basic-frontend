@@ -99,27 +99,38 @@ export default function OrganisationsPage() {
                 </Button>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
-                    <p>Loading...</p>
+                    <div className="col-span-full h-64 flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
                 ) : organisations.length === 0 ? (
-                    <p className="text-slate-500 col-span-full text-center py-10">No organisations found. Create one to get started.</p>
+                    <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
+                        <Building2 className="h-12 w-12 text-slate-300 mb-4" />
+                        <h3 className="text-lg font-medium text-slate-900">No organisations found</h3>
+                        <p className="text-slate-500 mt-1 max-w-sm">Setup your first top-level organisation to begin grouping departments and assets.</p>
+                        <Button onClick={handleOpenCreate} className="mt-6 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300">
+                            Add Organisation
+                        </Button>
+                    </div>
                 ) : (
                     organisations.map((org) => (
-                        <Card key={org.id}>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">
+                        <Card key={org.id} className="overflow-hidden hover:shadow-md transition-all group border-slate-200">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-slate-50/50 border-b border-slate-100">
+                                <CardTitle className="text-lg font-semibold text-slate-900 truncate" title={org.name}>
                                     {org.name}
                                 </CardTitle>
-                                <Building2 className="h-4 w-4 text-slate-500" />
+                                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg shrink-0">
+                                    <Building2 className="h-4 w-4" />
+                                </div>
                             </CardHeader>
-                            <CardContent>
-                                <div className="flex justify-end gap-2 mt-4">
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenEdit(org)}>
-                                        <Pencil className="h-4 w-4" />
+                            <CardContent className="p-4">
+                                <div className="flex justify-end gap-2 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenEdit(org)} className="h-8">
+                                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                     </Button>
-                                    <Button variant="destructive" size="sm" onClick={() => handleDelete(org.id)}>
-                                        <Trash2 className="h-4 w-4" />
+                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(org.id!)} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                        <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                 </div>
                             </CardContent>

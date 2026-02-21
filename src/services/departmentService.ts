@@ -2,13 +2,19 @@ import api from "@/lib/axios";
 import { Department, DepartmentDto } from "@/types";
 
 export const departmentService = {
-    getAll: async () => {
-        const response = await api.get<Department[]>("/departments");
+    getAll: async (organisationId?: string) => {
+        const params = organisationId ? { organisationId } : undefined;
+        const response = await api.get<Department[]>("/departments", { params });
         return response.data;
     },
 
     get: async (id: string) => {
         const response = await api.get<Department>(`/departments/${id}`);
+        return response.data;
+    },
+
+    getSubDepartments: async (parentId: string) => {
+        const response = await api.get<Department[]>(`/departments/${parentId}/sub-departments`);
         return response.data;
     },
 
