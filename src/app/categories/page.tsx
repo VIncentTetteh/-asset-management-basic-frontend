@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Category } from "@/types";
+import { Category, CategoryDto } from "@/types";
 import { categoryService } from "@/services/categoryService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, Tags } from "lucide-react";
+import { Plus, Pencil, Trash2, Tags, Shield, Clock } from "lucide-react";
 import { useForm } from "react-hook-form";
 
 export default function CategoriesPage() {
@@ -19,7 +19,7 @@ export default function CategoriesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<any>();
+    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CategoryDto>();
 
     const fetchCategories = async () => {
         try {
@@ -40,7 +40,7 @@ export default function CategoriesPage() {
 
     const handleOpenCreate = () => {
         setEditingCategory(null);
-        reset({ name: "", description: "", parentCategoryId: "" });
+        reset({ name: "", description: "", parentCategoryId: "", defaultWarrantyPeriodMonths: undefined });
         setIsModalOpen(true);
     };
 
@@ -49,7 +49,9 @@ export default function CategoriesPage() {
         reset({
             name: category.name,
             description: category.description || "",
-            parentCategoryId: category.parentCategoryId || ""
+            parentCategoryId: category.parentCategoryId || "",
+            depreciationPolicyId: category.depreciationPolicyId || "",
+            defaultWarrantyPeriodMonths: category.defaultWarrantyPeriodMonths,
         });
         setIsModalOpen(true);
     };
@@ -66,7 +68,7 @@ export default function CategoriesPage() {
         }
     };
 
-    const onSubmit = async (data: any) => {
+    const onSubmit = async (data: CategoryDto) => {
         const isDuplicate = categories.some(
             cat => cat.name.toLowerCase() === data.name.toLowerCase() && cat.id !== editingCategory?.id
         );
@@ -76,10 +78,16 @@ export default function CategoriesPage() {
             return;
         }
 
-        try {
-            // Clean up payload
-            if (!data.parentCategoryId) delete data.parentCategoryId;
+        // Clean up payload
+        if (!data.parentCategoryId) delete data.parentCategoryId;
+        if (!data.depreciationPolicyId) delete data.depreciationPolicyId;
+        if (data.defaultWarrantyPeriodMonths) {
+            data.defaultWarrantyPeriodMonths = Number(data.defaultWarrantyPeriodMonths);
+        } else {
+            delete data.defaultWarrantyPeriodMonths;
+        }
 
+        try {
             if (editingCategory) {
                 await categoryService.update(editingCategory.id!, data);
                 toast.success("Category updated");
@@ -123,32 +131,58 @@ export default function CategoriesPage() {
                     </div>
                 ) : (
                     categories.map((category) => (
-                        <Card key={category.id} className="overflow-hidden hover:shadow-md transition-all group border-slate-200">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-slate-50/50 border-b border-slate-100">
-                                <CardTitle className="text-lg font-semibold text-slate-900 truncate" title={category.name}>
-                                    {category.name}
-                                </CardTitle>
+                        <Card key={category.id} className="overflow-hidden hover:shadow-md transition-all flex flex-col h-full border-slate-200">
+                            <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-3 bg-slate-50/50 border-b border-slate-100">
                                 <div className="p-2 bg-orange-100 text-orange-600 rounded-lg shrink-0">
-                                    <Tags className="h-4 w-4" />
+                                    <Tags className="h-5 w-5" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <CardTitle className="text-base font-semibold text-slate-900 truncate" title={category.name}>
+                                        {category.name}
+                                    </CardTitle>
+                                    {category.parentCategoryId && (
+                                        <span className="text-[10px] font-bold uppercase text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
+                                            Sub-category
+                                        </span>
+                                    )}
                                 </div>
                             </CardHeader>
-                            <CardContent className="p-4 flex flex-col justify-between" style={{ minHeight: '120px' }}>
-                                <div>
-                                    {category.description && (
-                                        <p className="text-sm text-slate-600 line-clamp-2 mb-2">{category.description}</p>
+                            <CardContent className="p-0 flex-1 flex flex-col">
+                                <div className="p-4 space-y-3 flex-1">
+                                    {category.description ? (
+                                        <p className="text-sm text-slate-600 line-clamp-2" title={category.description}>
+                                            {category.description}
+                                        </p>
+                                    ) : (
+                                        <p className="text-xs text-slate-400 italic">No description provided.</p>
                                     )}
-                                    {category.parentCategoryId && (
-                                        <div className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">
-                                            Subcategory
+
+                                    {(category.defaultWarrantyPeriodMonths || category.depreciationPolicyId) && (
+                                        <div className="pt-3 border-t border-slate-100 space-y-2">
+                                            {category.defaultWarrantyPeriodMonths && (
+                                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                                    <Shield className="h-4 w-4 text-blue-400 shrink-0" />
+                                                    <span className="text-xs">Default Warranty:</span>
+                                                    <span className="font-semibold text-slate-800 text-xs">
+                                                        {category.defaultWarrantyPeriodMonths} months
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {category.depreciationPolicyId && (
+                                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                                    <Clock className="h-4 w-4 text-purple-400 shrink-0" />
+                                                    <span className="text-xs text-slate-500">Depreciation policy linked</span>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex justify-end gap-2 pt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="p-4 bg-slate-50/50 mt-auto border-t border-slate-100 flex justify-end gap-2">
                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(category)} className="h-8">
                                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                     </Button>
                                     <Button variant="ghost" size="sm" onClick={() => handleDelete(category.id!)} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
-                                        <Trash2 className="h-3.5 w-3.5" />
+                                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                                     </Button>
                                 </div>
                             </CardContent>
@@ -163,9 +197,9 @@ export default function CategoriesPage() {
                 title={editingCategory ? "Edit Category" : "Create Category"}
                 description={editingCategory ? "Update the details of the category." : "Add a new asset category."}
             >
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
                     <div className="space-y-2">
-                        <Label htmlFor="name">Name</Label>
+                        <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
                         <Input
                             id="name"
                             placeholder="e.g. IT Equipment"
@@ -183,17 +217,29 @@ export default function CategoriesPage() {
                         />
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="parentCategoryId">Parent Category (Optional)</Label>
-                        <Select id="parentCategoryId" {...register("parentCategoryId")}>
-                            <option value="">None (Top Level)</option>
-                            {categories.filter(c => c.id !== editingCategory?.id).map((cat) => (
-                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                            ))}
-                        </Select>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="defaultWarrantyPeriodMonths">Default Warranty (Months)</Label>
+                            <Input
+                                type="number"
+                                id="defaultWarrantyPeriodMonths"
+                                min="0"
+                                placeholder="24"
+                                {...register("defaultWarrantyPeriodMonths")}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="parentCategoryId">Parent Category</Label>
+                            <Select id="parentCategoryId" {...register("parentCategoryId")}>
+                                <option value="">None (Top Level)</option>
+                                {categories.filter(c => c.id !== editingCategory?.id).map((cat) => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
+                            </Select>
+                        </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-2">
+                    <div className="flex justify-end gap-2 pt-4 border-t">
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                             Cancel
                         </Button>

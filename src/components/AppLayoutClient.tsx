@@ -9,12 +9,40 @@ export function AppLayoutClient({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
+    const [orgName, setOrgName] = useState<string>("AssetMaster");
 
-    const publicPaths = ["/login", "/register"];
+    useEffect(() => {
+        const fetchOrg = async () => {
+            const storedUserStr = localStorage.getItem("user");
+            if (storedUserStr) {
+                const user = JSON.parse(storedUserStr);
+                if (user.organisationId) {
+                    try {
+                        const { organisationService } = await import("@/services/organisationService");
+                        const org = await organisationService.get(user.organisationId);
+                        setOrgName(org.name);
+                    } catch (e) {
+                        console.error("Failed to fetch org name for layout:", e);
+                    }
+                }
+            }
+        };
+        if (isAuthorized) {
+            fetchOrg();
+        }
+    }, [isAuthorized]);
+
+    const publicPaths = ["/login", "/register", "/register-tenant"];
     const isPublicPage = publicPaths.includes(pathname);
 
     useEffect(() => {
-        setIsMounted(true);
+        const timer = setTimeout(() => setIsMounted(true), 0);
+        return () => clearTimeout(timer);
+    }, []);
+
+    useEffect(() => {
+        if (!isMounted) return;
+
         const checkAuth = () => {
             const token = localStorage.getItem("token");
             if (!token && !isPublicPage) {
@@ -27,7 +55,7 @@ export function AppLayoutClient({ children }: { children: React.ReactNode }) {
         };
 
         checkAuth();
-    }, [pathname, router, isPublicPage]);
+    }, [pathname, router, isPublicPage, isMounted]);
 
     // Prevent hydration mismatch by not rendering until mounted
     if (!isMounted) {
@@ -53,7 +81,7 @@ export function AppLayoutClient({ children }: { children: React.ReactNode }) {
 
             <div className="flex-1 flex flex-col overflow-hidden">
                 <header className="h-16 border-b bg-white flex items-center px-6 shadow-sm md:hidden">
-                    <span className="font-bold text-xl text-emerald-600">AssetMaster</span>
+                    <span className="font-bold text-xl text-emerald-600 truncate">{orgName}</span>
                 </header>
                 <main className="flex-1 overflow-auto p-4 md:p-8">
                     {children}

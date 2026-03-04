@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { User, UserDto } from "@/types";
 import { userService } from "@/services/userService";
+import { organisationService } from "@/services/organisationService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,12 +15,13 @@ import { UserCircle, Mail, Phone, Building, Briefcase, Shield, Save } from "luci
 export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [organisatonName, setOrganisationName] = useState<string>("Loading...");
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<UserDto>();
 
     useEffect(() => {
         // Fetch current user from local storage
-        const loadUser = () => {
+        const loadUserAndOrg = async () => {
             try {
                 const storedUserStr = localStorage.getItem("user");
                 if (storedUserStr) {
@@ -34,6 +36,19 @@ export default function ProfilePage() {
                         phone: storedUser.phone || "",
                         jobTitle: storedUser.jobTitle || "",
                     });
+
+                    // Fetch Organisation name
+                    if (storedUser.organisationId) {
+                        try {
+                            const org = await organisationService.get(storedUser.organisationId);
+                            setOrganisationName(org.name);
+                        } catch (e) {
+                            console.error("Failed to fetch organisation name:", e);
+                            setOrganisationName("Unknown Organisation");
+                        }
+                    } else {
+                        setOrganisationName("No Organisation Assigned");
+                    }
                 } else {
                     toast.error("User session not found. Please log in again.");
                 }
@@ -45,7 +60,7 @@ export default function ProfilePage() {
             }
         };
 
-        loadUser();
+        loadUserAndOrg();
     }, [reset]);
 
     const onSubmit = async (data: UserDto) => {
@@ -62,7 +77,6 @@ export default function ProfilePage() {
             // Preserve existing relationships that shouldn't be changed via this restricted form
             const updatePayload: UserDto = {
                 ...data,
-                organisationId: user.organisationId,
                 departmentId: user.departmentId,
                 roleId: user.roleId,
                 status: user.status
@@ -131,7 +145,7 @@ export default function ProfilePage() {
                         )}
                         <div className="flex items-center gap-3 text-sm text-slate-600">
                             <Building className="h-4 w-4 text-slate-400 shrink-0" />
-                            <span>Organisation ID: {user.organisationId || 'N/A'}</span>
+                            <span>{organisatonName}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm text-slate-600">
                             <Briefcase className="h-4 w-4 text-slate-400 shrink-0" />

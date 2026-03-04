@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, ArrowRightLeft, Hexagon, MapPin, Layers, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, ArrowRightLeft, Hexagon, MapPin, Layers, CheckCircle2, XCircle, ThumbsUp } from "lucide-react";
 import { useForm } from "react-hook-form";
 
 export default function TransfersPage() {
@@ -23,7 +23,6 @@ export default function TransfersPage() {
     const [departments, setDepartments] = useState<Department[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingTransfer, setEditingTransfer] = useState<AssetTransfer | null>(null);
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<AssetTransferDto>();
 
@@ -58,31 +57,14 @@ export default function TransfersPage() {
     const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
 
     const handleOpenCreate = () => {
-        setEditingTransfer(null);
         reset({
             assetId: "",
-            fromLocationId: "",
-            toLocationId: "",
             fromDepartmentId: "",
             toDepartmentId: "",
-            transferDate: new Date().toISOString().split('T')[0],
-            status: "PENDING",
-            reason: ""
-        });
-        setIsModalOpen(true);
-    };
-
-    const handleOpenEdit = (transfer: AssetTransfer) => {
-        setEditingTransfer(transfer);
-        reset({
-            assetId: transfer.assetId,
-            fromLocationId: transfer.fromLocationId || "",
-            toLocationId: transfer.toLocationId || "",
-            fromDepartmentId: transfer.fromDepartmentId || "",
-            toDepartmentId: transfer.toDepartmentId || "",
-            transferDate: transfer.transferDate ? transfer.transferDate.split('T')[0] : "",
-            status: transfer.status,
-            reason: transfer.reason || ""
+            fromLocationId: "",
+            toLocationId: "",
+            requestedById: "",
+            reason: "",
         });
         setIsModalOpen(true);
     };
@@ -99,60 +81,60 @@ export default function TransfersPage() {
         }
     };
 
-    const handleApprove = async (id: string, currentStatus: string) => {
-        if (currentStatus === 'COMPLETED') return;
+    const handleApprove = async (id: string) => {
         try {
-            // Let's assume there's an approve method or we just update status
-            const t = transfers.find(tr => tr.id === id);
-            if (t) {
-                await assetTransferService.update(id, {
-                    assetId: t.assetId,
-                    fromDepartmentId: t.fromDepartmentId,
-                    toDepartmentId: t.toDepartmentId,
-                    fromLocationId: t.fromLocationId,
-                    toLocationId: t.toLocationId,
-                    transferDate: t.transferDate,
-                    status: 'COMPLETED',
-                    reason: t.reason
-                });
-                toast.success("Transfer marked as COMPLETED");
-                fetchData();
-            }
+            await assetTransferService.approve(id);
+            toast.success("Transfer approved");
+            fetchData();
+        } catch (e) {
+            toast.error("Failed to approve transfer");
+        }
+    };
+
+    const handleReject = async (id: string) => {
+        try {
+            await assetTransferService.reject(id);
+            toast.success("Transfer rejected");
+            fetchData();
+        } catch (e) {
+            toast.error("Failed to reject transfer");
+        }
+    };
+
+    const handleComplete = async (id: string) => {
+        try {
+            await assetTransferService.complete(id);
+            toast.success("Transfer completed — asset moved");
+            fetchData();
         } catch (e) {
             toast.error("Failed to complete transfer");
         }
     };
 
     const onSubmit = async (data: AssetTransferDto) => {
-        try {
-            // Cleanup empty refs
-            if (!data.fromLocationId) delete data.fromLocationId;
-            if (!data.toLocationId) delete data.toLocationId;
-            if (!data.fromDepartmentId) delete data.fromDepartmentId;
-            if (!data.toDepartmentId) delete data.toDepartmentId;
+        // Remove empty optional fields
+        if (!data.fromLocationId) delete data.fromLocationId;
+        if (!data.toLocationId) delete data.toLocationId;
+        if (!data.reason) delete data.reason;
 
-            if (editingTransfer) {
-                await assetTransferService.update(editingTransfer.id!, data);
-                toast.success("Transfer updated");
-            } else {
-                await assetTransferService.create(data);
-                toast.success("Transfer created");
-            }
+        try {
+            await assetTransferService.create(data);
+            toast.success("Transfer requested successfully");
             setIsModalOpen(false);
             fetchData();
         } catch (error) {
-            toast.error("Failed to save transfer");
+            toast.error("Failed to create transfer request");
             console.error(error);
         }
     };
 
     const getStatusStyles = (status: string) => {
         switch (status) {
-            case 'COMPLETED': return "bg-emerald-100 text-emerald-700 border-emerald-200";
-            case 'PENDING': return "bg-blue-100 text-blue-700 border-blue-200";
-            case 'IN_TRANSIT': return "bg-indigo-100 text-indigo-700 border-indigo-200";
-            case 'CANCELLED': return "bg-slate-100 text-slate-700 border-slate-200";
-            default: return "bg-gray-100 text-gray-700 border-gray-200";
+            case "COMPLETED": return "bg-emerald-100 text-emerald-700 border-emerald-200";
+            case "REQUESTED": return "bg-blue-100 text-blue-700 border-blue-200";
+            case "APPROVED": return "bg-indigo-100 text-indigo-700 border-indigo-200";
+            case "CANCELLED": return "bg-red-100 text-red-700 border-red-200";
+            default: return "bg-slate-100 text-slate-700 border-slate-200";
         }
     };
 
@@ -161,7 +143,7 @@ export default function TransfersPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Asset Transfers</h1>
-                    <p className="text-slate-500">Relocate assets between physical locations or departments.</p>
+                    <p className="text-slate-500">Relocate assets between departments or locations.</p>
                 </div>
                 <Button onClick={handleOpenCreate} className="bg-indigo-600 hover:bg-indigo-700">
                     <Plus className="mr-2 h-4 w-4" /> Request Transfer
@@ -177,8 +159,8 @@ export default function TransfersPage() {
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
                         <ArrowRightLeft className="h-12 w-12 text-slate-300 mb-4" />
                         <h3 className="text-lg font-medium text-slate-900">No transfers found</h3>
-                        <p className="text-slate-500 mt-1 max-w-sm">Move assets securely between branches or hand them over to different departments.</p>
-                        <Button onClick={handleOpenCreate} className="mt-6 border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300">
+                        <p className="text-slate-500 mt-1 max-w-sm">Move assets securely between departments.</p>
+                        <Button onClick={handleOpenCreate} className="mt-6 border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
                             Request Transfer
                         </Button>
                     </div>
@@ -194,8 +176,8 @@ export default function TransfersPage() {
                                                 {assetMap.get(transfer.assetId) || "Unknown Asset"}
                                             </span>
                                         </CardTitle>
-                                        <div className={`px-2 flex items-center h-5 text-[10px] font-bold rounded-full border shrink-0 ${getStatusStyles(transfer.status || 'PENDING')}`}>
-                                            {(transfer.status || 'PENDING').replace('_', ' ')}
+                                        <div className={`px-2 flex items-center h-5 text-[10px] font-bold rounded-full border shrink-0 ${getStatusStyles(transfer.status || "REQUESTED")}`}>
+                                            {(transfer.status || "REQUESTED").replace("_", " ")}
                                         </div>
                                     </div>
                                     <div className="text-xs text-slate-500 font-mono mt-0.5 ml-5">
@@ -207,48 +189,44 @@ export default function TransfersPage() {
                                 <div className="space-y-4 text-sm text-slate-600 flex-1 relative">
                                     <div className="absolute left-[8px] top-[20px] bottom-[20px] w-0.5 bg-slate-200 z-0"></div>
 
-                                    {/* FROM Block */}
+                                    {/* FROM */}
                                     <div className="relative z-10 flex gap-3 pb-2">
                                         <div className="mt-0.5 w-4 h-4 rounded-full bg-slate-200 border-2 border-white flex-shrink-0 shadow-sm"></div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">From</p>
-                                            {(transfer.fromLocationId || transfer.fromDepartmentId) ? (
-                                                <div className="bg-slate-50 rounded p-2 border border-slate-100">
-                                                    {transfer.fromLocationId && (
-                                                        <div className="flex items-center gap-1.5 text-slate-700 truncate" title={locationMap.get(transfer.fromLocationId)}>
-                                                            <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                                                            <span className="truncate">{locationMap.get(transfer.fromLocationId)}</span>
-                                                        </div>
-                                                    )}
-                                                    {transfer.fromDepartmentId && (
-                                                        <div className="flex items-center gap-1.5 text-slate-700 truncate mt-1" title={deptMap.get(transfer.fromDepartmentId)}>
-                                                            <Layers className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                                                            <span className="truncate">{deptMap.get(transfer.fromDepartmentId)}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="text-slate-400 italic">Unassigned</span>
-                                            )}
+                                            <div className="bg-slate-50 rounded p-2 border border-slate-100">
+                                                {transfer.fromDepartmentId && (
+                                                    <div className="flex items-center gap-1.5 text-slate-700 truncate">
+                                                        <Layers className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                                        <span className="truncate">{deptMap.get(transfer.fromDepartmentId) || transfer.fromDepartmentId}</span>
+                                                    </div>
+                                                )}
+                                                {transfer.fromLocationId && (
+                                                    <div className="flex items-center gap-1.5 text-slate-700 truncate mt-1">
+                                                        <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                                        <span className="truncate">{locationMap.get(transfer.fromLocationId)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* TO Block */}
+                                    {/* TO */}
                                     <div className="relative z-10 flex gap-3 pt-2">
                                         <div className="mt-0.5 w-4 h-4 rounded-full bg-indigo-500 border-2 border-white flex-shrink-0 shadow-sm"></div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-1">To</p>
                                             <div className="bg-indigo-50/50 rounded p-2 border border-indigo-100">
-                                                {transfer.toLocationId ? (
-                                                    <div className="flex items-center gap-1.5 text-indigo-900 truncate" title={locationMap.get(transfer.toLocationId)}>
+                                                {transfer.toDepartmentId && (
+                                                    <div className="flex items-center gap-1.5 text-indigo-900 truncate">
+                                                        <Layers className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
+                                                        <span className="truncate">{deptMap.get(transfer.toDepartmentId) || transfer.toDepartmentId}</span>
+                                                    </div>
+                                                )}
+                                                {transfer.toLocationId && (
+                                                    <div className="flex items-center gap-1.5 text-indigo-900 truncate mt-1">
                                                         <MapPin className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
                                                         <span className="truncate">{locationMap.get(transfer.toLocationId)}</span>
-                                                    </div>
-                                                ) : <span className="text-indigo-300 italic">-</span>}
-                                                {transfer.toDepartmentId && (
-                                                    <div className="flex items-center gap-1.5 text-indigo-900 truncate mt-1" title={deptMap.get(transfer.toDepartmentId)}>
-                                                        <Layers className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
-                                                        <span className="truncate">{deptMap.get(transfer.toDepartmentId)}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -258,18 +236,25 @@ export default function TransfersPage() {
 
                                 <div className="flex justify-between items-center gap-2 pt-4 border-t border-slate-100 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <div className="text-xs text-slate-400 font-medium">
-                                        {new Date(transfer.createdAt || transfer.transferDate || new Date()).toLocaleDateString()}
+                                        {new Date(transfer.createdAt || new Date()).toLocaleDateString()}
                                     </div>
                                     <div className="flex gap-1.5">
-                                        {transfer.status !== 'COMPLETED' && (
-                                            <Button variant="ghost" size="sm" onClick={() => handleApprove(transfer.id!, transfer.status || 'PENDING')} className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Complete Transfer">
+                                        {transfer.status === "REQUESTED" && (
+                                            <Button variant="ghost" size="sm" onClick={() => handleApprove(transfer.id!)} className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50" title="Approve">
+                                                <ThumbsUp className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                        {transfer.status === "REQUESTED" && (
+                                            <Button variant="ghost" size="sm" onClick={() => handleReject(transfer.id!)} className="h-8 w-8 p-0 text-amber-600 hover:bg-amber-50" title="Reject">
+                                                <XCircle className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                        {transfer.status === "APPROVED" && (
+                                            <Button variant="ghost" size="sm" onClick={() => handleComplete(transfer.id!)} className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50" title="Complete Transfer">
                                                 <CheckCircle2 className="h-4 w-4" />
                                             </Button>
                                         )}
-                                        <Button variant="outline" size="sm" onClick={() => handleOpenEdit(transfer)} className="h-8 w-8 p-0">
-                                            <Pencil className="h-3.5 w-3.5" />
-                                        </Button>
-                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(transfer.id!)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(transfer.id!)} className="h-8 w-8 p-0 text-red-600 hover:bg-red-50" title="Delete">
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>
@@ -283,56 +268,47 @@ export default function TransfersPage() {
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                title={editingTransfer ? "Edit Transfer" : "Relocate Asset"}
-                description={editingTransfer ? "Update transfer logistics." : "Move an asset to a new location or department."}
+                title="Request Asset Transfer"
+                description="Move an asset to a new department or location."
             >
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
                     <div className="space-y-2">
-                        <Label htmlFor="assetId">Target Asset <span className="text-red-500">*</span></Label>
-                        <Select id="assetId" {...register("assetId", { required: "Asset is required" })} disabled={!!editingTransfer}>
+                        <Label htmlFor="assetId">Asset <span className="text-red-500">*</span></Label>
+                        <Select id="assetId" {...register("assetId", { required: "Asset is required" })}>
                             <option value="">Select Asset</option>
                             {assets.map((a) => (
-                                <option key={a.id} value={a.id}>{a.name} ({a.assetTag || 'NO-TAG'})</option>
+                                <option key={a.id} value={a.id}>{a.name} ({a.assetTag || "NO-TAG"})</option>
                             ))}
                         </Select>
                         {errors.assetId && <p className="text-sm text-red-500">{errors.assetId.message as string}</p>}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 border-t pt-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="transferDate">Transfer Date <span className="text-red-500">*</span></Label>
-                            <Input id="transferDate" type="date" {...register("transferDate", { required: true })} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="status">Status</Label>
-                            <Select id="status" {...register("status")}>
-                                <option value="PENDING">PENDING</option>
-                                <option value="IN_TRANSIT">IN TRANSIT</option>
-                                <option value="COMPLETED">COMPLETED</option>
-                                <option value="CANCELLED">CANCELLED</option>
-                            </Select>
-                        </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="requestedById">Requested By (User ID) <span className="text-red-500">*</span></Label>
+                        <Input id="requestedById" placeholder="uuid of the requesting user" {...register("requestedById", { required: "Requester is required" })} />
+                        {errors.requestedById && <p className="text-sm text-red-500">{errors.requestedById.message as string}</p>}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
                         <div className="col-span-full mb-1">
-                            <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><ArrowRightLeft className="h-4 w-4" /> Origin details</h4>
+                            <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5"><ArrowRightLeft className="h-4 w-4" /> Origin</h4>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="fromLocationId" className="text-xs">From Location</Label>
-                            <Select id="fromLocationId" {...register("fromLocationId")}>
-                                <option value="">Unknown / Same Location</option>
-                                {locations.map((loc) => (
-                                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                            <Label htmlFor="fromDepartmentId" className="text-xs">From Department <span className="text-red-500">*</span></Label>
+                            <Select id="fromDepartmentId" {...register("fromDepartmentId", { required: "Origin department required" })}>
+                                <option value="">Select Department</option>
+                                {departments.map((d) => (
+                                    <option key={d.id} value={d.id}>{d.name}</option>
                                 ))}
                             </Select>
+                            {errors.fromDepartmentId && <p className="text-sm text-red-500">{errors.fromDepartmentId.message as string}</p>}
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="fromDepartmentId" className="text-xs">From Department</Label>
-                            <Select id="fromDepartmentId" {...register("fromDepartmentId")}>
-                                <option value="">Unknown / Same Dept</option>
-                                {departments.map((dept) => (
-                                    <option key={dept.id} value={dept.id}>{dept.name}</option>
+                            <Label htmlFor="fromLocationId" className="text-xs">From Location (optional)</Label>
+                            <Select id="fromLocationId" {...register("fromLocationId")}>
+                                <option value="">None</option>
+                                {locations.map((l) => (
+                                    <option key={l.id} value={l.id}>{l.name}</option>
                                 ))}
                             </Select>
                         </div>
@@ -340,23 +316,24 @@ export default function TransfersPage() {
 
                     <div className="grid grid-cols-2 gap-4 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100">
                         <div className="col-span-full mb-1">
-                            <h4 className="text-sm font-semibold text-indigo-900 flex items-center gap-1.5"><ArrowRightLeft className="h-4 w-4 text-indigo-500" /> Destination details</h4>
+                            <h4 className="text-sm font-semibold text-indigo-900 flex items-center gap-1.5"><ArrowRightLeft className="h-4 w-4 text-indigo-500" /> Destination</h4>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="toLocationId" className="text-xs text-indigo-800">To Location</Label>
-                            <Select id="toLocationId" {...register("toLocationId")}>
-                                <option value="">Select Destination Location</option>
-                                {locations.map((loc) => (
-                                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                            <Label htmlFor="toDepartmentId" className="text-xs text-indigo-800">To Department <span className="text-red-500">*</span></Label>
+                            <Select id="toDepartmentId" {...register("toDepartmentId", { required: "Destination department required" })}>
+                                <option value="">Select Department</option>
+                                {departments.map((d) => (
+                                    <option key={d.id} value={d.id}>{d.name}</option>
                                 ))}
                             </Select>
+                            {errors.toDepartmentId && <p className="text-sm text-red-500">{errors.toDepartmentId.message as string}</p>}
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="toDepartmentId" className="text-xs text-indigo-800">To Department</Label>
-                            <Select id="toDepartmentId" {...register("toDepartmentId")}>
-                                <option value="">Select Destination Dept</option>
-                                {departments.map((dept) => (
-                                    <option key={dept.id} value={dept.id}>{dept.name}</option>
+                            <Label htmlFor="toLocationId" className="text-xs text-indigo-800">To Location (optional)</Label>
+                            <Select id="toLocationId" {...register("toLocationId")}>
+                                <option value="">None</option>
+                                {locations.map((l) => (
+                                    <option key={l.id} value={l.id}>{l.name}</option>
                                 ))}
                             </Select>
                         </div>
@@ -372,7 +349,7 @@ export default function TransfersPage() {
                             Cancel
                         </Button>
                         <Button type="submit" isLoading={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700">
-                            {editingTransfer ? "Save Changes" : "Create Transfer"}
+                            Submit Request
                         </Button>
                     </div>
                 </form>

@@ -5,47 +5,54 @@ export interface TransferFilterParams {
     assetId?: string;
     fromDepartmentId?: string;
     toDepartmentId?: string;
+    requestedById?: string;
 }
 
 export const assetTransferService = {
-    getAll: async (params?: TransferFilterParams) => {
+    /** GET /asset-transfers — all for org (JWT-scoped) */
+    getAll: async (params?: TransferFilterParams): Promise<AssetTransfer[]> => {
         const response = await api.get<AssetTransfer[]>("/asset-transfers", { params });
         return response.data;
     },
 
-    get: async (id: string) => {
+    /** GET /asset-transfers/{id} */
+    get: async (id: string): Promise<AssetTransfer> => {
         const response = await api.get<AssetTransfer>(`/asset-transfers/${id}`);
         return response.data;
     },
 
+    /** POST /asset-transfers */
     create: async (data: AssetTransferDto): Promise<AssetTransfer> => {
-        const response = await api.post('/asset-transfers', data);
+        const response = await api.post<AssetTransfer>("/asset-transfers", data);
         return response.data;
     },
 
-    update: async (id: string, data: AssetTransferDto): Promise<AssetTransfer> => {
-        const response = await api.put(`/asset-transfers/${id}`, data);
+    /**
+     * POST /asset-transfers/{id}/approve
+     * Approver is the currently authenticated user — no body or params needed.
+     */
+    approve: async (id: string): Promise<AssetTransfer> => {
+        const response = await api.post<AssetTransfer>(`/asset-transfers/${id}/approve`);
         return response.data;
     },
 
-    approve: async (id: string, approvedById: string) => {
-        const response = await api.post<AssetTransfer>(`/asset-transfers/${id}/approve`, null, {
-            params: { approvedById }
-        });
-        return response.data;
-    },
-
-    reject: async (id: string) => {
+    /** POST /asset-transfers/{id}/reject */
+    reject: async (id: string): Promise<AssetTransfer> => {
         const response = await api.post<AssetTransfer>(`/asset-transfers/${id}/reject`);
         return response.data;
     },
 
-    complete: async (id: string) => {
+    /**
+     * POST /asset-transfers/{id}/complete
+     * Moves the asset to toDepartment/toLocation, sets status → COMPLETED.
+     */
+    complete: async (id: string): Promise<AssetTransfer> => {
         const response = await api.post<AssetTransfer>(`/asset-transfers/${id}/complete`);
         return response.data;
     },
 
-    delete: async (id: string) => {
-        await api.delete(`/asset-transfers/${id}`); // Assumes exist according to API doc
+    /** DELETE /asset-transfers/{id} — ADMIN only */
+    delete: async (id: string): Promise<void> => {
+        await api.delete(`/asset-transfers/${id}`);
     },
 };

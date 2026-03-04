@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Audit, AuditDto, Asset, User } from "@/types";
+import { Audit, AssetAuditDto, Department, User, AuditStatus } from "@/types";
 import { auditService } from "@/services/auditService";
-import { assetService } from "@/services/assetService";
+import { departmentService } from "@/services/departmentService";
 import { userService } from "@/services/userService";
+import { authService } from "@/services/authService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
@@ -12,30 +13,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, ClipboardCheck, Calendar, Hexagon, User as UserIcon, CheckSquare, XSquare } from "lucide-react";
+import { Plus, Pencil, Trash2, ClipboardCheck, Calendar, Layers, User as UserIcon, CheckSquare, XSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
 
 export default function AuditsPage() {
     const [audits, setAudits] = useState<Audit[]>([]);
-    const [assets, setAssets] = useState<Asset[]>([]);
+    const [departments, setDepartments] = useState<Department[]>([]);
     const [users, setUsers] = useState<User[]>([]);
+    const [orgId, setOrgId] = useState<string>("");
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAudit, setEditingAudit] = useState<Audit | null>(null);
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<AuditDto>();
+    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<AssetAuditDto>();
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const [auditsData, assetsData, usersData] = await Promise.all([
+            const [auditsData, deptsData, usersData, profileData] = await Promise.all([
                 auditService.getAll(),
-                assetService.getAll(),
-                userService.getAll()
+                departmentService.getAll(),
+                userService.getAll(),
+                authService.getProfile(),
             ]);
             setAudits(auditsData);
-            setAssets(assetsData);
+            setDepartments(deptsData);
             setUsers(usersData);
+            setOrgId((profileData as any).organisationId || "");
         } catch (error) {
             toast.error("Failed to load audit records");
             console.error(error);
@@ -48,19 +52,18 @@ export default function AuditsPage() {
         fetchData();
     }, []);
 
-    const assetMap = useMemo(() => new Map(assets.map(a => [a.id, a.name])), [assets]);
-    const assetTagMap = useMemo(() => new Map(assets.map(a => [a.id, a.assetTag])), [assets]);
+    const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
     const userMap = useMemo(() => new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`])), [users]);
 
     const handleOpenCreate = () => {
         setEditingAudit(null);
         reset({
-            assetId: "", // Keep assetId for now, as it's used in the form
+            organisationId: orgId,
             departmentId: "",
             auditDate: new Date().toISOString().split('T')[0],
             conductedById: "",
-            status: "PENDING",
-            remarks: ""
+            status: AuditStatus.PLANNED,
+            remarks: "",
         });
         setIsModalOpen(true);
     };
@@ -68,12 +71,11 @@ export default function AuditsPage() {
     const handleEdit = (audit: Audit) => {
         setEditingAudit(audit);
         reset({
-            assetId: audit.assetId, // Keep assetId for now, as it's used in the form
             organisationId: audit.organisationId || "",
             departmentId: audit.departmentId || "",
             auditDate: audit.auditDate ? new Date(audit.auditDate).toISOString().split('T')[0] : "",
             conductedById: audit.conductedById || "",
-            status: audit.status || "PENDING",
+            status: audit.status as AuditStatus || AuditStatus.PLANNED,
             remarks: audit.remarks || ""
         });
         setIsModalOpen(true);
@@ -91,39 +93,25 @@ export default function AuditsPage() {
         }
     };
 
-    const handlePass = async (id: string) => {
+    const handleMarkStatus = async (id: string, status: AuditStatus) => {
         try {
-            await auditService.updateStatus(id, "PASSED");
-            toast.success("Audit marked as Passed");
+            await auditService.updateStatus(id, status);
+            toast.success(`Audit status updated to ${status.replace(/_/g, ' ')}`);
             fetchData();
         } catch (error) {
             toast.error("Failed to update status");
         }
     };
 
-    const handleFail = async (id: string) => {
+    const onSubmit = async (data: AssetAuditDto) => {
         try {
-            await auditService.updateStatus(id, "FAILED");
-            toast.error("Audit marked as Failed");
-            fetchData();
-        } catch (error) {
-            toast.error("Failed to update status");
-        }
-    };
-
-    const onSubmit = async (data: AuditDto) => {
-        try {
-            if (data.conductedById === "") delete data.conductedById;
-            if (data.departmentId === "") delete data.departmentId;
-            if (data.remarks === "") delete data.remarks;
-            if (data.organisationId === "") delete data.organisationId;
-
             if (editingAudit) {
-                // The instruction implies updateStatus, but the original code was update(id, data).
-                // Sticking to the instruction for updateStatus, but if full data update is needed, this might change.
+                // On edit, only status can be PATCH'd via API
                 await auditService.updateStatus(editingAudit.id!, data.status!);
-                toast.success("Audit updated successfully");
+                toast.success("Audit status updated");
             } else {
+                // Ensure organisationId is set from profile
+                if (!data.organisationId) data.organisationId = orgId;
                 await auditService.create(data);
                 toast.success("Audit scheduled");
             }
@@ -137,10 +125,10 @@ export default function AuditsPage() {
 
     const getStatusStyles = (status: string) => {
         switch (status) {
-            case 'PASSED': return "bg-emerald-100 text-emerald-700 border-emerald-200";
-            case 'PENDING': return "bg-blue-100 text-blue-700 border-blue-200";
-            case 'IN_PROGRESS': return "bg-amber-100 text-amber-700 border-amber-200";
-            case 'FAILED': return "bg-red-100 text-red-700 border-red-200";
+            case AuditStatus.COMPLETED: return "bg-emerald-100 text-emerald-700 border-emerald-200";
+            case AuditStatus.PLANNED: return "bg-blue-100 text-blue-700 border-blue-200";
+            case AuditStatus.IN_PROGRESS: return "bg-amber-100 text-amber-700 border-amber-200";
+            case AuditStatus.CANCELLED: return "bg-red-100 text-red-700 border-red-200";
             default: return "bg-gray-100 text-gray-700 border-gray-200";
         }
     };
@@ -173,29 +161,26 @@ export default function AuditsPage() {
                     </div>
                 ) : (
                     audits.map((audit) => (
-                        <Card key={audit.id} className={`overflow-hidden hover:shadow-md transition-all group border-l-4 ${audit.status === 'PASSED' ? 'border-l-emerald-500' :
-                            audit.status === 'FAILED' ? 'border-l-red-500' :
-                                audit.status === 'IN_PROGRESS' ? 'border-l-amber-500' :
+                        <Card key={audit.id} className={`overflow-hidden hover:shadow-md transition-all group border-l-4 ${audit.status === AuditStatus.COMPLETED ? 'border-l-emerald-500' :
+                            audit.status === AuditStatus.CANCELLED ? 'border-l-red-500' :
+                                audit.status === AuditStatus.IN_PROGRESS ? 'border-l-amber-500' :
                                     'border-l-blue-500'
                             }`}>
                             <CardHeader className="flex flex-row items-baseline justify-between space-y-0 pb-3 bg-slate-50/50 border-b border-slate-100">
                                 <div className="truncate pr-2 w-full">
                                     <div className="flex justify-between items-start mb-1">
-                                        <CardTitle className="text-sm font-semibold text-slate-900 flex items-center gap-1.5 truncate pr-2" title={assetMap.get(audit.assetId || "") || audit.assetId}>
-                                            <Hexagon className="h-3.5 w-3.5 text-fuchsia-600" />
-                                            {audit.auditDate ? new Date(audit.auditDate).toLocaleDateString() : "No Date"}
+                                        <CardTitle className="text-sm font-semibold text-slate-900 flex items-center gap-1.5 truncate pr-2">
+                                            <ClipboardCheck className="h-3.5 w-3.5 text-fuchsia-600" />
+                                            {deptMap.get(audit.departmentId || "") || "Department Audit"}
                                         </CardTitle>
                                         <div className="flex flex-col items-end gap-1">
                                             <div className="text-xs font-semibold text-slate-800">
                                                 {audit.auditDate ? new Date(audit.auditDate).toLocaleDateString() : ""}
                                             </div>
-                                            <div className={`px-2 flex items-center h-5 text-[10px] font-bold rounded-full border shrink-0 ${getStatusStyles(audit.status || 'PENDING')}`}>
-                                                {audit.status?.replace('_', ' ')}
+                                            <div className={`px-2 flex items-center h-5 text-[10px] font-bold rounded-full border shrink-0 ${getStatusStyles(audit.status || 'PLANNED')}`}>
+                                                {audit.status?.replace(/_/g, ' ')}
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="text-xs text-slate-500 font-mono mt-0.5 ml-5">
-                                        {assetTagMap.get(audit.assetId || "") || ""}
                                     </div>
                                 </div>
                             </CardHeader>
@@ -224,12 +209,17 @@ export default function AuditsPage() {
 
                                 <div className="flex justify-between items-center gap-2 pt-4 border-t border-slate-100 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <div className="flex gap-1">
-                                        {(audit.status === 'PENDING' || audit.status === 'IN_PROGRESS') && (
+                                        {(audit.status === AuditStatus.PLANNED) && (
+                                            <Button variant="ghost" size="sm" onClick={() => handleMarkStatus(audit.id!, AuditStatus.IN_PROGRESS)} className="h-8 gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50" title="Start Audit">
+                                                <ClipboardCheck className="h-4 w-4" /> Start
+                                            </Button>
+                                        )}
+                                        {audit.status === AuditStatus.IN_PROGRESS && (
                                             <>
-                                                <Button variant="ghost" size="sm" onClick={() => handlePass(audit.id!)} className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Pass Audit">
+                                                <Button variant="ghost" size="sm" onClick={() => handleMarkStatus(audit.id!, AuditStatus.COMPLETED)} className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Mark Completed">
                                                     <CheckSquare className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => handleFail(audit.id!)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50" title="Fail Audit">
+                                                <Button variant="ghost" size="sm" onClick={() => handleMarkStatus(audit.id!, AuditStatus.CANCELLED)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50" title="Cancel">
                                                     <XSquare className="h-4 w-4" />
                                                 </Button>
                                             </>
@@ -259,15 +249,18 @@ export default function AuditsPage() {
                 description={editingAudit ? "Update the audit findings." : "Schedule an asset for review or inspection."}
             >
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+                    {/* Hidden organisationId - read from profile */}
+                    <input type="hidden" {...register("organisationId")} value={editingAudit ? (editingAudit.organisationId || orgId) : orgId} />
+
                     <div className="space-y-2">
-                        <Label htmlFor="assetId">Target Asset <span className="text-red-500">*</span></Label>
-                        <Select id="assetId" {...register("assetId", { required: "Asset is required" })} disabled={!!editingAudit}>
-                            <option value="">Select Asset</option>
-                            {assets.map((a) => (
-                                <option key={a.id} value={a.id}>{a.name} ({a.assetTag || 'NO-TAG'})</option>
+                        <Label htmlFor="departmentId">Target Department <span className="text-red-500">*</span></Label>
+                        <Select id="departmentId" {...register("departmentId", { required: "Department is required" })} disabled={!!editingAudit}>
+                            <option value="">Select Department</option>
+                            {departments.map((d) => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
                             ))}
                         </Select>
-                        {errors.assetId && <p className="text-sm text-red-500">{errors.assetId.message as string}</p>}
+                        {errors.departmentId && <p className="text-sm text-red-500">{errors.departmentId.message as string}</p>}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -276,12 +269,11 @@ export default function AuditsPage() {
                             <Input id="auditDate" type="date" {...register("auditDate", { required: true })} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="departmentId">Department to Audit</Label>
-                            <Select id="departmentId" {...register("departmentId", { required: true })}>
-                                <option value="PENDING">PENDING</option>
-                                <option value="IN_PROGRESS">IN PROGRESS</option>
-                                <option value="PASSED">PASSED</option>
-                                <option value="FAILED">FAILED</option>
+                            <Label htmlFor="status">Audit Status</Label>
+                            <Select id="status" {...register("status", { required: true })}>
+                                {Object.values(AuditStatus).map((s) => (
+                                    <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                                ))}
                             </Select>
                         </div>
                     </div>

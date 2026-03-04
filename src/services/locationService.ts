@@ -2,33 +2,38 @@ import api from "@/lib/axios";
 import { Location, LocationDto } from "@/types";
 
 export const locationService = {
-    getAll: async (organisationId?: string) => {
-        const params = organisationId ? { organisationId } : undefined;
-        const response = await api.get<Location[]>("/locations", { params });
+    /** GET /locations — all in org (JWT-scoped) */
+    getAll: async (): Promise<Location[]> => {
+        const response = await api.get<Location[]>("/locations");
         return response.data;
     },
 
-    get: async (id: string) => {
+    /** GET /locations/{id} */
+    get: async (id: string): Promise<Location> => {
         const response = await api.get<Location>(`/locations/${id}`);
         return response.data;
     },
 
-    getSubLocations: async (parentId: string) => {
+    /** GET /locations/{parentId}/sub-locations */
+    getSubLocations: async (parentId: string): Promise<Location[]> => {
         const response = await api.get<Location[]>(`/locations/${parentId}/sub-locations`);
         return response.data;
     },
 
-    create: async (data: LocationDto) => {
+    /** POST /locations */
+    create: async (data: LocationDto): Promise<Location> => {
         const response = await api.post<Location>("/locations", data);
         return response.data;
     },
 
-    update: async (id: string, data: LocationDto) => {
+    /** PUT /locations/{id} */
+    update: async (id: string, data: LocationDto): Promise<Location> => {
         const response = await api.put<Location>(`/locations/${id}`, data);
         return response.data;
     },
 
-    delete: async (id: string) => {
+    /** DELETE /locations/{id} — soft delete */
+    delete: async (id: string): Promise<void> => {
         await api.delete(`/locations/${id}`);
     },
 };

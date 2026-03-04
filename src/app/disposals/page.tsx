@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { DisposalRecord, DisposalRecordDto, Asset, AssetState, DisposalMethod } from "@/types";
+import { DisposalRecord, DisposalsDto, Asset, AssetState, DisposalMethod } from "@/types";
 import { disposalService } from "@/services/disposalService";
 import { assetService } from "@/services/assetService";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ export default function DisposalsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDisposal, setEditingDisposal] = useState<DisposalRecord | null>(null);
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<DisposalRecordDto>();
+    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<DisposalsDto>();
 
     const fetchData = async () => {
         try {
@@ -87,20 +87,26 @@ export default function DisposalsPage() {
         }
     };
 
-    const onSubmit = async (data: DisposalRecordDto) => {
+    const onSubmit = async (data: DisposalsDto) => {
         try {
             data.saleValue = Number(data.saleValue);
-            if (!data.approvedById) delete data.approvedById;
+
+            // Clean empty strings
+            Object.keys(data).forEach(key => {
+                const k = key as keyof DisposalsDto;
+                if (data[k] === "") {
+                    delete (data as any)[k];
+                }
+            });
 
             if (editingDisposal) {
                 await disposalService.update(editingDisposal.id!, data);
                 toast.success("Disposal record updated");
             } else {
-                await disposalService.create(data);
 
-                // Optimistically update the asset state here if you want:
-                // await assetService.update(data.assetId, { ...assets.find(a=>a.id === data.assetId), status: 'DISPOSED' } as any);
-                toast.success("Asset marked for disposal");
+
+                await disposalService.create(data);
+                toast.success("Asset disposed successfully");
             }
             setIsModalOpen(false);
             fetchData();
@@ -112,10 +118,11 @@ export default function DisposalsPage() {
 
     const getMethodStyles = (method: string) => {
         switch (method) {
-            case 'SOLD': return "bg-emerald-100 text-emerald-800 border-emerald-200";
-            case 'DONATED': return "bg-blue-100 text-blue-800 border-blue-200";
-            case 'RECYCLED': return "bg-teal-100 text-teal-800 border-teal-200";
-            case 'SCRAPPED': return "bg-slate-200 text-slate-800 border-slate-300";
+            case 'SALE': return "bg-emerald-100 text-emerald-800 border-emerald-200";
+            case 'AUCTION': return "bg-violet-100 text-violet-800 border-violet-200";
+            case 'DONATION': return "bg-blue-100 text-blue-800 border-blue-200";
+            case 'SCRAP': return "bg-slate-200 text-slate-800 border-slate-300";
+            case 'RETURN_TO_VENDOR': return "bg-orange-100 text-orange-800 border-orange-200";
             default: return "bg-gray-100 text-gray-800 border-gray-200";
         }
     };
@@ -236,11 +243,12 @@ export default function DisposalsPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="disposalMethod">Disposal Method</Label>
-                            <Select id="disposalMethod" {...register("disposalMethod")}>
-                                <option value="SCRAP">Scrapped / Trashed</option>
-                                <option value="SALE">Sold</option>
-                                <option value="DONATION">Donated</option>
-                                <option value="RECYCLING">Recycled</option>
+                            <Select id="disposalMethod" {...register("disposalMethod", { required: true })}>
+                                <option value="SALE">SALE — Sold to buyer</option>
+                                <option value="AUCTION">AUCTION — Sold at auction</option>
+                                <option value="SCRAP">SCRAP — Scrapped / recycled</option>
+                                <option value="DONATION">DONATION — Donated</option>
+                                <option value="RETURN_TO_VENDOR">RETURN TO VENDOR</option>
                             </Select>
                         </div>
                     </div>

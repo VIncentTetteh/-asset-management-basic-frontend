@@ -10,7 +10,7 @@ import {
 
 import {
     Asset, AssetDto, Department, Organisation, Category, Location, Supplier,
-    AssetState, AssetCondition, AssetType, DepreciationMethod
+    AssetStatus, AssetCondition, AssetType, DepreciationMethod, PurchaseOrder
 } from "@/types";
 
 import { assetService } from "@/services/assetService";
@@ -19,6 +19,7 @@ import { organisationService } from "@/services/organisationService";
 import { categoryService } from "@/services/categoryService";
 import { locationService } from "@/services/locationService";
 import { supplierService } from "@/services/supplierService";
+import { purchaseOrderService } from "@/services/purchaseOrderService";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -37,6 +38,7 @@ export default function AssetsPage() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [locations, setLocations] = useState<Location[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,23 +49,38 @@ export default function AssetsPage() {
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const [
-                assetsData, deptsData, orgsData, catsData, locsData, suppsData
-            ] = await Promise.all([
+            const results = await Promise.allSettled([
                 assetService.getAll(),
                 departmentService.getAll(),
                 organisationService.getAll(),
                 categoryService.getAll(),
                 locationService.getAll(),
-                supplierService.getAll()
+                supplierService.getAll(),
+                purchaseOrderService.getAll()
             ]);
 
-            setAssets(assetsData);
-            setDepartments(deptsData);
-            setOrganisations(orgsData);
-            setCategories(catsData);
-            setLocations(locsData);
-            setSuppliers(suppsData);
+            const safeGet = <T,>(result: PromiseSettledResult<T[]>, name: string): T[] => {
+                if (result.status === "fulfilled") return result.value;
+                console.warn(`[Assets] Failed to load ${name}:`, (result as PromiseRejectedResult).reason);
+                return [];
+            };
+
+            const assetsResult = results[0];
+            if (assetsResult.status === "rejected") {
+                toast.error("Failed to load assets");
+                console.error("[Assets] Asset fetch failed:", assetsResult.reason);
+            } else {
+                setAssets(assetsResult.value);
+            }
+
+            setDepartments(safeGet(results[1] as PromiseSettledResult<Department[]>, "departments"));
+            setOrganisations(safeGet(results[2] as PromiseSettledResult<Organisation[]>, "organisations"));
+            setCategories(safeGet(results[3] as PromiseSettledResult<Category[]>, "categories"));
+            setLocations(safeGet(results[4] as PromiseSettledResult<Location[]>, "locations"));
+            setSuppliers(safeGet(results[5] as PromiseSettledResult<Supplier[]>, "suppliers"));
+            const posResult = safeGet(results[6] as PromiseSettledResult<PurchaseOrder[]>, "purchase orders");
+            setPurchaseOrders(Array.isArray(posResult) ? posResult : []);
+
         } catch (error) {
             toast.error("Failed to load data");
             console.error(error);
@@ -101,11 +118,10 @@ export default function AssetsPage() {
             usefulLifeMonths: 36,
             residualValue: 0,
             warrantyExpiryDate: "",
-            status: AssetState.IN_STOCK,
+            status: AssetStatus.IN_STOCK,
             condition: AssetCondition.NEW,
             locationId: "",
             departmentId: "",
-            organisationId: "",
             supplierId: "",
             assignedUserId: ""
         });
@@ -120,7 +136,7 @@ export default function AssetsPage() {
             serialNumber: asset.serialNumber,
             barcodeQrCode: asset.barcodeQrCode,
             description: asset.description,
-            categoryId: asset.categoryId || asset.category,
+            categoryId: asset.categoryId,
             assetType: asset.assetType,
             manufacturer: asset.manufacturer,
             model: asset.model,
@@ -128,14 +144,13 @@ export default function AssetsPage() {
             purchaseCost: asset.purchaseCost,
             currency: asset.currency || "USD",
             depreciationMethod: asset.depreciationMethod,
-            usefulLifeMonths: asset.usefulLifeMonths || (asset.usefulLifeInYears ? asset.usefulLifeInYears * 12 : 36),
+            usefulLifeMonths: asset.usefulLifeMonths || 36,
             residualValue: asset.residualValue,
             warrantyExpiryDate: asset.warrantyExpiryDate ? asset.warrantyExpiryDate.split('T')[0] : "",
-            status: (asset.status as AssetState) || (asset.state as AssetState),
+            status: asset.status as AssetStatus,
             condition: asset.condition,
             locationId: asset.locationId || "",
             departmentId: asset.departmentId || "",
-            organisationId: asset.organisationId || "",
             supplierId: asset.supplierId || "",
             assignedUserId: asset.assignedUserId || ""
         });
@@ -156,28 +171,21 @@ export default function AssetsPage() {
 
     const onSubmit = async (data: AssetDto) => {
         try {
-            // Clean up payload
+            // Clean up payload: coerce numeric fields
             data.purchaseCost = Number(data.purchaseCost);
             data.usefulLifeMonths = Number(data.usefulLifeMonths);
             data.residualValue = Number(data.residualValue);
 
-            // Remove empty strings
-            Object.keys(data).forEach(key => {
-                const k = key as keyof AssetDto;
-                if (data[k] === "") delete data[k];
+            // Remove empty optional strings (send null/absent rather than "")
+            (Object.keys(data) as (keyof AssetDto)[]).forEach(key => {
+                if (data[key] === "") delete (data as any)[key];
             });
 
             if (editingAsset) {
                 await assetService.update(editingAsset.id!, data);
-                if (data.departmentId && data.departmentId !== editingAsset.departmentId) {
-                    await assetService.assignToDepartment(editingAsset.id!, data.departmentId);
-                }
                 toast.success("Asset updated");
             } else {
-                const created = await assetService.create(data);
-                if (data.departmentId) {
-                    await assetService.assignToDepartment(created.id!, data.departmentId);
-                }
+                await assetService.create(data);
                 toast.success("Asset created");
             }
             setIsModalOpen(false);
@@ -190,13 +198,13 @@ export default function AssetsPage() {
 
     const getStatusStyles = (status: string) => {
         switch (status) {
-            case AssetState.IN_USE: return "bg-emerald-100 text-emerald-700 border-emerald-200";
-            case AssetState.IN_STOCK: return "bg-blue-100 text-blue-700 border-blue-200";
-            case AssetState.MAINTENANCE: return "bg-amber-100 text-amber-700 border-amber-200";
-            case AssetState.RETIRED:
-            case AssetState.DISPOSED: return "bg-slate-100 text-slate-700 border-slate-200";
-            case AssetState.MISSING: return "bg-red-100 text-red-700 border-red-200";
-            default: return "bg-gray-100 text-gray-700 border-gray-200";
+            case 'IN_STOCK': return "bg-emerald-100 text-emerald-700 border-emerald-200";
+            case 'IN_USE': return "bg-blue-100 text-blue-700 border-blue-200";
+            case 'MAINTENANCE': return "bg-amber-100 text-amber-700 border-amber-200";
+            case 'DISPOSED':
+            case 'RETIRED': return "bg-gray-100 text-gray-700 border-gray-200";
+            case 'MISSING': return "bg-red-100 text-red-700 border-red-200";
+            default: return "bg-slate-100 text-slate-700 border-gray-200";
         }
     };
 
@@ -249,11 +257,11 @@ export default function AssetsPage() {
                                             <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200">
                                                 {asset.assetTag || asset.barcodeQrCode || 'NO-TAG'}
                                             </span>
-                                            <span className="truncate">{catMap.get(asset.categoryId || asset.category || "") || "Uncategorized"}</span>
+                                            <span className="truncate">{catMap.get(asset.categoryId || "") || "Uncategorized"}</span>
                                         </CardDescription>
                                     </div>
-                                    <div className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusStyles(asset.status || asset.state || "")}`}>
-                                        {(asset.status || asset.state || "UNKNOWN").replace('_', ' ')}
+                                    <div className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusStyles(asset.status || "")}`}>
+                                        {(asset.status || "UNKNOWN").replace('_', ' ')}
                                     </div>
                                 </div>
                             </CardHeader>
@@ -411,7 +419,7 @@ export default function AssetsPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="status">Current Status</Label>
                                 <Select id="status" {...register("status")}>
-                                    {Object.values(AssetState).map((s) => (
+                                    {Object.values(AssetStatus).map((s) => (
                                         <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
                                     ))}
                                 </Select>
@@ -436,15 +444,6 @@ export default function AssetsPage() {
                         <h4 className="text-sm font-semibold text-slate-900 border-b pb-1">Assignment & Location</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="organisationId">Organisation</Label>
-                                <Select id="organisationId" {...register("organisationId")}>
-                                    <option value="">None</option>
-                                    {organisations.map((o) => (
-                                        <option key={o.id} value={o.id}>{o.name}</option>
-                                    ))}
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
                                 <Label htmlFor="departmentId">Department</Label>
                                 <Select id="departmentId" {...register("departmentId")}>
                                     <option value="">None</option>
@@ -468,6 +467,15 @@ export default function AssetsPage() {
                                     <option value="">None</option>
                                     {suppliers.map((s) => (
                                         <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="purchaseOrderId">Purchase Order</Label>
+                                <Select id="purchaseOrderId" {...register("purchaseOrderId")}>
+                                    <option value="">None</option>
+                                    {purchaseOrders.map((po) => (
+                                        <option key={po.id} value={po.id}>{po.poNumber}</option>
                                     ))}
                                 </Select>
                             </div>

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { MaintenanceRecord, MaintenanceDto, Asset, MaintenanceType } from "@/types";
 import { maintenanceService } from "@/services/maintenanceService";
 import { assetService } from "@/services/assetService";
+import { supplierService } from "@/services/supplierService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
@@ -17,6 +18,7 @@ import { useForm } from "react-hook-form";
 export default function MaintenancePage() {
     const [records, setRecords] = useState<MaintenanceRecord[]>([]);
     const [assets, setAssets] = useState<Asset[]>([]);
+    const [suppliers, setSuppliers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
@@ -26,12 +28,14 @@ export default function MaintenancePage() {
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const [recordsData, assetsData] = await Promise.all([
+            const [recordsData, assetsData, suppliersData] = await Promise.all([
                 maintenanceService.getAll(),
-                assetService.getAll() // Simplification: in a real app, you might want server-side search for assets if the list is huge
+                assetService.getAll(),
+                supplierService.getAll()
             ]);
             setRecords(recordsData);
             setAssets(assetsData);
+            setSuppliers(suppliersData);
         } catch (error) {
             toast.error("Failed to load maintenance records");
             console.error(error);
@@ -53,10 +57,10 @@ export default function MaintenancePage() {
             assetId: "",
             scheduledDate: new Date().toISOString().split('T')[0],
             description: "",
-            type: MaintenanceType.PREVENTIVE,
+            maintenanceType: MaintenanceType.PREVENTIVE,
             cost: 0,
-            performedBy: "",
-            status: "SCHEDULED" // Simplified string status for the form
+            vendorId: "",
+            status: "SCHEDULED"
         });
         setIsModalOpen(true);
     };
@@ -66,11 +70,11 @@ export default function MaintenancePage() {
         reset({
             assetId: record.assetId,
             scheduledDate: record.scheduledDate ? record.scheduledDate.split('T')[0] : "",
-            completedDate: record.completedDate ? record.completedDate.split('T')[0] : "",
+            performedDate: record.performedDate ? record.performedDate.split('T')[0] : "",
             description: record.description || "",
-            type: record.type,
+            maintenanceType: record.maintenanceType,
             cost: record.cost,
-            performedBy: record.performedBy || "",
+            vendorId: record.vendorId || "",
             status: record.status
         });
         setIsModalOpen(true);
@@ -92,10 +96,7 @@ export default function MaintenancePage() {
         // Optimistically ask for cost & performed by, or just use backend defaults
         // For simplicity, we'll mark as complete via the service directly
         try {
-            await maintenanceService.complete(id, {
-                notes: "Completed from dashboard"
-                // Cost could be passed here if required by a prompt
-            });
+            await maintenanceService.complete(id);
             toast.success("Maintenance marked as completed");
             fetchData();
         } catch (error) {
@@ -106,15 +107,21 @@ export default function MaintenancePage() {
     const onSubmit = async (data: MaintenanceDto) => {
         try {
             data.cost = Number(data.cost);
-            if (!data.completedDate) delete data.completedDate;
-            if (!data.performedBy) delete data.performedBy;
+
+            // Clean empty strings
+            Object.keys(data).forEach(key => {
+                const k = key as keyof MaintenanceDto;
+                if (data[k] === "") {
+                    delete (data as any)[k];
+                }
+            });
 
             if (editingRecord) {
                 await maintenanceService.update(editingRecord.id!, data);
-                toast.success("Record updated");
+                toast.success("Maintenance record updated");
             } else {
                 await maintenanceService.create(data);
-                toast.success("Record created");
+                toast.success("Maintenance scheduled successfully");
             }
             setIsModalOpen(false);
             fetchData();
@@ -168,7 +175,7 @@ export default function MaintenancePage() {
                                     <div className="flex justify-between items-start mb-1">
                                         <CardTitle className="text-sm font-semibold text-teal-700 flex items-center gap-1.5 uppercase tracking-wide">
                                             <Wrench className="h-3.5 w-3.5" />
-                                            {record.type.replace('_', ' ')}
+                                            {(record.maintenanceType as string).replace('_', ' ')}
                                         </CardTitle>
                                         <div className={`px-2 flex items-center h-5 text-[10px] font-bold rounded-full border uppercase tracking-wider ${getStatusColor(record.status)}`}>
                                             {record.status}
@@ -247,8 +254,8 @@ export default function MaintenancePage() {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="type">Maintenance Type</Label>
-                            <Select id="type" {...register("type")}>
+                            <Label htmlFor="maintenanceType">Maintenance Type</Label>
+                            <Select id="maintenanceType" {...register("maintenanceType")}>
                                 {Object.values(MaintenanceType).map((t) => (
                                     <option key={t} value={t}>{t.replace('_', ' ')}</option>
                                 ))}
@@ -258,7 +265,7 @@ export default function MaintenancePage() {
                             <Label htmlFor="status">Status</Label>
                             <Select id="status" {...register("status")}>
                                 <option value="SCHEDULED">SCHEDULED</option>
-                                <option value="IN_PROGRESS">IN PROGRESS</option>
+                                <option value="IN_PROGRESS">IN_PROGRESS</option>
                                 <option value="COMPLETED">COMPLETED</option>
                                 <option value="CANCELLED">CANCELLED</option>
                             </Select>
@@ -283,12 +290,17 @@ export default function MaintenancePage() {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="performedBy">Technician / Vendor</Label>
-                            <Input id="performedBy" placeholder="John Doe or Acme Repairs" {...register("performedBy")} />
+                            <Label htmlFor="vendorId">Technician / Vendor</Label>
+                            <Select id="vendorId" {...register("vendorId")}>
+                                <option value="">Select Vendor</option>
+                                {suppliers.map((s) => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="completedDate">Completion Date</Label>
-                            <Input id="completedDate" type="date" {...register("completedDate")} />
+                            <Label htmlFor="performedDate">Completion Date</Label>
+                            <Input id="performedDate" type="date" {...register("performedDate")} />
                         </div>
                     </div>
 

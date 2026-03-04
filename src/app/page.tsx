@@ -11,13 +11,20 @@ import {
     CheckCircle2,
     Activity,
     ShoppingCart,
-    Clock
+    Clock,
+    Mail,
+    Phone,
+    MapPin,
+    Hash,
+    Receipt
 } from "lucide-react";
 import { assetService } from "@/services/assetService";
 import { organisationService } from "@/services/organisationService";
 import { userService } from "@/services/userService";
 import { purchaseOrderService } from "@/services/purchaseOrderService";
 import { maintenanceService } from "@/services/maintenanceService";
+import { authService } from "@/services/authService";
+import { Organisation } from "@/types";
 
 export default function Home() {
     const [stats, setStats] = useState({
@@ -28,27 +35,57 @@ export default function Home() {
         pendingPOs: 0,
         scheduledMaintenance: 0
     });
+    const [myOrg, setMyOrg] = useState<Organisation | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                // In a real app, there'd be a dedicated /dashboard endpoint. 
-                // We're simulating it by calling the lists and counting them.
-                const [assets, orgs, users, pos, maint] = await Promise.all([
+                // Fetch the user's profile first to get organisationId
+                const profile = await authService.getProfile();
+                const orgId = (profile as any).organisationId;
+
+                // Construct the fetch promise array
+                const fetchPromises = [
                     assetService.getAll(),
                     organisationService.getAll(),
                     userService.getAll(),
                     purchaseOrderService.getAll(),
                     maintenanceService.getAll()
-                ]);
+                ];
+
+                // Add fetching the specific organisation if we have an ID
+                if (orgId) {
+                    fetchPromises.push(organisationService.get(orgId) as Promise<any>);
+                }
+
+                const results = await Promise.allSettled(fetchPromises);
+
+                const getResult = <T,>(result: PromiseSettledResult<T>, defaultValue: T): T => {
+                    if (result.status === 'fulfilled') {
+                        return result.value;
+                    }
+                    console.error("Dashboard fetch segment failed:", result.reason);
+                    return defaultValue;
+                };
+
+                const assets = getResult(results[0] as PromiseSettledResult<any[]>, []);
+                const orgs = getResult(results[1] as PromiseSettledResult<any[]>, []);
+                const users = getResult(results[2] as PromiseSettledResult<any[]>, []);
+                const pos = getResult(results[3] as PromiseSettledResult<any[]>, []);
+                const safePos = Array.isArray(pos) ? pos : [];
+                const maint = getResult(results[4] as PromiseSettledResult<any[]>, []);
+
+                if (orgId && results[5] && results[5].status === 'fulfilled') {
+                    setMyOrg(results[5].value as unknown as Organisation);
+                }
 
                 setStats({
                     totalAssets: assets.length,
-                    activeAssets: assets.filter(a => a.status === 'AVAILABLE' || a.status === 'IN_USE').length,
+                    activeAssets: assets.filter(a => a.status === 'IN_STOCK' || a.status === 'IN_USE').length,
                     totalOrganisations: orgs.length,
                     totalUsers: users.length,
-                    pendingPOs: pos.filter(po => po.status === 'PENDING_APPROVAL').length,
+                    pendingPOs: safePos.filter(po => po.status === 'PENDING').length,
                     scheduledMaintenance: maint.filter(m => m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS').length
                 });
 
@@ -76,6 +113,99 @@ export default function Home() {
                 <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard Overview</h1>
                 <p className="text-slate-500 mt-1">Platform metrics and system health at a glance.</p>
             </div>
+
+            {myOrg && (
+                <Card className="border-slate-200 shadow-sm overflow-hidden">
+                    <CardHeader className="bg-slate-50 border-b border-slate-100 flex flex-row items-center gap-3">
+                        <div className="p-2 bg-blue-100 text-blue-600 rounded-lg shrink-0">
+                            <Building2 className="h-6 w-6" />
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                                <CardTitle className="text-xl font-bold text-slate-900">{myOrg.name}</CardTitle>
+                                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border shrink-0 ${myOrg.status === "ACTIVE" ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
+                                    myOrg.status === "SUSPENDED" ? "bg-red-100 text-red-700 border-red-200" :
+                                        "bg-slate-100 text-slate-700 border-slate-200"
+                                    }`}>
+                                    {myOrg.status || "ACTIVE"}
+                                </span>
+                            </div>
+                            {myOrg.industry && <p className="text-sm text-slate-500 font-medium">{myOrg.industry}</p>}
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+
+                            {/* Contact Section */}
+                            <div className="p-5 space-y-4">
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> Contact Details</h4>
+                                <div className="space-y-3 text-sm">
+                                    {myOrg.contactEmail ? (
+                                        <div className="flex items-center gap-2 text-slate-700">
+                                            <span className="font-medium truncate">{myOrg.contactEmail}</span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-slate-400 italic text-xs">No email provided</p>
+                                    )}
+                                    {myOrg.contactPhone ? (
+                                        <div className="flex items-center gap-2 text-slate-700">
+                                            <Phone className="h-4 w-4 text-slate-400 shrink-0" />
+                                            <span>{myOrg.contactPhone}</span>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+
+                            {/* Location Section */}
+                            <div className="p-5 space-y-4">
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> Location & Timezone</h4>
+                                <div className="space-y-3 text-sm">
+                                    {(myOrg.address || myOrg.country) ? (
+                                        <div className="text-slate-700">
+                                            <span className="block">{myOrg.address}</span>
+                                            <span className="block text-slate-500">{myOrg.country}</span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-slate-400 italic text-xs">No location provided</p>
+                                    )}
+                                    {myOrg.timezone ? (
+                                        <div className="flex items-center gap-2 text-slate-700">
+                                            <Clock className="h-4 w-4 text-slate-400 shrink-0" />
+                                            <span className="text-xs font-medium">{myOrg.timezone}</span>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+
+                            {/* Legal/Business Section */}
+                            <div className="p-5 space-y-4">
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Registration & Tax</h4>
+                                <div className="space-y-3 text-sm">
+                                    {myOrg.registrationNumber ? (
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-slate-500">Reg. Number</span>
+                                            <span className="font-mono font-medium text-slate-800">{myOrg.registrationNumber}</span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-slate-400 italic text-xs mb-2">No registration number provided</p>
+                                    )}
+                                    {myOrg.taxId ? (
+                                        <div className="flex flex-col">
+                                            <span className="text-xs text-slate-500">Tax ID</span>
+                                            <span className="font-mono font-medium text-slate-800 flex items-center gap-1.5">
+                                                <Receipt className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                                {myOrg.taxId}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-slate-400 italic text-xs">No Tax ID provided</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="bg-gradient-to-br from-indigo-500 to-indigo-700 text-white border-none shadow-md">

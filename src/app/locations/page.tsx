@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Location } from "@/types";
+import { Location, LocationDto } from "@/types";
 import { locationService } from "@/services/locationService";
-import { organisationService } from "@/services/organisationService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
@@ -11,27 +10,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, MapPin } from "lucide-react";
+import { Plus, Pencil, Trash2, MapPin, Building2, Layers, Navigation, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 
 export default function LocationsPage() {
     const [locations, setLocations] = useState<Location[]>([]);
-    const [organisations, setOrganisations] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingLocation, setEditingLocation] = useState<Location | null>(null);
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<any>();
+    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<LocationDto>();
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const [locData, orgData] = await Promise.all([
-                locationService.getAll(),
-                organisationService.getAll()
-            ]);
+            const locData = await locationService.getAll();
             setLocations(locData);
-            setOrganisations(orgData);
         } catch (error) {
             toast.error("Failed to load data");
             console.error(error);
@@ -46,7 +40,7 @@ export default function LocationsPage() {
 
     const handleOpenCreate = () => {
         setEditingLocation(null);
-        reset({ name: "", address: "", city: "", state: "", country: "", zipCode: "", parentLocationId: "", organisationId: "" });
+        reset({ name: "", building: "", floor: "", room: "", city: "", country: "", geoCoordinates: "", parentLocationId: "" });
         setIsModalOpen(true);
     };
 
@@ -54,13 +48,13 @@ export default function LocationsPage() {
         setEditingLocation(location);
         reset({
             name: location.name,
-            address: location.address || "",
+            building: location.building || "",
+            floor: location.floor || "",
+            room: location.room || "",
             city: location.city || "",
-            state: location.state || "",
             country: location.country || "",
-            zipCode: location.zipCode || "",
+            geoCoordinates: location.geoCoordinates || "",
             parentLocationId: location.parentLocationId || "",
-            organisationId: location.organisationId || ""
         });
         setIsModalOpen(true);
     };
@@ -77,7 +71,7 @@ export default function LocationsPage() {
         }
     };
 
-    const onSubmit = async (data: any) => {
+    const onSubmit = async (data: LocationDto) => {
         const isDuplicate = locations.some(
             loc => loc.name.toLowerCase() === data.name.toLowerCase() && loc.id !== editingLocation?.id
         );
@@ -87,11 +81,16 @@ export default function LocationsPage() {
             return;
         }
 
-        try {
-            // Clean empty relationships
-            if (!data.parentLocationId) delete data.parentLocationId;
-            if (!data.organisationId) delete data.organisationId;
+        // Clean empty optional strings
+        if (!data.parentLocationId) delete data.parentLocationId;
+        if (!data.building) delete data.building;
+        if (!data.floor) delete data.floor;
+        if (!data.room) delete data.room;
+        if (!data.city) delete data.city;
+        if (!data.country) delete data.country;
+        if (!data.geoCoordinates) delete data.geoCoordinates;
 
+        try {
             if (editingLocation) {
                 await locationService.update(editingLocation.id!, data);
                 toast.success("Location updated");
@@ -112,7 +111,7 @@ export default function LocationsPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Locations</h1>
-                    <p className="text-slate-500">Manage physical asset locations.</p>
+                    <p className="text-slate-500">Manage physical asset locations and spaces.</p>
                 </div>
                 <Button onClick={handleOpenCreate} className="bg-rose-600 hover:bg-rose-700">
                     <Plus className="mr-2 h-4 w-4" /> Add Location
@@ -135,33 +134,95 @@ export default function LocationsPage() {
                     </div>
                 ) : (
                     locations.map((location) => (
-                        <Card key={location.id} className="overflow-hidden hover:shadow-md transition-all group border-slate-200">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-slate-50/50 border-b border-slate-100">
-                                <CardTitle className="text-lg font-semibold text-slate-900 truncate" title={location.name}>
-                                    {location.name}
-                                </CardTitle>
+                        <Card key={location.id} className="overflow-hidden hover:shadow-md transition-all flex flex-col h-full border-slate-200">
+                            <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-3 bg-slate-50/50 border-b border-slate-100">
                                 <div className="p-2 bg-rose-100 text-rose-600 rounded-lg shrink-0">
-                                    <MapPin className="h-4 w-4" />
+                                    <MapPin className="h-5 w-5" />
                                 </div>
+                                <div className="min-w-0 flex-1">
+                                    <CardTitle className="text-base font-semibold text-slate-900 truncate" title={location.name}>
+                                        {location.name}
+                                    </CardTitle>
+                                    {(location.city || location.country) && (
+                                        <p className="text-xs text-slate-500 mt-0.5 truncate">
+                                            {[location.city, location.country].filter(Boolean).join(", ")}
+                                        </p>
+                                    )}
+                                </div>
+                                {location.parentLocationId && (
+                                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full border bg-slate-100 text-slate-600 border-slate-200 shrink-0 uppercase">
+                                        Sub
+                                    </span>
+                                )}
                             </CardHeader>
-                            <CardContent className="p-4 flex flex-col justify-between" style={{ minHeight: '140px' }}>
-                                <div>
-                                    <p className="text-sm text-slate-700 mb-1">{location.address || "No address"}</p>
-                                    <p className="text-xs text-slate-500 mb-2">
-                                        {[location.city, location.state, location.country].filter(Boolean).join(", ")}
-                                    </p>
+                            <CardContent className="p-0 flex-1 flex flex-col">
+                                <div className="p-4 space-y-4 flex-1">
+                                    {/* Building Details */}
+                                    {(location.building || location.floor || location.room) ? (
+                                        <div className="space-y-2">
+                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                                <Building2 className="h-3.5 w-3.5" /> Physical Space
+                                            </h4>
+                                            <div className="space-y-1.5 text-sm text-slate-700">
+                                                {location.building && (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-slate-500 text-xs">Building</span>
+                                                        <span className="font-medium">{location.building}</span>
+                                                    </div>
+                                                )}
+                                                {location.floor && (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-slate-500 text-xs">Floor</span>
+                                                        <span className="font-medium">{location.floor}</span>
+                                                    </div>
+                                                )}
+                                                {location.room && (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-slate-500 text-xs">Room</span>
+                                                        <span className="font-medium">{location.room}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-slate-400 italic">No physical space details.</p>
+                                    )}
+
+                                    {/* Geo Coordinates */}
+                                    {location.geoCoordinates && (
+                                        <div className="pt-2 border-t border-slate-100">
+                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                                                <Navigation className="h-3.5 w-3.5" /> Coordinates
+                                            </h4>
+                                            <p className="text-xs font-mono text-slate-600 bg-slate-50 border border-slate-200 rounded px-2 py-1 truncate" title={location.geoCoordinates}>
+                                                {location.geoCoordinates}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Hierarchy */}
                                     {location.parentLocationId && (
-                                        <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                                            Sub-location
+                                        <div className="flex items-center gap-2 text-sm text-slate-600 bg-rose-50 border border-rose-100 rounded-md px-2.5 py-1.5">
+                                            <Layers className="h-4 w-4 text-rose-400 shrink-0" />
+                                            <span className="text-xs font-medium text-rose-700">Nested sub-location</span>
+                                        </div>
+                                    )}
+
+                                    {/* Empty Fallback */}
+                                    {!location.building && !location.floor && !location.room && !location.geoCoordinates && !location.parentLocationId && (
+                                        <div className="flex flex-col items-center justify-center opacity-50 py-2">
+                                            <AlertCircle className="h-5 w-5 text-slate-300 mb-1" />
+                                            <span className="text-[10px] text-slate-400 font-medium">BASIC RECORD</span>
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex justify-end gap-2 pt-4 opacity-0 group-hover:opacity-100 transition-opacity mt-auto">
+
+                                <div className="p-4 bg-slate-50/50 mt-auto border-t border-slate-100 flex justify-end gap-2">
                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(location)} className="h-8">
                                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                     </Button>
                                     <Button variant="ghost" size="sm" onClick={() => handleDelete(location.id!)} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
-                                        <Trash2 className="h-3.5 w-3.5" />
+                                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                                     </Button>
                                 </div>
                             </CardContent>
@@ -181,55 +242,57 @@ export default function LocationsPage() {
                         <Label htmlFor="name">Location Name <span className="text-red-500">*</span></Label>
                         <Input
                             id="name"
-                            placeholder="e.g. Headquarters, Room 402"
+                            placeholder="e.g. Main Warehouse"
                             {...register("name", { required: "Name is required" })}
                         />
                         {errors.name && <p className="text-sm text-red-500">{errors.name.message as string}</p>}
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="address">Address</Label>
-                        <Input id="address" placeholder="123 Corporate Blvd" {...register("address")} />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="city">City</Label>
-                            <Input id="city" placeholder="San Francisco" {...register("city")} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="state">State/Region</Label>
-                            <Input id="state" placeholder="CA" {...register("state")} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="zipCode">Zip/Postal Code</Label>
-                            <Input id="zipCode" placeholder="94105" {...register("zipCode")} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="country">Country</Label>
-                            <Input id="country" placeholder="USA" {...register("country")} />
+                    <div className="pt-2 border-t">
+                        <p className="text-xs font-semibold uppercase text-slate-400 tracking-wider mb-3">Physical Space</p>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="building">Building</Label>
+                                <Input id="building" placeholder="Block A" {...register("building")} />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="floor">Floor</Label>
+                                <Input id="floor" placeholder="2nd Floor" {...register("floor")} />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="room">Room</Label>
+                                <Input id="room" placeholder="Room 202" {...register("room")} />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="parentLocationId">Parent Location</Label>
-                            <Select id="parentLocationId" {...register("parentLocationId")}>
-                                <option value="">None</option>
-                                {locations.filter(l => l.id !== editingLocation?.id).map((loc) => (
-                                    <option key={loc.id} value={loc.id}>{loc.name}</option>
-                                ))}
-                            </Select>
+                    <div className="pt-2 border-t">
+                        <p className="text-xs font-semibold uppercase text-slate-400 tracking-wider mb-3">Location</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="city">City</Label>
+                                <Input id="city" placeholder="Accra" {...register("city")} />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="country">Country</Label>
+                                <Input id="country" placeholder="Ghana" {...register("country")} />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="organisationId">Linked Organisation</Label>
-                            <Select id="organisationId" {...register("organisationId")}>
-                                <option value="">None</option>
-                                {organisations.map((org) => (
-                                    <option key={org.id} value={org.id}>{org.name}</option>
-                                ))}
-                            </Select>
-                        </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label htmlFor="geoCoordinates">Geo Coordinates</Label>
+                        <Input id="geoCoordinates" placeholder="5.6037° N, 0.1870° W" {...register("geoCoordinates")} className="font-mono text-sm" />
+                    </div>
+
+                    <div className="space-y-1.5 pt-2 border-t">
+                        <Label htmlFor="parentLocationId">Parent Location</Label>
+                        <Select id="parentLocationId" {...register("parentLocationId")}>
+                            <option value="">None (top-level)</option>
+                            {locations.filter(l => l.id !== editingLocation?.id).map((loc) => (
+                                <option key={loc.id} value={loc.id}>{loc.name}</option>
+                            ))}
+                        </Select>
                     </div>
 
                     <div className="flex justify-end gap-2 pt-4 border-t">

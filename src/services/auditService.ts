@@ -1,36 +1,45 @@
 import api from "@/lib/axios";
-import { Audit, AuditDto } from "@/types";
+import { Audit, AssetAuditDto } from "@/types";
 
 export interface AuditFilterParams {
-    organisationId?: string;
-    startDate?: string;
-    endDate?: string;
+    departmentId?: string;
+    startDate?: string;       // YYYY-MM-DD
+    endDate?: string;         // YYYY-MM-DD
+    conductedById?: string;
 }
 
 export const auditService = {
-    getAll: async (params?: AuditFilterParams) => {
+    /** GET /audits — all for org (JWT-scoped) */
+    getAll: async (params?: AuditFilterParams): Promise<Audit[]> => {
         const response = await api.get<Audit[]>("/audits", { params });
         return response.data;
     },
 
-    get: async (id: string) => {
+    /** GET /audits/{id} */
+    get: async (id: string): Promise<Audit> => {
         const response = await api.get<Audit>(`/audits/${id}`);
         return response.data;
     },
 
-    create: async (data: AuditDto) => {
+    /** POST /audits */
+    create: async (data: AssetAuditDto): Promise<Audit> => {
         const response = await api.post<Audit>("/audits", data);
         return response.data;
     },
 
-    updateStatus: async (id: string, status: string) => {
+    /**
+     * PATCH /audits/{id}/status?status={value}
+     * status: PLANNED | IN_PROGRESS | COMPLETED | CANCELLED
+     */
+    updateStatus: async (id: string, status: string): Promise<Audit> => {
         const response = await api.patch<Audit>(`/audits/${id}/status`, null, {
             params: { status }
         });
         return response.data;
     },
 
-    delete: async (id: string) => {
+    /** DELETE /audits/{id} — ADMIN only */
+    delete: async (id: string): Promise<void> => {
         await api.delete(`/audits/${id}`);
     },
 };

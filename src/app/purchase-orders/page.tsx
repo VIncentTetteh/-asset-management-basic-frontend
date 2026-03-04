@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { PurchaseOrder, PurchaseOrderDto, Supplier, POStatus } from "@/types";
+import { PurchaseOrder, PurchaseOrderDto, Supplier, Department, POStatus, User } from "@/types";
 import { purchaseOrderService } from "@/services/purchaseOrderService";
 import { supplierService } from "@/services/supplierService";
+import { departmentService } from "@/services/departmentService";
+import { authService } from "@/services/authService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu";
@@ -12,27 +14,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, ShoppingCart, Calendar, Building2, CheckCircle2, XCircle, MoreHorizontal } from "lucide-react";
+import { Plus, Pencil, Trash2, ShoppingCart, Calendar, Building2, CheckCircle2, XCircle, MoreHorizontal, Layers } from "lucide-react";
 import { useForm } from "react-hook-form";
 
 export default function PurchaseOrdersPage() {
     const [orders, setOrders] = useState<PurchaseOrder[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [departments, setDepartments] = useState<Department[]>([]);
+    const [profile, setProfile] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
 
-    const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<PurchaseOrderDto>();
+    const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<PurchaseOrderDto>();
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const [ordersData, suppliersData] = await Promise.all([
+            const [ordersData, suppliersData, deptData, profileData] = await Promise.all([
                 purchaseOrderService.getAll(),
-                supplierService.getAll()
+                supplierService.getAll(),
+                departmentService.getAll(),
+                authService.getProfile(),
             ]);
             setOrders(ordersData);
             setSuppliers(suppliersData);
+            setDepartments(deptData);
+            setProfile(profileData as unknown as User);
         } catch (error) {
             toast.error("Failed to load purchase orders");
             console.error(error);
@@ -45,18 +53,27 @@ export default function PurchaseOrdersPage() {
         fetchData();
     }, []);
 
+    // Populate organisationId into RHF state once profile is loaded
+    useEffect(() => {
+        if (profile) {
+            setValue("organisationId", (profile as any).organisationId || "");
+        }
+    }, [profile, setValue]);
+
     const supplierMap = useMemo(() => new Map(suppliers.map(s => [s.id, s.name])), [suppliers]);
+    const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
 
     const handleOpenCreate = () => {
         setEditingOrder(null);
         reset({
             poNumber: "",
             totalAmount: 0,
-            currency: "USD",
+            currency: "GHS",
             status: POStatus.DRAFT,
             remarks: "",
             supplierId: "",
-            departmentId: ""
+            departmentId: "",
+            organisationId: (profile as any)?.organisationId || "",
         });
         setIsModalOpen(true);
     };
@@ -66,11 +83,12 @@ export default function PurchaseOrdersPage() {
         reset({
             poNumber: order.poNumber,
             totalAmount: order.totalAmount,
-            currency: order.currency || "USD",
+            currency: order.currency || "GHS",
             status: order.status || POStatus.DRAFT,
             supplierId: order.supplierId || "",
             departmentId: order.departmentId || "",
-            remarks: order.remarks || ""
+            organisationId: order.organisationId || (profile as any)?.organisationId || "",
+            remarks: order.remarks || "",
         });
         setIsModalOpen(true);
     };
@@ -87,13 +105,14 @@ export default function PurchaseOrdersPage() {
         }
     };
 
-    const handleUpdateStatus = async (id: string, status: POStatus) => {
+    const handleUpdateStatus = async (id: string, action: "approve" | "reject") => {
         try {
-            await purchaseOrderService.updateStatus(id, status);
-            toast.success(`Purchase order status updated to ${status.replace('_', ' ')}`);
+            if (action === "approve") await purchaseOrderService.approve(id);
+            else await purchaseOrderService.reject(id);
+            toast.success(`Purchase order ${action}d`);
             fetchData();
         } catch (error) {
-            toast.error("Failed to update purchase order status");
+            toast.error(`Failed to ${action} purchase order`);
             console.error(error);
         }
     };
@@ -101,8 +120,15 @@ export default function PurchaseOrdersPage() {
     const onSubmit = async (data: PurchaseOrderDto) => {
         try {
             data.totalAmount = Number(data.totalAmount);
-            if (!data.supplierId) delete data.supplierId;
-            if (!data.departmentId) delete data.departmentId;
+
+            // Clean empty optional strings (keep mandatory keys)
+            const mandatoryKeys = ["departmentId", "supplierId", "organisationId", "poNumber"];
+            (Object.keys(data) as (keyof PurchaseOrderDto)[]).forEach(k => {
+                if (data[k] === "" && !mandatoryKeys.includes(k)) {
+                    delete (data as any)[k];
+                }
+            });
+
             if (editingOrder) {
                 await purchaseOrderService.update(editingOrder.id!, data);
                 toast.success("Purchase order updated");
@@ -121,13 +147,12 @@ export default function PurchaseOrdersPage() {
     const getStatusStyles = (status: string) => {
         switch (status) {
             case POStatus.DRAFT: return "bg-slate-100 text-slate-700 border-slate-200";
-            case POStatus.PENDING_APPROVAL: return "bg-amber-100 text-amber-700 border-amber-200";
+            case POStatus.PENDING: return "bg-amber-100 text-amber-700 border-amber-200";
             case POStatus.APPROVED: return "bg-emerald-100 text-emerald-700 border-emerald-200";
             case POStatus.ORDERED: return "bg-blue-100 text-blue-700 border-blue-200";
-            case POStatus.PARTIALLY_DELIVERED: return "bg-indigo-100 text-indigo-700 border-indigo-200";
-            case POStatus.DELIVERED: return "bg-green-100 text-green-700 border-green-200";
-            case POStatus.CANCELLED:
-            case POStatus.REJECTED: return "bg-red-100 text-red-700 border-red-200";
+            case POStatus.RECEIVED: return "bg-green-100 text-green-700 border-green-200";
+            case POStatus.REJECTED:
+            case POStatus.CANCELLED: return "bg-red-100 text-red-700 border-red-200";
             default: return "bg-gray-100 text-gray-700 border-gray-200";
         }
     };
@@ -161,46 +186,34 @@ export default function PurchaseOrdersPage() {
                 ) : (
                     orders.map((order) => (
                         <Card key={order.id} className="overflow-hidden hover:shadow-md transition-all group border-slate-200 flex flex-col">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-slate-50/50 border-b border-slate-100">
-                                <div className="truncate pr-2">
-                                    <CardTitle className="text-lg font-semibold text-slate-900 truncate" title={order.poNumber}>
+                            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3 bg-slate-50/50 border-b border-slate-100">
+                                <div className="truncate pr-2 flex-1">
+                                    <CardTitle className="text-base font-semibold text-slate-900 truncate" title={order.poNumber}>
                                         {order.poNumber}
                                     </CardTitle>
-                                    <div className="text-xs font-semibold text-slate-800">
+                                    <div className="text-xs text-slate-500 mt-0.5">
                                         {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : ""}
                                     </div>
-                                    <div className={`px-2 py-0.5 flex items-center justify-center rounded-full text-[10px] font-bold border ${getStatusStyles(order.status || "")}`}>
-                                        {order.status?.replace('_', ' ')}
-                                    </div>
                                 </div>
-                                <CardDescription className="mt-1 font-medium text-slate-600">
-                                    ${Number(order.totalAmount).toLocaleString()}
-                                </CardDescription>
+                                <div className={`px-2 py-0.5 flex items-center rounded-full text-[10px] font-bold border shrink-0 mt-0.5 ${getStatusStyles(order.status || "")}`}>
+                                    {order.status?.replace(/_/g, " ")}
+                                </div>
                             </CardHeader>
                             <CardContent className="p-4 flex-1 flex flex-col">
                                 <div className="space-y-3 text-sm text-slate-600 flex-1">
+                                    <div className="text-xl font-bold text-slate-900">
+                                        {order.currency || "GHS"} {Number(order.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </div>
                                     <div className="flex items-center gap-2 truncate text-slate-700" title={supplierMap.get(order.supplierId || "") || "Unknown Supplier"}>
                                         <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
-                                        <span className="truncate font-medium">{supplierMap.get(order.supplierId || "") || "No Supplier Assigned"}</span>
+                                        <span className="truncate font-medium">{supplierMap.get(order.supplierId || "") || "No Supplier"}</span>
                                     </div>
-                                    <div className="space-y-4 pt-2">
-                                        <div className="flex justify-between items-center text-sm">
-                                            <div className="flex items-center gap-1.5 text-slate-500">
-                                                <Calendar className="h-4 w-4 text-slate-400" />
-                                                <span>Order Date</span>
-                                            </div>
-                                            <span className="font-medium text-slate-700">{order.orderDate ? new Date(order.orderDate).toLocaleDateString() : ""}</span>
+                                    {order.departmentId && (
+                                        <div className="flex items-center gap-2 truncate text-slate-700">
+                                            <Layers className="h-4 w-4 text-slate-400 shrink-0" />
+                                            <span className="truncate">{deptMap.get(order.departmentId) || order.departmentId}</span>
                                         </div>
-                                        {order.expectedDeliveryDate && (
-                                            <div className="flex justify-between items-center text-sm">
-                                                <div className="flex items-center gap-1.5 text-slate-500">
-                                                    <Calendar className="h-4 w-4 text-slate-400" />
-                                                    <span>Expected Delivery</span>
-                                                </div>
-                                                <span className="font-medium text-slate-700">{new Date(order.expectedDeliveryDate).toLocaleDateString()}</span>
-                                            </div>
-                                        )}
-                                    </div>
+                                    )}
                                     {order.remarks && (
                                         <p className="text-sm text-slate-500 pt-2 border-t border-slate-100 mt-2 line-clamp-2" title={order.remarks}>
                                             <b className="text-slate-600">Remarks:</b> {order.remarks}
@@ -209,42 +222,36 @@ export default function PurchaseOrdersPage() {
                                 </div>
                                 <div className="flex justify-between items-center gap-2 pt-4 border-t border-slate-100 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <div className="flex gap-1">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700 hover:bg-slate-50">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="start">
-                                                {order.status === POStatus.DRAFT && (
-                                                    <DropdownMenuItem onClick={() => handleUpdateStatus(order.id!, POStatus.PENDING_APPROVAL)}>Submit for Approval</DropdownMenuItem>
-                                                )}
-                                                {order.status === POStatus.PENDING_APPROVAL && (
-                                                    <>
-                                                        <DropdownMenuItem onClick={() => handleUpdateStatus(order.id!, POStatus.APPROVED)}>Approve</DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleUpdateStatus(order.id!, POStatus.REJECTED)}>Reject</DropdownMenuItem>
-                                                    </>
-                                                )}
-                                                {order.status === POStatus.APPROVED && (
-                                                    <DropdownMenuItem onClick={() => handleUpdateStatus(order.id!, POStatus.ORDERED)}>Mark Ordered</DropdownMenuItem>
-                                                )}
-                                                {(order.status === POStatus.ORDERED || order.status === POStatus.PARTIALLY_DELIVERED) && (
-                                                    <DropdownMenuItem onClick={() => handleUpdateStatus(order.id!, POStatus.PARTIALLY_DELIVERED)}>Mark Partially Delivered</DropdownMenuItem>
-                                                )}
-                                                {(order.status === POStatus.ORDERED || order.status === POStatus.PARTIALLY_DELIVERED) && (
-                                                    <DropdownMenuItem onClick={() => handleUpdateStatus(order.id!, POStatus.DELIVERED)}>Mark Delivered</DropdownMenuItem>
-                                                )}
-                                                {order.status !== POStatus.CANCELLED && order.status !== POStatus.REJECTED && (
-                                                    <DropdownMenuItem onClick={() => handleUpdateStatus(order.id!, POStatus.CANCELLED)} className="text-red-600">Cancel Order</DropdownMenuItem>
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        {/* Approve / Reject available for PENDING status */}
+                                        {order.status === POStatus.PENDING && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700 hover:bg-slate-50">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="start" className="bg-white border border-slate-200 rounded-lg shadow-lg p-1 min-w-[120px] z-50">
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleUpdateStatus(order.id!, "approve")}
+                                                        className="flex items-center gap-2 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 rounded cursor-pointer"
+                                                    >
+                                                        <CheckCircle2 className="h-4 w-4" /> Approve
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleUpdateStatus(order.id!, "reject")}
+                                                        className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded cursor-pointer"
+                                                    >
+                                                        <XCircle className="h-4 w-4" /> Reject
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
                                     </div>
                                     <div className="flex gap-2">
-                                        <Button variant="outline" size="sm" onClick={() => handleOpenEdit(order)} className="h-8">
+                                        <Button variant="outline" size="sm" onClick={() => handleOpenEdit(order)} className="h-8 w-8 p-0">
                                             <Pencil className="h-3.5 w-3.5" />
                                         </Button>
-                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(order.id!)} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(order.id!)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>
@@ -252,9 +259,8 @@ export default function PurchaseOrdersPage() {
                             </CardContent>
                         </Card>
                     ))
-                )
-                }
-            </div >
+                )}
+            </div>
 
             <Modal
                 isOpen={isModalOpen}
@@ -263,15 +269,19 @@ export default function PurchaseOrdersPage() {
                 description={editingOrder ? "Update the purchase order details." : "Create a new procurement request."}
             >
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+                    {/* Hidden organisationId — populated via setValue when profile loads */}
+                    <input type="hidden" {...register("organisationId")} />
+
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="poNumber">PO Number</Label>
-                            <Input id="poNumber" placeholder="e.g., PO-2023-001" {...register("poNumber")} />
+                        <div className="space-y-2 col-span-2">
+                            <Label htmlFor="poNumber">PO Number <span className="text-red-500">*</span></Label>
+                            <Input id="poNumber" placeholder="e.g., PO-2025-001" {...register("poNumber", { required: "PO Number is required" })} />
+                            {errors.poNumber && <p className="text-sm text-red-500">{errors.poNumber.message}</p>}
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="supplierId">Supplier</Label>
+                        <Label htmlFor="supplierId">Supplier <span className="text-red-500">*</span></Label>
                         <Select id="supplierId" {...register("supplierId", { required: "Supplier is required" })}>
                             <option value="">Select Supplier</option>
                             {suppliers.map((s) => (
@@ -282,24 +292,47 @@ export default function PurchaseOrdersPage() {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="remarks">Remarks</Label>
-                        <Input id="remarks" placeholder="Urgent order..." {...register("remarks")} />
+                        <Label htmlFor="departmentId">Department <span className="text-red-500">*</span></Label>
+                        <Select id="departmentId" {...register("departmentId", { required: "Department is required" })}>
+                            <option value="">Select Department</option>
+                            {departments.map((d) => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
+                        </Select>
+                        {errors.departmentId && <p className="text-sm text-red-500">{errors.departmentId.message as string}</p>}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4 border-t pt-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="remarks">Remarks</Label>
+                        <Input id="remarks" placeholder="IT equipment batch, urgent order..." {...register("remarks")} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 border-t pt-4">
                         <div className="space-y-2">
-                            <Label htmlFor="totalAmount">Total Amount ($) <span className="text-red-500">*</span></Label>
+                            <Label htmlFor="totalAmount">Total Amount <span className="text-red-500">*</span></Label>
                             <Input id="totalAmount" type="number" step="0.01" min="0" {...register("totalAmount", { required: true, min: 0 })} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="createdAt">Order Date</Label>
-                            <Input id="createdAt" type="date" {...register("createdAt")} disabled />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="expectedDeliveryDate" className="text-slate-400">Expected Delivery</Label>
-                            <Input id="expectedDeliveryDate" type="date" disabled title="Not implemented on backend yet" />
+                            <Label htmlFor="currency">Currency</Label>
+                            <Select id="currency" {...register("currency")}>
+                                <option value="GHS">GHS</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                                <option value="GBP">GBP</option>
+                            </Select>
                         </div>
                     </div>
+
+                    {editingOrder && (
+                        <div className="space-y-2">
+                            <Label htmlFor="status">Status</Label>
+                            <Select id="status" {...register("status")}>
+                                {Object.values(POStatus).map(s => (
+                                    <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                                ))}
+                            </Select>
+                        </div>
+                    )}
 
                     <div className="flex justify-end gap-2 pt-4 border-t mt-4">
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
@@ -311,6 +344,6 @@ export default function PurchaseOrdersPage() {
                     </div>
                 </form>
             </Modal>
-        </div >
+        </div>
     );
 }

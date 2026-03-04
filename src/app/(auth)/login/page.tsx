@@ -72,7 +72,7 @@ export default function LoginPage() {
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="password">Password</Label>
-                                <Link href="#" className="text-sm font-medium text-emerald-600 hover:underline">
+                                <Link href="/forgot-password" className="text-sm font-medium text-emerald-600 hover:underline">
                                     Forgot password?
                                 </Link>
                             </div>
@@ -91,11 +91,19 @@ export default function LoginPage() {
                         <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isLoading}>
                             {isLoading ? "Signing in..." : "Sign in"}
                         </Button>
-                        <div className="text-sm text-center text-gray-500">
-                            Don't have an account?{" "}
-                            <Link href="/register" className="font-semibold text-emerald-600 hover:underline">
-                                Request Access
-                            </Link>
+                        <div className="text-sm text-center text-gray-500 pt-4 border-t space-y-2">
+                            <div>
+                                Need to create a new workspace?{" "}
+                                <Link href="/register-tenant" className="font-semibold text-emerald-600 hover:underline">
+                                    Register Organization
+                                </Link>
+                            </div>
+                            <div>
+                                Joining an existing workspace?{" "}
+                                <Link href="/register" className="font-semibold text-emerald-600 hover:underline">
+                                    Create User Account
+                                </Link>
+                            </div>
                         </div>
                     </CardFooter>
                 </form>

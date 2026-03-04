@@ -166,11 +166,19 @@ export default function RegisterPage() {
                         <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isLoading}>
                             {isLoading ? "Registering..." : "Create Account"}
                         </Button>
-                        <div className="text-sm text-center text-gray-500">
-                            Already have an account?{" "}
-                            <Link href="/login" className="font-semibold text-emerald-600 hover:underline">
-                                Sign in
-                            </Link>
+                        <div className="text-sm text-center text-gray-500 space-y-2">
+                            <div>
+                                Setting up a new company?{" "}
+                                <Link href="/register-tenant" className="font-semibold text-emerald-600 hover:underline">
+                                    Create a Workspace
+                                </Link>
+                            </div>
+                            <div>
+                                Already have an account?{" "}
+                                <Link href="/login" className="font-semibold text-emerald-600 hover:underline">
+                                    Sign in
+                                </Link>
+                            </div>
                         </div>
                     </CardFooter>
                 </form>

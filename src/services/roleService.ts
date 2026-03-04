@@ -2,35 +2,32 @@ import api from "@/lib/axios";
 import { Role, RoleDto } from "@/types";
 
 export const roleService = {
-    getAll: async (organisationId?: string) => {
-        const params = organisationId ? { organisationId } : undefined;
-        const response = await api.get<Role[]>("/roles", { params });
+    /** GET /roles — all roles in org (JWT-scoped) */
+    getAll: async (): Promise<Role[]> => {
+        const response = await api.get<Role[]>("/roles");
         return response.data;
     },
 
-    get: async (id: string) => {
+    /** GET /roles/{id} */
+    get: async (id: string): Promise<Role> => {
         const response = await api.get<Role>(`/roles/${id}`);
         return response.data;
     },
 
-    getByName: async (name: string, organisationId?: string) => {
-        const params: any = { name };
-        if (organisationId) params.organisationId = organisationId;
-        const response = await api.get<Role>("/roles/by-name", { params });
-        return response.data;
-    },
-
-    create: async (data: RoleDto) => {
+    /** POST /roles */
+    create: async (data: RoleDto): Promise<Role> => {
         const response = await api.post<Role>("/roles", data);
         return response.data;
     },
 
-    update: async (id: string, data: RoleDto) => {
+    /** PUT /roles/{id} */
+    update: async (id: string, data: RoleDto): Promise<Role> => {
         const response = await api.put<Role>(`/roles/${id}`, data);
         return response.data;
     },
 
-    delete: async (id: string) => {
+    /** DELETE /roles/{id} */
+    delete: async (id: string): Promise<void> => {
         await api.delete(`/roles/${id}`);
     },
 };

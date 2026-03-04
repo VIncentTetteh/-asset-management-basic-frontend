@@ -12,8 +12,19 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
     if (typeof window !== "undefined") {
         const token = localStorage.getItem("token");
+        const userStr = localStorage.getItem("user");
         if (token && config.headers) {
             config.headers["Authorization"] = `Bearer ${token}`;
+        }
+        if (userStr && config.headers) {
+            try {
+                const user = JSON.parse(userStr);
+                if (user.organisationId) {
+                    config.headers["X-Organisation-Id"] = user.organisationId;
+                }
+            } catch (e) {
+                // Ignore parse errors
+            }
         }
     }
     return config;

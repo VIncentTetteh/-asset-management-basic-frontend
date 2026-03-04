@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Role, RoleDto, Organisation } from "@/types";
+import { Role, RoleDto } from "@/types";
 import { roleService } from "@/services/roleService";
-import { organisationService } from "@/services/organisationService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
@@ -16,7 +15,6 @@ import { useForm } from "react-hook-form";
 
 export default function RolesPage() {
     const [roles, setRoles] = useState<Role[]>([]);
-    const [organisations, setOrganisations] = useState<Organisation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRole, setEditingRole] = useState<Role | null>(null);
@@ -26,12 +24,8 @@ export default function RolesPage() {
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const [rolesData, orgsData] = await Promise.all([
-                roleService.getAll(),
-                organisationService.getAll()
-            ]);
+            const rolesData = await roleService.getAll();
             setRoles(rolesData);
-            setOrganisations(orgsData);
         } catch (error) {
             toast.error("Failed to load roles");
             console.error(error);
@@ -43,8 +37,6 @@ export default function RolesPage() {
     useEffect(() => {
         fetchData();
     }, []);
-
-    const orgMap = useMemo(() => new Map(organisations.map(o => [o.id, o.name])), [organisations]);
 
     // Hardcode a list of common permissions for the multi-select payload
     const ALL_PERMISSIONS = [
@@ -64,8 +56,7 @@ export default function RolesPage() {
         reset({
             name: "",
             description: "",
-            organisationId: "",
-            isSystemRole: false
+            permissions: []
         });
         setIsModalOpen(true);
     };
@@ -81,8 +72,7 @@ export default function RolesPage() {
         reset({
             name: role.name,
             description: role.description || "",
-            organisationId: role.organisationId || "",
-            isSystemRole: role.isSystemRole
+            permissions: role.permissions || []
         });
         setIsModalOpen(true);
     };
@@ -122,7 +112,6 @@ export default function RolesPage() {
         }
 
         try {
-            if (!data.organisationId) delete data.organisationId;
             data.permissions = selectedPermissions;
 
             if (editingRole) {
@@ -165,7 +154,7 @@ export default function RolesPage() {
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
                         <Shield className="h-12 w-12 text-slate-300 mb-4" />
                         <h3 className="text-lg font-medium text-slate-900">No roles configured</h3>
-                        <p className="text-slate-500 mt-1 max-w-sm">Create security roles like "Admin" or "Auditor" to map permissions to your users.</p>
+                        <p className="text-slate-500 mt-1 max-w-sm">Create security roles like &quot;Admin&quot; or &quot;Auditor&quot; to map permissions to your users.</p>
                         <Button onClick={handleOpenCreate} className="mt-6 border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 hover:border-zinc-300">
                             Configure First Role
                         </Button>
@@ -187,8 +176,8 @@ export default function RolesPage() {
                                             <span className="truncate">{role.name}</span>
                                         </CardTitle>
                                     </div>
-                                    <div className="text-xs text-slate-500 mt-0.5 ml-5 truncate" title={orgMap.get(role.organisationId || "") || "Global Role"}>
-                                        {orgMap.get(role.organisationId || "") || "Global Access"}
+                                    <div className="text-xs text-slate-500 mt-0.5 ml-5 truncate">
+                                        Role Access
                                     </div>
                                 </div>
                             </CardHeader>
@@ -260,16 +249,7 @@ export default function RolesPage() {
                         {errors.name && <p className="text-sm text-red-500">{errors.name.message as string}</p>}
                     </div>
 
-                    <div className="space-y-2 border-t pt-4">
-                        <Label htmlFor="organisationId">Bounded Organisation (Optional)</Label>
-                        <Select id="organisationId" {...register("organisationId")} disabled={!!(editingRole?.isSystemRole)}>
-                            <option value="">Global (All Orgs)</option>
-                            {organisations.map((org) => (
-                                <option key={org.id} value={org.id}>{org.name}</option>
-                            ))}
-                        </Select>
-                        <p className="text-[10px] text-slate-500">Leaving this blank creates a system-wide role applicable to all tenants.</p>
-                    </div>
+
 
                     <div className="space-y-2">
                         <Label htmlFor="description">Profile Description</Label>

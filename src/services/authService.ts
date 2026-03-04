@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { User } from "@/types";
+import { User, UserDto } from "@/types";
 
 export interface LoginResponse {
     token: string;
@@ -7,29 +7,79 @@ export interface LoginResponse {
     expiresIn: number;
 }
 
+/** Full tenant registration payload — POST /tenant/register */
+export interface TenantRegistrationDto {
+    // Organisation fields
+    organisationName: string;               // required
+    organisationContactEmail: string;       // required
+    country?: string;
+    address?: string;
+    timezone?: string;
+    industry?: string;
+    registrationNumber?: string;
+    taxId?: string;
+    contactPhone?: string;
+    // Admin user fields
+    adminFirstName: string;                 // required
+    adminLastName: string;                  // required
+    adminEmail: string;                     // required
+    adminPhone?: string;
+    adminJobTitle?: string;
+    password: string;                       // required, min 8 chars
+}
+
+export interface TenantRegistrationResponse {
+    organisationId: string;
+    adminUserId: string;
+    message: string;
+}
+
 export const authService = {
-    register: async (data: any) => {
-        const response = await api.post("/auth/register", data);
+    /** POST /tenant/register — creates org + first admin user */
+    registerTenant: async (data: TenantRegistrationDto): Promise<TenantRegistrationResponse> => {
+        const response = await api.post<TenantRegistrationResponse>("/tenant/register", data);
         return response.data;
     },
 
-    login: async (data: any): Promise<LoginResponse> => {
+    /** POST /auth/register — register additional user within existing org */
+    register: async (data: UserDto & { organisationId: string; roleId?: string }): Promise<User> => {
+        const response = await api.post<User>("/auth/register", data);
+        return response.data;
+    },
+
+    /** POST /auth/login */
+    login: async (data: { email: string; password: string }): Promise<LoginResponse> => {
         const response = await api.post<LoginResponse>("/auth/login", data);
         return response.data;
     },
 
+    /** GET /auth/profile */
     getProfile: async (): Promise<User> => {
         const response = await api.get<User>("/auth/profile");
         return response.data;
     },
 
-    refreshToken: async (): Promise<{ token: string, expiresIn: number }> => {
+    /** POST /auth/refresh — refreshes the JWT expiry to 24 h */
+    refreshToken: async (): Promise<{ token: string; expiresIn: number }> => {
         const response = await api.post("/auth/refresh");
         return response.data;
     },
 
-    logout: async () => {
+    /** POST /auth/logout */
+    logout: async (): Promise<{ message: string }> => {
         const response = await api.post("/auth/logout");
         return response.data;
-    }
+    },
+
+    /** POST /auth/forgot-password */
+    forgotPassword: async (data: { email: string }): Promise<{ message: string; token?: string }> => {
+        const response = await api.post("/auth/forgot-password", data);
+        return response.data;
+    },
+
+    /** POST /auth/reset-password */
+    resetPassword: async (data: { token: string; newPassword: string }): Promise<{ message: string }> => {
+        const response = await api.post("/auth/reset-password", data);
+        return response.data;
+    },
 };

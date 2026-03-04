@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -17,11 +18,33 @@ import {
     ClipboardCheck,
     ArrowRightLeft,
     Trash2,
-    UserCircle
+    UserCircle,
+    Tags
 } from "lucide-react";
+import { organisationService } from "@/services/organisationService";
+import { User } from "@/types";
 
 export function Sidebar() {
     const pathname = usePathname();
+    const [orgName, setOrgName] = useState<string>("AssetMaster");
+
+    useEffect(() => {
+        const loadOrgName = async () => {
+            try {
+                const storedUserStr = localStorage.getItem("user");
+                if (storedUserStr) {
+                    const user = JSON.parse(storedUserStr) as User;
+                    if (user.organisationId) {
+                        const org = await organisationService.get(user.organisationId);
+                        setOrgName(org.name);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to load org name in sidebar:", error);
+            }
+        };
+        loadOrgName();
+    }, []);
 
     const routes = [
         {
@@ -50,6 +73,7 @@ export function Sidebar() {
             group: "Asset Lifecycle",
             items: [
                 { href: "/assets", label: "All Assets", icon: Hexagon, active: pathname.startsWith("/assets") },
+                { href: "/categories", label: "Categories", icon: Tags, active: pathname.startsWith("/categories") },
                 { href: "/maintenance", label: "Maintenance", icon: Wrench, active: pathname.startsWith("/maintenance") },
                 { href: "/transfers", label: "Transfers", icon: ArrowRightLeft, active: pathname.startsWith("/transfers") },
                 { href: "/disposals", label: "Disposals", icon: Trash2, active: pathname.startsWith("/disposals") },
@@ -70,7 +94,7 @@ export function Sidebar() {
             <div className="p-6">
                 <Link href="/" className="flex items-center gap-2 font-bold text-xl text-emerald-400">
                     <Hexagon className="h-6 w-6" />
-                    <span>AssetMaster</span>
+                    <span className="truncate">{orgName}</span>
                 </Link>
             </div>
 

@@ -3,36 +3,47 @@ import { MaintenanceRecord, MaintenanceDto } from "@/types";
 
 export interface MaintenanceFilterParams {
     assetId?: string;
-    dueBefore?: string;
+    vendorId?: string;
+    dueBefore?: string;   // YYYY-MM-DD
 }
 
 export const maintenanceService = {
-    getAll: async (params?: MaintenanceFilterParams) => {
+    /** GET /maintenance — all for org (JWT-scoped) */
+    getAll: async (params?: MaintenanceFilterParams): Promise<MaintenanceRecord[]> => {
         const response = await api.get<MaintenanceRecord[]>("/maintenance", { params });
         return response.data;
     },
 
-    get: async (id: string) => {
+    /** GET /maintenance/{id} */
+    get: async (id: string): Promise<MaintenanceRecord> => {
         const response = await api.get<MaintenanceRecord>(`/maintenance/${id}`);
         return response.data;
     },
 
-    create: async (data: MaintenanceDto) => {
+    /** POST /maintenance — automatically sets asset status → MAINTENANCE */
+    create: async (data: MaintenanceDto): Promise<MaintenanceRecord> => {
         const response = await api.post<MaintenanceRecord>("/maintenance", data);
         return response.data;
     },
 
-    update: async (id: string, data: MaintenanceDto) => {
+    /** PUT /maintenance/{id} */
+    update: async (id: string, data: MaintenanceDto): Promise<MaintenanceRecord> => {
         const response = await api.put<MaintenanceRecord>(`/maintenance/${id}`, data);
         return response.data;
     },
 
-    complete: async (id: string, data?: { notes?: string }) => {
-        const response = await api.post<MaintenanceRecord>(`/maintenance/${id}/complete`, data);
+    /**
+     * POST /maintenance/{id}/complete
+     * Sets status → COMPLETED, performedDate → today, asset status → IN_USE.
+     * No body required.
+     */
+    complete: async (id: string): Promise<MaintenanceRecord> => {
+        const response = await api.post<MaintenanceRecord>(`/maintenance/${id}/complete`);
         return response.data;
     },
 
-    delete: async (id: string) => {
+    /** DELETE /maintenance/{id} — ADMIN only */
+    delete: async (id: string): Promise<void> => {
         await api.delete(`/maintenance/${id}`);
     },
 };
