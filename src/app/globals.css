@@ -1,26 +1,63 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f7fb;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border: #dbe4f0;
+  --text-muted: #5b6475;
+  --primary: #0f766e;
+  --primary-strong: #0d9488;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --success: #16a34a;
+  --ring: #0ea5e9;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-body);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), "Segoe UI", sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading), "Segoe UI", sans-serif;
+}
+
+.ea-shell-gradient {
+  background-image: radial-gradient(circle at 20% 20%, rgba(15, 118, 110, 0.08), transparent 35%),
+    radial-gradient(circle at 80% 0%, rgba(2, 132, 199, 0.08), transparent 32%);
+}
+
+.ea-focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring), 0 0 0 4px rgba(14, 165, 233, 0.2);
+}
+
+.ea-table th {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ea-status-pill {
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
 }

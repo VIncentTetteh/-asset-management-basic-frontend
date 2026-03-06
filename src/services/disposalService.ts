@@ -1,5 +1,6 @@
 import api from "@/lib/axios";
 import { DisposalRecord, DisposalsDto } from "@/types";
+import { extractList } from "@/services/responseUtils";
 
 export interface DisposalFilterParams {
     assetId?: string;
@@ -11,8 +12,8 @@ export interface DisposalFilterParams {
 export const disposalService = {
     /** GET /disposals — all for org (JWT-scoped) */
     getAll: async (params?: DisposalFilterParams): Promise<DisposalRecord[]> => {
-        const response = await api.get<DisposalRecord[]>("/disposals", { params });
-        return response.data;
+        const response = await api.get("/disposals", { params });
+        return extractList<DisposalRecord>(response.data);
     },
 
     /** GET /disposals/{id} */
@@ -27,9 +28,9 @@ export const disposalService = {
         return response.data;
     },
 
-    /** PUT /disposals/{id} */
-    update: async (id: string, data: DisposalsDto): Promise<DisposalRecord> => {
-        const response = await api.put<DisposalRecord>(`/disposals/${id}`, data);
+    /** PATCH /disposals/{id} */
+    update: async (id: string, data: Partial<DisposalsDto>): Promise<DisposalRecord> => {
+        const response = await api.patch<DisposalRecord>(`/disposals/${id}`, data);
         return response.data;
     },
 

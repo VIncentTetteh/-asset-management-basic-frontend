@@ -1,0 +1,59 @@
+:root {
+  /* Color */
+  --color-bg: #0b1020;
+  --color-surface: #11182b;
+  --color-surface-muted: #161f36;
+  --color-border: #2a3553;
+  --color-text: #e6ebf5;
+  --color-text-muted: #a4b0cc;
+
+  --color-primary: #12b981;
+  --color-primary-strong: #0e9f6e;
+  --color-info: #3b82f6;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-success: #22c55e;
+
+  /* Typography */
+  --font-heading: "Manrope", "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", monospace;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-14: 56px;
+
+  /* Radius */
+  --radius-input: 8px;
+  --radius-card: 12px;
+  --radius-panel: 16px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 14px 40px rgba(0, 0, 0, 0.35);
+
+  /* Interaction */
+  --focus-ring: 0 0 0 2px var(--color-info);
+  --focus-offset: 0 0 0 4px rgba(59, 130, 246, 0.25);
+}
+
+.ui-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-input:focus,
+.ui-select:focus,
+.ui-button:focus {
+  outline: none;
+  box-shadow: var(--focus-ring), var(--focus-offset);
+}

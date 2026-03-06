@@ -1,5 +1,6 @@
 import api from "@/lib/axios";
 import { MaintenanceRecord, MaintenanceDto } from "@/types";
+import { extractList } from "@/services/responseUtils";
 
 export interface MaintenanceFilterParams {
     assetId?: string;
@@ -10,8 +11,8 @@ export interface MaintenanceFilterParams {
 export const maintenanceService = {
     /** GET /maintenance — all for org (JWT-scoped) */
     getAll: async (params?: MaintenanceFilterParams): Promise<MaintenanceRecord[]> => {
-        const response = await api.get<MaintenanceRecord[]>("/maintenance", { params });
-        return response.data;
+        const response = await api.get("/maintenance", { params });
+        return extractList<MaintenanceRecord>(response.data);
     },
 
     /** GET /maintenance/{id} */
@@ -26,9 +27,9 @@ export const maintenanceService = {
         return response.data;
     },
 
-    /** PUT /maintenance/{id} */
-    update: async (id: string, data: MaintenanceDto): Promise<MaintenanceRecord> => {
-        const response = await api.put<MaintenanceRecord>(`/maintenance/${id}`, data);
+    /** PATCH /maintenance/{id} */
+    update: async (id: string, data: Partial<MaintenanceDto>): Promise<MaintenanceRecord> => {
+        const response = await api.patch<MaintenanceRecord>(`/maintenance/${id}`, data);
         return response.data;
     },
 

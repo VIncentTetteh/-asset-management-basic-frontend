@@ -1,11 +1,12 @@
 import api from "@/lib/axios";
 import { SsoConfig, SsoConfigDto } from "@/types";
+import { extractList } from "@/services/responseUtils";
 
 export const ssoConfigService = {
     /** GET /sso-configs — current org's SSO config */
     getAll: async (): Promise<SsoConfig[]> => {
-        const response = await api.get<SsoConfig[]>("/sso-configs");
-        return response.data;
+        const response = await api.get("/sso-configs");
+        return extractList<SsoConfig>(response.data);
     },
 
     /** GET /sso-configs/{id} */

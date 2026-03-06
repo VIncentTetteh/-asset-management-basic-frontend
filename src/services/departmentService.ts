@@ -1,11 +1,12 @@
 import api from "@/lib/axios";
 import { Department, DepartmentDto } from "@/types";
+import { extractList } from "@/services/responseUtils";
 
 export const departmentService = {
     /** GET /departments — all in org (JWT-scoped) */
     getAll: async (): Promise<Department[]> => {
-        const response = await api.get<Department[]>("/departments");
-        return response.data;
+        const response = await api.get("/departments");
+        return extractList<Department>(response.data);
     },
 
     /** GET /departments/{id} */
@@ -16,8 +17,8 @@ export const departmentService = {
 
     /** GET /departments/{id}/sub-departments */
     getSubDepartments: async (parentId: string): Promise<Department[]> => {
-        const response = await api.get<Department[]>(`/departments/${parentId}/sub-departments`);
-        return response.data;
+        const response = await api.get(`/departments/${parentId}/sub-departments`);
+        return extractList<Department>(response.data);
     },
 
     /** POST /departments */
@@ -26,9 +27,9 @@ export const departmentService = {
         return response.data;
     },
 
-    /** PUT /departments/{id} */
-    update: async (id: string, data: DepartmentDto): Promise<Department> => {
-        const response = await api.put<Department>(`/departments/${id}`, data);
+    /** PATCH /departments/{id} */
+    update: async (id: string, data: Partial<DepartmentDto>): Promise<Department> => {
+        const response = await api.patch<Department>(`/departments/${id}`, data);
         return response.data;
     },
 

@@ -40,7 +40,7 @@ export default function CategoriesPage() {
 
     const handleOpenCreate = () => {
         setEditingCategory(null);
-        reset({ name: "", description: "", parentCategoryId: "", defaultWarrantyPeriodMonths: undefined });
+        reset({ name: "", description: "", assetPrefixCode: "", parentCategoryId: "", defaultWarrantyPeriodMonths: undefined });
         setIsModalOpen(true);
     };
 
@@ -49,6 +49,7 @@ export default function CategoriesPage() {
         reset({
             name: category.name,
             description: category.description || "",
+            assetPrefixCode: category.assetPrefixCode || "",
             parentCategoryId: category.parentCategoryId || "",
             depreciationPolicyId: category.depreciationPolicyId || "",
             defaultWarrantyPeriodMonths: category.defaultWarrantyPeriodMonths,
@@ -81,6 +82,7 @@ export default function CategoriesPage() {
         // Clean up payload
         if (!data.parentCategoryId) delete data.parentCategoryId;
         if (!data.depreciationPolicyId) delete data.depreciationPolicyId;
+        if (!data.assetPrefixCode) delete data.assetPrefixCode;
         if (data.defaultWarrantyPeriodMonths) {
             data.defaultWarrantyPeriodMonths = Number(data.defaultWarrantyPeriodMonths);
         } else {
@@ -214,6 +216,16 @@ export default function CategoriesPage() {
                             id="description"
                             placeholder="All computers, servers, and peripherals"
                             {...register("description")}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="assetPrefixCode">Asset Prefix Code</Label>
+                        <Input
+                            id="assetPrefixCode"
+                            placeholder="e.g. LTP"
+                            maxLength={10}
+                            {...register("assetPrefixCode")}
                         />
                     </div>
 

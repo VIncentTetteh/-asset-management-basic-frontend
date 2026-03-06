@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
     Building2,
@@ -19,12 +19,18 @@ import {
     ArrowRightLeft,
     Trash2,
     UserCircle,
-    Tags
+    Tags,
+    BarChart3,
+    FileText,
+    Webhook,
+    Bell,
+    Activity
 } from "lucide-react";
 import { organisationService } from "@/services/organisationService";
 import { User } from "@/types";
 
 export function Sidebar() {
+    const router = useRouter();
     const pathname = usePathname();
     const [orgName, setOrgName] = useState<string>("AssetMaster");
 
@@ -50,7 +56,9 @@ export function Sidebar() {
         {
             group: "Overview",
             items: [
-                { href: "/", label: "Dashboard", icon: LayoutGrid, active: pathname === "/" },
+                { href: "/dashboard", label: "Dashboard", icon: LayoutGrid, active: pathname.startsWith("/dashboard") },
+                { href: "/analytics", label: "Analytics", icon: BarChart3, active: pathname.startsWith("/analytics") },
+                { href: "/reports", label: "Reports", icon: FileText, active: pathname.startsWith("/reports") },
             ]
         },
         {
@@ -86,13 +94,28 @@ export function Sidebar() {
                 { href: "/suppliers", label: "Suppliers", icon: Truck, active: pathname.startsWith("/suppliers") },
                 { href: "/purchase-orders", label: "Purchase Orders", icon: ShoppingCart, active: pathname.startsWith("/purchase-orders") },
             ]
+        },
+        {
+            group: "System Config",
+            items: [
+                { href: "/webhooks", label: "Webhooks", icon: Webhook, active: pathname.startsWith("/webhooks") },
+                { href: "/notifications", label: "Notifications", icon: Bell, active: pathname.startsWith("/notifications") },
+                { href: "/audit-events", label: "Audit Events", icon: Shield, active: pathname.startsWith("/audit-events") },
+                { href: "/health", label: "System Health", icon: Activity, active: pathname.startsWith("/health") },
+            ]
         }
     ];
+
+    const handleLogout = () => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/login");
+    };
 
     return (
         <aside className="w-64 bg-slate-900 border-r border-slate-800 text-slate-300 hidden md:flex flex-col h-full overflow-y-auto">
             <div className="p-6">
-                <Link href="/" className="flex items-center gap-2 font-bold text-xl text-emerald-400">
+                <Link href="/dashboard" className="flex items-center gap-2 font-bold text-xl text-emerald-400">
                     <Hexagon className="h-6 w-6" />
                     <span className="truncate">{orgName}</span>
                 </Link>
@@ -123,9 +146,13 @@ export function Sidebar() {
                 ))}
             </nav>
             <div className="p-4 border-t border-slate-800">
-                <Link href="/login" className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors">
+                <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors"
+                >
                     Logout
-                </Link>
+                </button>
             </div>
         </aside>
     );

@@ -50,7 +50,7 @@ export default function DepreciationPoliciesPage() {
             name: "",
             method: "STRAIGHT_LINE",
             usefulLifeMonths: 36, // default 3 years
-            residualValuePercentage: 0,
+            salvageValuePercent: 0,
             description: "",
             organisationId: orgId
         });
@@ -63,7 +63,7 @@ export default function DepreciationPoliciesPage() {
             name: policy.name,
             method: policy.method,
             usefulLifeMonths: policy.usefulLifeMonths || 36,
-            residualValuePercentage: policy.residualValuePercentage || 0,
+            salvageValuePercent: policy.salvageValuePercent || 0,
             description: policy.description || "",
             organisationId: policy.organisationId || orgId
         });
@@ -85,7 +85,7 @@ export default function DepreciationPoliciesPage() {
     const onSubmit = async (data: DepreciationPolicyDto) => {
         try {
             data.usefulLifeMonths = Number(data.usefulLifeMonths);
-            data.residualValuePercentage = Number(data.residualValuePercentage);
+            data.salvageValuePercent = Number(data.salvageValuePercent);
 
             if (!data.organisationId) data.organisationId = orgId;
 
@@ -178,13 +178,13 @@ export default function DepreciationPoliciesPage() {
                                                 <span className="font-semibold">{policy.usefulLifeMonths} <span className="text-xs font-normal text-slate-400">mos</span></span>
                                             </div>
                                         )}
-                                        {policy.residualValuePercentage !== undefined && (
+                                        {policy.salvageValuePercent !== undefined && (
                                             <div className="flex justify-between items-center text-slate-700">
                                                 <div className="flex items-center gap-1.5 text-slate-500">
                                                     <DollarSign className="h-4 w-4" />
                                                     <span>Residual Value</span>
                                                 </div>
-                                                <span className="font-semibold">{policy.residualValuePercentage}%</span>
+                                                <span className="font-semibold">{policy.salvageValuePercent}%</span>
                                             </div>
                                         )}
                                     </div>
@@ -234,8 +234,8 @@ export default function DepreciationPoliciesPage() {
                             <p className="text-[10px] text-slate-500 mt-1">Expected lifespan of the asset.</p>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="residualValuePercentage">Residual Value (%)</Label>
-                            <Input id="residualValuePercentage" type="number" step="0.01" min="0" max="100" {...register("residualValuePercentage")} />
+                            <Label htmlFor="salvageValuePercent">Residual Value (%)</Label>
+                            <Input id="salvageValuePercent" type="number" step="0.01" min="0" max="100" {...register("salvageValuePercent")} />
                             <p className="text-[10px] text-slate-500 mt-1">Salvage value at end of life.</p>
                         </div>
                     </div>

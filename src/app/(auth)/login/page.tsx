@@ -29,7 +29,7 @@ export default function LoginPage() {
 
                 api.defaults.headers.common["Authorization"] = `Bearer ${response.token}`;
                 toast.success(`Welcome back, ${response.user.firstName}!`);
-                router.push("/assets"); // redirect to main dashboard
+                router.push("/dashboard");
             } else {
                 toast.error("Invalid response from server");
             }
@@ -92,6 +92,12 @@ export default function LoginPage() {
                             {isLoading ? "Signing in..." : "Sign in"}
                         </Button>
                         <div className="text-sm text-center text-gray-500 pt-4 border-t space-y-2">
+                            <div>
+                                Learn more about the platform{" "}
+                                <Link href="/" className="font-semibold text-emerald-600 hover:underline">
+                                    View product overview
+                                </Link>
+                            </div>
                             <div>
                                 Need to create a new workspace?{" "}
                                 <Link href="/register-tenant" className="font-semibold text-emerald-600 hover:underline">

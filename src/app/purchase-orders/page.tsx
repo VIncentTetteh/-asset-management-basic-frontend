@@ -1,46 +1,43 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { PurchaseOrder, PurchaseOrderDto, Supplier, Department, POStatus, User } from "@/types";
+import { PurchaseOrder, PurchaseOrderDto, Supplier, Department, POStatus } from "@/types";
 import { purchaseOrderService } from "@/services/purchaseOrderService";
 import { supplierService } from "@/services/supplierService";
 import { departmentService } from "@/services/departmentService";
-import { authService } from "@/services/authService";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, ShoppingCart, Calendar, Building2, CheckCircle2, XCircle, MoreHorizontal, Layers } from "lucide-react";
+import { Plus, Pencil, Trash2, ShoppingCart, Building2, CheckCircle2, XCircle, MoreHorizontal, Layers } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { getOrganisationIdFromStorage } from "@/lib/authContext";
 
 export default function PurchaseOrdersPage() {
     const [orders, setOrders] = useState<PurchaseOrder[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
-    const [profile, setProfile] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
 
-    const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<PurchaseOrderDto>();
+    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<PurchaseOrderDto>();
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const [ordersData, suppliersData, deptData, profileData] = await Promise.all([
+            const [ordersData, suppliersData, deptData] = await Promise.all([
                 purchaseOrderService.getAll(),
                 supplierService.getAll(),
                 departmentService.getAll(),
-                authService.getProfile(),
             ]);
             setOrders(ordersData);
             setSuppliers(suppliersData);
             setDepartments(deptData);
-            setProfile(profileData as unknown as User);
         } catch (error) {
             toast.error("Failed to load purchase orders");
             console.error(error);
@@ -53,15 +50,14 @@ export default function PurchaseOrdersPage() {
         fetchData();
     }, []);
 
-    // Populate organisationId into RHF state once profile is loaded
-    useEffect(() => {
-        if (profile) {
-            setValue("organisationId", (profile as any).organisationId || "");
-        }
-    }, [profile, setValue]);
-
     const supplierMap = useMemo(() => new Map(suppliers.map(s => [s.id, s.name])), [suppliers]);
     const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
+    const normalizePoStatus = (status?: string): string | undefined => {
+        if (!status) return undefined;
+        if (status === "PENDING") return POStatus.SUBMITTED;
+        if (status === "RECEIVED" || status === "ORDERED") return POStatus.DELIVERED;
+        return status;
+    };
 
     const handleOpenCreate = () => {
         setEditingOrder(null);
@@ -73,7 +69,6 @@ export default function PurchaseOrdersPage() {
             remarks: "",
             supplierId: "",
             departmentId: "",
-            organisationId: (profile as any)?.organisationId || "",
         });
         setIsModalOpen(true);
     };
@@ -84,10 +79,9 @@ export default function PurchaseOrdersPage() {
             poNumber: order.poNumber,
             totalAmount: order.totalAmount,
             currency: order.currency || "GHS",
-            status: order.status || POStatus.DRAFT,
+            status: normalizePoStatus(order.status) || POStatus.DRAFT,
             supplierId: order.supplierId || "",
             departmentId: order.departmentId || "",
-            organisationId: order.organisationId || (profile as any)?.organisationId || "",
             remarks: order.remarks || "",
         });
         setIsModalOpen(true);
@@ -119,27 +113,97 @@ export default function PurchaseOrdersPage() {
 
     const onSubmit = async (data: PurchaseOrderDto) => {
         try {
-            data.totalAmount = Number(data.totalAmount);
+            const poNumber = data.poNumber?.trim();
+            const totalAmount = Number(data.totalAmount);
+            if (!poNumber) {
+                toast.error("PO Number is required");
+                return;
+            }
+            if (!data.supplierId) {
+                toast.error("Supplier is required");
+                return;
+            }
+            if (!data.departmentId) {
+                toast.error("Department is required");
+                return;
+            }
+            if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+                toast.error("Total amount must be greater than 0");
+                return;
+            }
+
+            const payload: Partial<PurchaseOrderDto> = {
+                ...data,
+                poNumber,
+                totalAmount,
+                status: normalizePoStatus(data.status),
+            };
 
             // Clean empty optional strings (keep mandatory keys)
-            const mandatoryKeys = ["departmentId", "supplierId", "organisationId", "poNumber"];
-            (Object.keys(data) as (keyof PurchaseOrderDto)[]).forEach(k => {
-                if (data[k] === "" && !mandatoryKeys.includes(k)) {
-                    delete (data as any)[k];
+            const mandatoryKeys: Array<keyof PurchaseOrderDto> = ["departmentId", "supplierId", "poNumber"];
+            (Object.keys(payload) as (keyof PurchaseOrderDto)[]).forEach((k) => {
+                if (payload[k] === "" && !mandatoryKeys.includes(k)) {
+                    delete payload[k];
                 }
             });
 
             if (editingOrder) {
-                await purchaseOrderService.update(editingOrder.id!, data);
-                toast.success("Purchase order updated");
+                const currentStatus = normalizePoStatus(editingOrder.status);
+                const desiredStatus = normalizePoStatus(payload.status);
+                const organisationId = editingOrder.organisationId || getOrganisationIdFromStorage();
+                if (!organisationId) {
+                    toast.error("Organisation ID is required");
+                    return;
+                }
+
+                const updatePayload: PurchaseOrderDto = {
+                    poNumber,
+                    totalAmount,
+                    currency: payload.currency,
+                    status: desiredStatus,
+                    remarks: payload.remarks,
+                    supplierId: data.supplierId,
+                    departmentId: data.departmentId,
+                    organisationId,
+                };
+
+                const updated = await purchaseOrderService.update(editingOrder.id!, updatePayload);
+                let finalStatus = normalizePoStatus(updated.status);
+
+                // Backend may ignore direct status edits; apply explicit workflow endpoints when available.
+                if (desiredStatus && desiredStatus !== currentStatus && finalStatus !== desiredStatus) {
+                    if (desiredStatus === POStatus.APPROVED) {
+                        const approved = await purchaseOrderService.approve(editingOrder.id!);
+                        finalStatus = normalizePoStatus(approved.status);
+                    } else if (desiredStatus === POStatus.REJECTED) {
+                        const rejected = await purchaseOrderService.reject(editingOrder.id!);
+                        finalStatus = normalizePoStatus(rejected.status);
+                    } else {
+                        toast.error(`Status change to ${desiredStatus} was not applied by backend workflow`);
+                    }
+                }
+
+                if (desiredStatus && finalStatus !== desiredStatus) {
+                    toast.error("Purchase order updated, but status did not change");
+                } else {
+                    toast.success("Purchase order updated");
+                }
             } else {
-                await purchaseOrderService.create(data);
+                const organisationId = getOrganisationIdFromStorage();
+                if (!organisationId) {
+                    toast.error("Organisation ID is required");
+                    return;
+                }
+                await purchaseOrderService.create({ ...payload, organisationId } as PurchaseOrderDto);
                 toast.success("Purchase order created");
             }
             setIsModalOpen(false);
             fetchData();
         } catch (error) {
-            toast.error("Failed to save purchase order");
+            const err = error as { response?: { data?: { message?: string; errors?: Record<string, string> } } };
+            const fieldErrors = err.response?.data?.errors;
+            const firstFieldError = fieldErrors ? Object.values(fieldErrors)[0] : undefined;
+            toast.error(firstFieldError || err.response?.data?.message || "Failed to save purchase order");
             console.error(error);
         }
     };
@@ -147,10 +211,11 @@ export default function PurchaseOrdersPage() {
     const getStatusStyles = (status: string) => {
         switch (status) {
             case POStatus.DRAFT: return "bg-slate-100 text-slate-700 border-slate-200";
-            case POStatus.PENDING: return "bg-amber-100 text-amber-700 border-amber-200";
+            case POStatus.SUBMITTED:
+            case "PENDING": return "bg-amber-100 text-amber-700 border-amber-200";
             case POStatus.APPROVED: return "bg-emerald-100 text-emerald-700 border-emerald-200";
-            case POStatus.ORDERED: return "bg-blue-100 text-blue-700 border-blue-200";
-            case POStatus.RECEIVED: return "bg-green-100 text-green-700 border-green-200";
+            case POStatus.DELIVERED:
+            case "RECEIVED": return "bg-green-100 text-green-700 border-green-200";
             case POStatus.REJECTED:
             case POStatus.CANCELLED: return "bg-red-100 text-red-700 border-red-200";
             default: return "bg-gray-100 text-gray-700 border-gray-200";
@@ -222,8 +287,8 @@ export default function PurchaseOrdersPage() {
                                 </div>
                                 <div className="flex justify-between items-center gap-2 pt-4 border-t border-slate-100 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <div className="flex gap-1">
-                                        {/* Approve / Reject available for PENDING status */}
-                                        {order.status === POStatus.PENDING && (
+                                        {/* Approve / Reject available for submitted status */}
+                                        {(order.status === POStatus.SUBMITTED || order.status === "PENDING") && (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700 hover:bg-slate-50">
@@ -269,9 +334,6 @@ export default function PurchaseOrdersPage() {
                 description={editingOrder ? "Update the purchase order details." : "Create a new procurement request."}
             >
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
-                    {/* Hidden organisationId — populated via setValue when profile loads */}
-                    <input type="hidden" {...register("organisationId")} />
-
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2 col-span-2">
                             <Label htmlFor="poNumber">PO Number <span className="text-red-500">*</span></Label>
@@ -310,7 +372,7 @@ export default function PurchaseOrdersPage() {
                     <div className="grid grid-cols-2 gap-4 border-t pt-4">
                         <div className="space-y-2">
                             <Label htmlFor="totalAmount">Total Amount <span className="text-red-500">*</span></Label>
-                            <Input id="totalAmount" type="number" step="0.01" min="0" {...register("totalAmount", { required: true, min: 0 })} />
+                            <Input id="totalAmount" type="number" step="0.01" min="0.01" {...register("totalAmount", { required: true, min: 0.01 })} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="currency">Currency</Label>

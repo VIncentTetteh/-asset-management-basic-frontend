@@ -1,11 +1,20 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Manrope, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/Sidebar";
 import { Toaster } from "react-hot-toast";
 import { AppLayoutClient } from "@/components/AppLayoutClient";
 
-const inter = Inter({ subsets: ["latin"] });
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-heading",
+  weight: ["600", "700", "800"],
+});
+
+const ibmPlexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  variable: "--font-body",
+  weight: ["400", "500", "600"],
+});
 
 export const metadata: Metadata = {
   title: "Enterprise Asset Management",
@@ -22,7 +31,7 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${manrope.variable} ${ibmPlexSans.variable}`}>
         <AppLayoutClient>
           {children}
         </AppLayoutClient>

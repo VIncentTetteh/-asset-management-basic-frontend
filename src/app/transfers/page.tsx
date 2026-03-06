@@ -24,7 +24,7 @@ export default function TransfersPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<AssetTransferDto>();
+    const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<AssetTransferDto>();
 
     const fetchData = async () => {
         try {
@@ -52,18 +52,22 @@ export default function TransfersPage() {
     }, []);
 
     const assetMap = useMemo(() => new Map(assets.map(a => [a.id, a.name])), [assets]);
+    const assetByIdMap = useMemo(() => new Map(assets.map(a => [a.id, a])), [assets]);
     const assetTagMap = useMemo(() => new Map(assets.map(a => [a.id, a.assetTag])), [assets]);
     const locationMap = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations]);
     const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
 
     const handleOpenCreate = () => {
+        const currentUser = typeof window !== "undefined"
+            ? JSON.parse(localStorage.getItem("user") || "{}")
+            : {};
         reset({
             assetId: "",
             fromDepartmentId: "",
             toDepartmentId: "",
             fromLocationId: "",
             toLocationId: "",
-            requestedById: "",
+            requestedById: currentUser?.id || "",
             reason: "",
         });
         setIsModalOpen(true);
@@ -111,14 +115,59 @@ export default function TransfersPage() {
         }
     };
 
+    const selectedAssetId = watch("assetId");
+
+    useEffect(() => {
+        if (!selectedAssetId) return;
+        const selectedAsset = assetByIdMap.get(selectedAssetId);
+        if (!selectedAsset) return;
+
+        setValue("fromDepartmentId", selectedAsset.departmentId || "");
+        setValue("fromLocationId", selectedAsset.locationId || "");
+    }, [selectedAssetId, assetByIdMap, setValue]);
+
     const onSubmit = async (data: AssetTransferDto) => {
-        // Remove empty optional fields
-        if (!data.fromLocationId) delete data.fromLocationId;
-        if (!data.toLocationId) delete data.toLocationId;
-        if (!data.reason) delete data.reason;
+        const currentUser = typeof window !== "undefined"
+            ? JSON.parse(localStorage.getItem("user") || "{}")
+            : {};
+
+        const selectedAsset = data.assetId ? assetByIdMap.get(data.assetId) : undefined;
+        const fromDepartmentId = data.fromDepartmentId || selectedAsset?.departmentId || "";
+        const fromLocationId = data.fromLocationId || selectedAsset?.locationId || undefined;
+        const requestedById = data.requestedById || currentUser?.id;
+
+        if (!requestedById) {
+            toast.error("Cannot submit transfer: requester user ID is missing");
+            return;
+        }
+
+        if (!fromDepartmentId) {
+            toast.error("Selected asset has no source department");
+            return;
+        }
+
+        if (fromDepartmentId === data.toDepartmentId) {
+            toast.error("Destination department must be different from source department");
+            return;
+        }
+
+        if (fromLocationId && data.toLocationId && fromLocationId === data.toLocationId) {
+            toast.error("Destination location must be different from source location");
+            return;
+        }
+
+        const payload: AssetTransferDto = {
+            assetId: data.assetId,
+            fromDepartmentId,
+            toDepartmentId: data.toDepartmentId,
+            requestedById,
+            fromLocationId: fromLocationId || undefined,
+            toLocationId: data.toLocationId || undefined,
+            reason: data.reason || undefined,
+        };
 
         try {
-            await assetTransferService.create(data);
+            await assetTransferService.create(payload);
             toast.success("Transfer requested successfully");
             setIsModalOpen(false);
             fetchData();
@@ -133,6 +182,8 @@ export default function TransfersPage() {
             case "COMPLETED": return "bg-emerald-100 text-emerald-700 border-emerald-200";
             case "REQUESTED": return "bg-blue-100 text-blue-700 border-blue-200";
             case "APPROVED": return "bg-indigo-100 text-indigo-700 border-indigo-200";
+            case "REJECTED": return "bg-amber-100 text-amber-700 border-amber-200";
+            case "IN_TRANSIT": return "bg-violet-100 text-violet-700 border-violet-200";
             case "CANCELLED": return "bg-red-100 text-red-700 border-red-200";
             default: return "bg-slate-100 text-slate-700 border-slate-200";
         }
@@ -283,11 +334,7 @@ export default function TransfersPage() {
                         {errors.assetId && <p className="text-sm text-red-500">{errors.assetId.message as string}</p>}
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="requestedById">Requested By (User ID) <span className="text-red-500">*</span></Label>
-                        <Input id="requestedById" placeholder="uuid of the requesting user" {...register("requestedById", { required: "Requester is required" })} />
-                        {errors.requestedById && <p className="text-sm text-red-500">{errors.requestedById.message as string}</p>}
-                    </div>
+                    <Input type="hidden" {...register("requestedById")} />
 
                     <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
                         <div className="col-span-full mb-1">
@@ -295,7 +342,7 @@ export default function TransfersPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="fromDepartmentId" className="text-xs">From Department <span className="text-red-500">*</span></Label>
-                            <Select id="fromDepartmentId" {...register("fromDepartmentId", { required: "Origin department required" })}>
+                            <Select id="fromDepartmentId" {...register("fromDepartmentId", { required: "Origin department required" })} disabled>
                                 <option value="">Select Department</option>
                                 {departments.map((d) => (
                                     <option key={d.id} value={d.id}>{d.name}</option>
@@ -304,8 +351,8 @@ export default function TransfersPage() {
                             {errors.fromDepartmentId && <p className="text-sm text-red-500">{errors.fromDepartmentId.message as string}</p>}
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="fromLocationId" className="text-xs">From Location (optional)</Label>
-                            <Select id="fromLocationId" {...register("fromLocationId")}>
+                            <Label htmlFor="fromLocationId" className="text-xs">From Location (auto)</Label>
+                            <Select id="fromLocationId" {...register("fromLocationId")} disabled>
                                 <option value="">None</option>
                                 {locations.map((l) => (
                                     <option key={l.id} value={l.id}>{l.name}</option>

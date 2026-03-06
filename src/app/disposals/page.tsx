@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { DisposalRecord, DisposalsDto, Asset, AssetState, DisposalMethod } from "@/types";
+import { DisposalRecord, DisposalsDto, Asset } from "@/types";
 import { disposalService } from "@/services/disposalService";
 import { assetService } from "@/services/assetService";
 import { Button } from "@/components/ui/button";
@@ -89,23 +89,41 @@ export default function DisposalsPage() {
 
     const onSubmit = async (data: DisposalsDto) => {
         try {
-            data.saleValue = Number(data.saleValue);
+            const currentUser = typeof window !== "undefined"
+                ? JSON.parse(localStorage.getItem("user") || "{}")
+                : {};
 
-            // Clean empty strings
-            Object.keys(data).forEach(key => {
-                const k = key as keyof DisposalsDto;
-                if (data[k] === "") {
-                    delete (data as any)[k];
-                }
-            });
+            const approvedById = editingDisposal?.approvedById || currentUser?.id;
+            if (!approvedById) {
+                toast.error("Cannot submit disposal: approver user ID is missing");
+                return;
+            }
+
+            const rawSaleValue = data.saleValue as unknown;
+            const hasSaleValue = rawSaleValue !== undefined && rawSaleValue !== null && String(rawSaleValue).trim() !== "";
+            const saleValue = hasSaleValue ? Number(rawSaleValue) : undefined;
+            if (hasSaleValue && (Number.isNaN(saleValue) || (saleValue as number) < 0)) {
+                toast.error("Recovered value must be a valid positive number");
+                return;
+            }
+
+            const payload: DisposalsDto = {
+                id: editingDisposal?.id,
+                assetId: data.assetId,
+                disposalDate: data.disposalDate,
+                disposalMethod: data.disposalMethod,
+                reason: data.reason || undefined,
+                saleValue,
+                approvedById,
+                complianceDocumentUrl: data.complianceDocumentUrl || undefined,
+                organisationId: currentUser?.organisationId || undefined,
+            };
 
             if (editingDisposal) {
-                await disposalService.update(editingDisposal.id!, data);
+                await disposalService.update(editingDisposal.id!, payload);
                 toast.success("Disposal record updated");
             } else {
-
-
-                await disposalService.create(data);
+                await disposalService.create(payload);
                 toast.success("Asset disposed successfully");
             }
             setIsModalOpen(false);
@@ -119,10 +137,11 @@ export default function DisposalsPage() {
     const getMethodStyles = (method: string) => {
         switch (method) {
             case 'SALE': return "bg-emerald-100 text-emerald-800 border-emerald-200";
-            case 'AUCTION': return "bg-violet-100 text-violet-800 border-violet-200";
-            case 'DONATION': return "bg-blue-100 text-blue-800 border-blue-200";
             case 'SCRAP': return "bg-slate-200 text-slate-800 border-slate-300";
-            case 'RETURN_TO_VENDOR': return "bg-orange-100 text-orange-800 border-orange-200";
+            case 'DONATION': return "bg-blue-100 text-blue-800 border-blue-200";
+            case 'RECYCLING': return "bg-teal-100 text-teal-800 border-teal-200";
+            case 'TRADE_IN': return "bg-violet-100 text-violet-800 border-violet-200";
+            case 'RETURN': return "bg-orange-100 text-orange-800 border-orange-200";
             default: return "bg-gray-100 text-gray-800 border-gray-200";
         }
     };
@@ -245,10 +264,11 @@ export default function DisposalsPage() {
                             <Label htmlFor="disposalMethod">Disposal Method</Label>
                             <Select id="disposalMethod" {...register("disposalMethod", { required: true })}>
                                 <option value="SALE">SALE — Sold to buyer</option>
-                                <option value="AUCTION">AUCTION — Sold at auction</option>
                                 <option value="SCRAP">SCRAP — Scrapped / recycled</option>
+                                <option value="RECYCLING">RECYCLING</option>
+                                <option value="TRADE_IN">TRADE IN</option>
+                                <option value="RETURN">RETURN</option>
                                 <option value="DONATION">DONATION — Donated</option>
-                                <option value="RETURN_TO_VENDOR">RETURN TO VENDOR</option>
                             </Select>
                         </div>
                     </div>

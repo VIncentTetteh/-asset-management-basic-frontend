@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Role, RoleDto } from "@/types";
 import { roleService } from "@/services/roleService";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, Shield, Lock, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, Lock, ShieldAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 
 export default function RolesPage() {
@@ -49,6 +48,23 @@ export default function RolesPage() {
     ];
 
     const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+    const parsePermissions = (value: Role["permissions"]): string[] => {
+        if (Array.isArray(value)) return value;
+        if (typeof value === "string") {
+            try {
+                const parsed = JSON.parse(value);
+                if (Array.isArray(parsed)) return parsed.map(String);
+                if (parsed && typeof parsed === "object") {
+                    return Object.entries(parsed)
+                        .filter(([, enabled]) => Boolean(enabled))
+                        .map(([key]) => key);
+                }
+            } catch {
+                return [];
+            }
+        }
+        return [];
+    };
 
     const handleOpenCreate = () => {
         setEditingRole(null);
@@ -68,11 +84,12 @@ export default function RolesPage() {
             // return; // Commented out to allow exploring the UI
         }
         setEditingRole(role);
-        setSelectedPermissions(role.permissions || []);
+        const perms = parsePermissions(role.permissions);
+        setSelectedPermissions(perms);
         reset({
             name: role.name,
             description: role.description || "",
-            permissions: role.permissions || []
+            permissions: perms
         });
         setIsModalOpen(true);
     };
@@ -186,16 +203,16 @@ export default function RolesPage() {
                                     <p className="line-clamp-2" title={role.description}>{role.description || "No description provided."}</p>
 
                                     <div className="mt-4 pt-4 border-t border-slate-100">
-                                        <div className="text-xs font-semibold uppercase text-slate-400 mb-2">Granted Permissions ({role.permissions?.length || 0})</div>
+                                        <div className="text-xs font-semibold uppercase text-slate-400 mb-2">Granted Permissions ({parsePermissions(role.permissions).length})</div>
                                         <div className="flex flex-wrap gap-1">
-                                            {role.permissions?.slice(0, 4).map(p => (
+                                            {parsePermissions(role.permissions).slice(0, 4).map(p => (
                                                 <span key={p} className="px-1.5 py-0.5 bg-slate-100 text-[10px] rounded border border-slate-200 text-slate-600 font-mono" title={p}>
                                                     {p.replace('_', ' ')}
                                                 </span>
                                             ))}
-                                            {(role.permissions?.length || 0) > 4 && (
+                                            {parsePermissions(role.permissions).length > 4 && (
                                                 <span className="px-1.5 py-0.5 bg-slate-50 text-[10px] rounded border border-slate-200 text-slate-500 font-mono">
-                                                    +{role.permissions!.length - 4} more
+                                                    +{parsePermissions(role.permissions).length - 4} more
                                                 </span>
                                             )}
                                         </div>

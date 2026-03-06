@@ -1,11 +1,5 @@
 import api from "@/lib/axios";
-import { User, UserDto } from "@/types";
-
-export interface LoginResponse {
-    token: string;
-    user: User;
-    expiresIn: number;
-}
+import { User, UserDto, LoginResponse } from "@/types";
 
 /** Full tenant registration payload — POST /tenant/register */
 export interface TenantRegistrationDto {
@@ -60,8 +54,8 @@ export const authService = {
     },
 
     /** POST /auth/refresh — refreshes the JWT expiry to 24 h */
-    refreshToken: async (): Promise<{ token: string; expiresIn: number }> => {
-        const response = await api.post("/auth/refresh");
+    refreshToken: async (): Promise<{ token: string; expiresIn: number; tokenType: string }> => {
+        const response = await api.post<{ token: string; expiresIn: number; tokenType: string }>("/auth/refresh");
         return response.data;
     },
 

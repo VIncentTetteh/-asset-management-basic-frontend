@@ -1,5 +1,6 @@
 import api from "@/lib/axios";
 import { Audit, AssetAuditDto } from "@/types";
+import { extractList } from "@/services/responseUtils";
 
 export interface AuditFilterParams {
     departmentId?: string;
@@ -11,8 +12,8 @@ export interface AuditFilterParams {
 export const auditService = {
     /** GET /audits — all for org (JWT-scoped) */
     getAll: async (params?: AuditFilterParams): Promise<Audit[]> => {
-        const response = await api.get<Audit[]>("/audits", { params });
-        return response.data;
+        const response = await api.get("/audits", { params });
+        return extractList<Audit>(response.data);
     },
 
     /** GET /audits/{id} */

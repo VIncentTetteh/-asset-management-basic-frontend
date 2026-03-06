@@ -1,11 +1,12 @@
 import api from "@/lib/axios";
 import { Category, CategoryDto } from "@/types";
+import { extractList } from "@/services/responseUtils";
 
 export const categoryService = {
     /** GET /categories — all in org (JWT-scoped) */
     getAll: async (): Promise<Category[]> => {
-        const response = await api.get<Category[]>("/categories");
-        return response.data;
+        const response = await api.get("/categories");
+        return extractList<Category>(response.data);
     },
 
     /** GET /categories/{id} */
@@ -16,8 +17,8 @@ export const categoryService = {
 
     /** GET /categories/{parentId}/sub-categories */
     getSubCategories: async (parentId: string): Promise<Category[]> => {
-        const response = await api.get<Category[]>(`/categories/${parentId}/sub-categories`);
-        return response.data;
+        const response = await api.get(`/categories/${parentId}/sub-categories`);
+        return extractList<Category>(response.data);
     },
 
     /** POST /categories */
@@ -26,9 +27,9 @@ export const categoryService = {
         return response.data;
     },
 
-    /** PUT /categories/{id} */
-    update: async (id: string, data: CategoryDto): Promise<Category> => {
-        const response = await api.put<Category>(`/categories/${id}`, data);
+    /** PATCH /categories/{id} */
+    update: async (id: string, data: Partial<CategoryDto>): Promise<Category> => {
+        const response = await api.patch<Category>(`/categories/${id}`, data);
         return response.data;
     },
 

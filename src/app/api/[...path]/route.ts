@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-const TARGET_BASE = "http://localhost:8085/api";
+const TARGET_BASE = process.env.API_TARGET_BASE || "http://localhost:8085/api";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
     return handleProxy(req, await params);

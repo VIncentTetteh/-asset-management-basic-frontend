@@ -168,6 +168,12 @@ export default function RegisterPage() {
                         </Button>
                         <div className="text-sm text-center text-gray-500 space-y-2">
                             <div>
+                                Learn more about the platform{" "}
+                                <Link href="/" className="font-semibold text-emerald-600 hover:underline">
+                                    View product overview
+                                </Link>
+                            </div>
+                            <div>
                                 Setting up a new company?{" "}
                                 <Link href="/register-tenant" className="font-semibold text-emerald-600 hover:underline">
                                     Create a Workspace

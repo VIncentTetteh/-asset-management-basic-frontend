@@ -1,49 +1,62 @@
 import api from "@/lib/axios";
 import { Supplier, SupplierDto } from "@/types";
+import { extractList } from "@/services/responseUtils";
+import { getOrganisationIdFromStorage } from "@/lib/authContext";
 
-/** Read organisationId from the cached user — needed as a query param for /suppliers */
-const getOrgId = (): string => {
-    if (typeof window !== "undefined") {
-        try {
-            const user = JSON.parse(localStorage.getItem("user") || "{}");
-            return user.organisationId || "";
-        } catch {
-            return "";
-        }
-    }
-    return "";
+const getOrgId = (): string | undefined => {
+    return getOrganisationIdFromStorage();
 };
 
+const withOrgParams = (params?: Record<string, string | number | boolean | undefined>) => ({
+    ...(params || {}),
+    organisationId: getOrgId(),
+});
+
 export const supplierService = {
-    /** GET /suppliers — backend requires organisationId as a query param */
+    /** GET /suppliers */
     getAll: async (): Promise<Supplier[]> => {
-        const orgId = getOrgId();
-        const response = await api.get<Supplier[]>("/suppliers", {
-            params: orgId ? { organisationId: orgId } : undefined,
+        const response = await api.get("/suppliers", {
+            params: withOrgParams(),
         });
-        return response.data;
+        return extractList<Supplier>(response.data);
     },
 
     /** GET /suppliers/{id} */
     get: async (id: string): Promise<Supplier> => {
-        const response = await api.get<Supplier>(`/suppliers/${id}`);
+        const response = await api.get<Supplier>(`/suppliers/${id}`, {
+            params: withOrgParams(),
+        });
         return response.data;
     },
 
     /** POST /suppliers */
     create: async (data: SupplierDto): Promise<Supplier> => {
-        const response = await api.post<Supplier>("/suppliers", data);
+        const payload: SupplierDto = {
+            ...data,
+            organisationId: data.organisationId || getOrgId(),
+        };
+        const response = await api.post<Supplier>("/suppliers", payload, {
+            params: withOrgParams(),
+        });
         return response.data;
     },
 
-    /** PUT /suppliers/{id} */
-    update: async (id: string, data: SupplierDto): Promise<Supplier> => {
-        const response = await api.put<Supplier>(`/suppliers/${id}`, data);
+    /** PATCH /suppliers/{id} */
+    update: async (id: string, data: Partial<SupplierDto>): Promise<Supplier> => {
+        const payload: Partial<SupplierDto> = {
+            ...data,
+            organisationId: data.organisationId || getOrgId(),
+        };
+        const response = await api.patch<Supplier>(`/suppliers/${id}`, payload, {
+            params: withOrgParams(),
+        });
         return response.data;
     },
 
-    /** DELETE /suppliers/{id} — soft delete */
+    /** DELETE /suppliers/{id} */
     delete: async (id: string): Promise<void> => {
-        await api.delete(`/suppliers/${id}`);
+        await api.delete(`/suppliers/${id}`, {
+            params: withOrgParams(),
+        });
     },
 };

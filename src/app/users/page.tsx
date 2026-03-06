@@ -14,6 +14,7 @@ import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, UserX, UsersIcon, Shield, Layers, Briefcase, Mail, Lock } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { getOrganisationIdFromStorage } from "@/lib/authContext";
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -94,23 +95,38 @@ export default function UsersPage() {
     };
 
     const onSubmit = async (data: UserDto) => {
-        // Remove empty optional strings
-        if (!data.phone) delete data.phone;
-        if (!data.jobTitle) delete data.jobTitle;
-        if (!data.departmentId) delete data.departmentId;
-        if (!data.roleId) delete data.roleId;
+        const payload: UserDto = {
+            ...data,
+            phone: data.phone || undefined,
+            jobTitle: data.jobTitle || undefined,
+            departmentId: data.departmentId || undefined,
+            roleId: data.roleId || undefined,
+        };
 
         try {
             if (editingUser) {
-                const { password, ...updateData } = data;
-                await userService.update(editingUser.id!, updateData);
+                const { password, ...updateData } = payload;
+                const { roleId, ...profileData } = updateData;
+
+                // Update base profile fields first.
+                await userService.update(editingUser.id!, profileData);
+
+                // Role changes must go through /users/{id}/role.
+                if (roleId && roleId !== editingUser.roleId) {
+                    await userService.assignRole(editingUser.id!, roleId);
+                }
+
                 toast.success("Profile updated");
             } else {
-                if (!data.password) {
+                if (!payload.password) {
                     toast.error("Password is required");
                     return;
                 }
-                await userService.create(data as UserDto & { password: string });
+                await userService.create({
+                    ...(payload as UserDto & { password: string }),
+                    organisationId: payload.organisationId || getOrganisationIdFromStorage(),
+                    status: payload.status || "ACTIVE",
+                });
                 toast.success("User created successfully");
             }
             setIsModalOpen(false);

@@ -1,11 +1,12 @@
 import api from "@/lib/axios";
 import { Location, LocationDto } from "@/types";
+import { extractList } from "@/services/responseUtils";
 
 export const locationService = {
     /** GET /locations — all in org (JWT-scoped) */
     getAll: async (): Promise<Location[]> => {
-        const response = await api.get<Location[]>("/locations");
-        return response.data;
+        const response = await api.get("/locations");
+        return extractList<Location>(response.data);
     },
 
     /** GET /locations/{id} */
@@ -16,8 +17,8 @@ export const locationService = {
 
     /** GET /locations/{parentId}/sub-locations */
     getSubLocations: async (parentId: string): Promise<Location[]> => {
-        const response = await api.get<Location[]>(`/locations/${parentId}/sub-locations`);
-        return response.data;
+        const response = await api.get(`/locations/${parentId}/sub-locations`);
+        return extractList<Location>(response.data);
     },
 
     /** POST /locations */
@@ -26,9 +27,9 @@ export const locationService = {
         return response.data;
     },
 
-    /** PUT /locations/{id} */
-    update: async (id: string, data: LocationDto): Promise<Location> => {
-        const response = await api.put<Location>(`/locations/${id}`, data);
+    /** PATCH /locations/{id} */
+    update: async (id: string, data: Partial<LocationDto>): Promise<Location> => {
+        const response = await api.patch<Location>(`/locations/${id}`, data);
         return response.data;
     },
 

@@ -1,5 +1,6 @@
 import api from "@/lib/axios";
 import { AssetTransfer, AssetTransferDto } from "@/types";
+import { extractList } from "@/services/responseUtils";
 
 export interface TransferFilterParams {
     assetId?: string;
@@ -11,8 +12,8 @@ export interface TransferFilterParams {
 export const assetTransferService = {
     /** GET /asset-transfers — all for org (JWT-scoped) */
     getAll: async (params?: TransferFilterParams): Promise<AssetTransfer[]> => {
-        const response = await api.get<AssetTransfer[]>("/asset-transfers", { params });
-        return response.data;
+        const response = await api.get("/asset-transfers", { params });
+        return extractList<AssetTransfer>(response.data);
     },
 
     /** GET /asset-transfers/{id} */

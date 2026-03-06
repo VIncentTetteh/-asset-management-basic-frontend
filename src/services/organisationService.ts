@@ -1,5 +1,6 @@
 import api from "@/lib/axios";
 import { Organisation, OrganisationDto } from "@/types";
+import { extractOneOrMany } from "@/services/responseUtils";
 
 export const organisationService = {
     /**
@@ -7,10 +8,8 @@ export const organisationService = {
      * The API may return a single object or an array; we normalise to always return an array.
      */
     getAll: async (): Promise<Organisation[]> => {
-        const response = await api.get<Organisation | Organisation[]>("/organisations");
-        const data = response.data;
-        if (!data) return [];
-        return Array.isArray(data) ? data : [data];
+        const response = await api.get("/organisations");
+        return extractOneOrMany<Organisation>(response.data);
     },
 
     /** GET /organisations/{id} */
@@ -19,13 +18,9 @@ export const organisationService = {
         return response.data;
     },
 
-    /**
-     * PUT /organisations/{id}
-     * Full payload: name, address, country, contactEmail, contactPhone,
-     * timezone, industry, registrationNumber, taxId, status
-     */
-    update: async (id: string, data: OrganisationDto): Promise<Organisation> => {
-        const response = await api.put<Organisation>(`/organisations/${id}`, data);
+    /** PATCH /organisations/{id} */
+    update: async (id: string, data: Partial<OrganisationDto>): Promise<Organisation> => {
+        const response = await api.patch<Organisation>(`/organisations/${id}`, data);
         return response.data;
     },
 };

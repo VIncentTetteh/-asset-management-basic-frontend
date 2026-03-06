@@ -8,7 +8,7 @@ export interface BaseEntity {
 }
 
 // ─── Organisation ─────────────────────────────────────────────────────────────
-export type OrganisationStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED";
+export type OrganisationStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED" | "DELETED";
 
 export interface Organisation extends BaseEntity {
     name: string;
@@ -62,7 +62,7 @@ export interface SsoConfigDto {
 }
 
 // ─── Department ───────────────────────────────────────────────────────────────
-export type DepartmentStatus = "ACTIVE" | "INACTIVE";
+export type DepartmentStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
 export interface Department extends BaseEntity {
     name: string;
@@ -127,11 +127,13 @@ export enum AssetStatus {
 }
 
 export enum AssetCondition {
+    EXCELLENT = "EXCELLENT",
     NEW = "NEW",
     GOOD = "GOOD",
     FAIR = "FAIR",
     POOR = "POOR",
     DAMAGED = "DAMAGED",
+    SCRAP = "SCRAP",
 }
 
 export enum AssetType {
@@ -152,7 +154,6 @@ export enum AssetState {
 export enum DepreciationMethod {
     STRAIGHT_LINE = "STRAIGHT_LINE",
     DECLINING_BALANCE = "DECLINING_BALANCE",
-    DOUBLE_DECLINING_BALANCE = "DOUBLE_DECLINING_BALANCE",
     SUM_OF_YEARS_DIGITS = "SUM_OF_YEARS_DIGITS",
     UNITS_OF_PRODUCTION = "UNITS_OF_PRODUCTION",
 }
@@ -162,6 +163,7 @@ export interface Asset extends BaseEntity {
     name: string;
     assetTag?: string;
     serialNumber?: string;
+    barcode?: string;
     barcodeQrCode?: string;
     description?: string;
     categoryId?: string;
@@ -173,6 +175,7 @@ export interface Asset extends BaseEntity {
     currency?: string;
     depreciationMethod?: DepreciationMethod | string;
     usefulLifeMonths?: number;
+    salvageValue?: number;
     residualValue?: number;
     warrantyExpiryDate?: string;
     status?: AssetStatus | string;
@@ -193,6 +196,7 @@ export interface AssetDto {
     name: string;                  // required
     assetTag?: string;
     serialNumber?: string;
+    barcode?: string;
     barcodeQrCode?: string;
     description?: string;
     categoryId?: string;
@@ -204,6 +208,7 @@ export interface AssetDto {
     currency?: string;
     depreciationMethod?: DepreciationMethod | string;
     usefulLifeMonths?: number;
+    salvageValue?: number;
     residualValue?: number;
     warrantyExpiryDate?: string;
     status?: AssetStatus | string;
@@ -215,12 +220,14 @@ export interface AssetDto {
     insurancePolicyId?: string;
     departmentId?: string;
     purchaseOrderId?: string;
+    currentBookValue?: number;
 }
 
 // ─── Category ─────────────────────────────────────────────────────────────────
 export interface Category extends BaseEntity {
     name: string;
     description?: string;
+    assetPrefixCode?: string;
     parentCategoryId?: string | null;
     depreciationPolicyId?: string;
     defaultWarrantyPeriodMonths?: number;
@@ -231,6 +238,7 @@ export interface CategoryDto {
     id?: string;
     name: string;                         // required
     description?: string;
+    assetPrefixCode?: string;
     parentCategoryId?: string | null;
     depreciationPolicyId?: string;
     defaultWarrantyPeriodMonths?: number;
@@ -249,7 +257,7 @@ export interface Role {
     id: string;
     name: string;
     description?: string;
-    permissions: string[];
+    permissions: string[] | string;
     organisationId?: string;
     isSystemRole?: boolean;
     createdAt?: string;
@@ -259,11 +267,11 @@ export interface Role {
 export interface RoleDto {
     name: string;                 // required
     description?: string;
-    permissions: string[];        // array of Permission values
+    permissions: string[] | string;
 }
 
 // ─── User ─────────────────────────────────────────────────────────────────────
-export type UserStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED";
+export type UserStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED" | "TERMINATED";
 
 export interface User extends BaseEntity {
     firstName: string;
@@ -287,6 +295,7 @@ export interface UserDto {
     employeeId?: string;
     jobTitle?: string;
     roleId?: string;
+    organisationId?: string;
     departmentId?: string;
     password?: string;            // required on creation only
     status?: UserStatus | string;
@@ -295,11 +304,10 @@ export interface UserDto {
 // ─── Purchase Order ───────────────────────────────────────────────────────────
 export enum POStatus {
     DRAFT = "DRAFT",
-    PENDING = "PENDING",
+    SUBMITTED = "SUBMITTED",
     APPROVED = "APPROVED",
     REJECTED = "REJECTED",
-    ORDERED = "ORDERED",
-    RECEIVED = "RECEIVED",
+    DELIVERED = "DELIVERED",
     CANCELLED = "CANCELLED",
 }
 
@@ -321,17 +329,17 @@ export interface PurchaseOrderDto {
     currency?: string;
     status?: POStatus | string;
     remarks?: string;
-    organisationId: string;       // required
     departmentId: string;         // required
     supplierId: string;           // required
+    organisationId: string;
 }
 
 // ─── Maintenance ──────────────────────────────────────────────────────────────
 export enum MaintenanceType {
     PREVENTIVE = "PREVENTIVE",
     CORRECTIVE = "CORRECTIVE",
-    PREDICTIVE = "PREDICTIVE",
-    CONDITION_BASED = "CONDITION_BASED",
+    EMERGENCY = "EMERGENCY",
+    ROUTINE = "ROUTINE",
 }
 
 export enum MaintenanceStatus {
@@ -339,7 +347,6 @@ export enum MaintenanceStatus {
     IN_PROGRESS = "IN_PROGRESS",
     COMPLETED = "COMPLETED",
     CANCELLED = "CANCELLED",
-    OVERDUE = "OVERDUE",
 }
 
 export interface MaintenanceRecord extends BaseEntity {
@@ -374,6 +381,8 @@ export enum AuditStatus {
     IN_PROGRESS = "IN_PROGRESS",
     COMPLETED = "COMPLETED",
     CANCELLED = "CANCELLED",
+    DISCREPANCY_FOUND = "DISCREPANCY_FOUND",
+    RESOLVED = "RESOLVED",
 }
 
 export interface Audit extends BaseEntity {
@@ -399,6 +408,8 @@ export interface AssetAuditDto {
 export enum TransferStatus {
     REQUESTED = "REQUESTED",
     APPROVED = "APPROVED",
+    REJECTED = "REJECTED",
+    IN_TRANSIT = "IN_TRANSIT",
     COMPLETED = "COMPLETED",
     CANCELLED = "CANCELLED",
 }
@@ -430,10 +441,11 @@ export interface AssetTransferDto {
 // ─── Disposal ─────────────────────────────────────────────────────────────────
 export enum DisposalMethod {
     SALE = "SALE",
-    AUCTION = "AUCTION",
-    SCRAP = "SCRAP",
     DONATION = "DONATION",
-    RETURN_TO_VENDOR = "RETURN_TO_VENDOR",
+    SCRAP = "SCRAP",
+    RECYCLING = "RECYCLING",
+    TRADE_IN = "TRADE_IN",
+    RETURN = "RETURN",
 }
 
 export interface DisposalRecord extends BaseEntity {
@@ -456,18 +468,21 @@ export interface DisposalsDto {
     approvedById: string;         // required
     reason?: string;
     complianceDocumentUrl?: string;
+    organisationId?: string;
 }
 
 // ─── Supplier ─────────────────────────────────────────────────────────────────
-export type SupplierStatus = "ACTIVE" | "INACTIVE" | "BLACKLISTED";
+export type SupplierStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED" | "BLACKLISTED";
 
 export interface Supplier extends BaseEntity {
     name: string;
     email?: string;
     phone?: string;
     address?: string;
+    contactPerson?: string;
     taxId?: string;
     registrationNumber?: string;
+    bankDetails?: string;
     status?: SupplierStatus | string;
     organisationId?: string;
 }
@@ -478,8 +493,10 @@ export interface SupplierDto {
     email?: string;
     phone?: string;
     address?: string;
+    contactPerson?: string;
     taxId?: string;
     registrationNumber?: string;
+    bankDetails?: string;
     status?: SupplierStatus | string;
     organisationId?: string;
 }
@@ -489,7 +506,7 @@ export interface DepreciationPolicy extends BaseEntity {
     name: string;
     method?: DepreciationMethod | string;
     usefulLifeMonths?: number;
-    residualValuePercentage?: number;
+    salvageValuePercent?: number;
     description?: string;
     organisationId?: string;
 }
@@ -499,7 +516,307 @@ export interface DepreciationPolicyDto {
     name: string;                 // required
     method: DepreciationMethod | string;  // required
     usefulLifeMonths?: number;
-    residualValuePercentage?: number;
+    salvageValuePercent?: number;
     description?: string;
     organisationId?: string;
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+export interface LoginResponse {
+    token: string;
+    expiresIn: number;
+    tokenType: string;
+    user: User;
+}
+
+// ─── Pagination ───────────────────────────────────────────────────────────────
+export interface PaginatedResponse<T> {
+    content: T[];
+    totalElements: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+export interface DashboardSummary {
+    totalAssets: number;
+    assetsInUse: number;
+    assetsInStock: number;
+    assetsRetired: number;
+    pendingPurchaseOrders: number;
+    approvedPurchaseOrders: number;
+    totalAssetValue: number;
+    totalPendingValue: number;
+    assetsNeedingMaintenance: number;
+    deprecatedAssets: number;
+    lastUpdated: string;
+    totalDepreciation: number;
+    maintenanceAlerts: number;
+}
+
+export interface AssetsByStatus {
+    data: {
+        name: string;
+        count: number;
+        value: number;
+        percentage: number;
+    }[];
+    total: number;
+    totalValue: number;
+}
+
+export interface MaintenanceAlerts {
+    alertCount: number;
+    criticalCount: number;
+    warningCount: number;
+    scheduledCount: number;
+    alerts: {
+        message: string;
+        assetName: string;
+        severity: string;
+        dueDate: string;
+    }[];
+}
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+export interface AssetAnalytics {
+    period: string;
+    groupBy: string;
+    data: {
+        name: string;
+        count: number;
+        value: number;
+        percentage: number;
+    }[];
+    total: number;
+    totalValue: number;
+}
+
+export interface FinancialAnalytics {
+    period: string;
+    totalAssetValue: number;
+    totalDepreciation: number;
+    netBookValue: number;
+    totalAcquisition: number;
+    totalDisposal: number;
+    totalMaintenance: number;
+    assetTurnover: number;
+    averageAssetAge: number;
+    depreciationMethod: string;
+    assetsFullyDepreciated: number;
+    monthlyDepreciation: number;
+    breakdown: {
+        byCategory: Record<string, {
+            count: number;
+            value: number;
+            monthlyDepreciation: number;
+        }>;
+    };
+}
+
+export interface PurchaseOrderAnalytics {
+    period: string;
+    totalPOs: number;
+    draftPOs: number;
+    approvedPOs: number;
+    rejectedPOs: number;
+    totalPOValue: number;
+    averagePOValue: number;
+    largestPO: number;
+    smallestPO: number;
+    averageApprovalTime: number;
+    averageDeliveryTime: number;
+    topSuppliers: {
+        supplier: string;
+        poCount: number;
+        totalValue: number;
+    }[];
+}
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+export interface ReportRequest {
+    format: string;
+    includeDetails: boolean;
+    filters: Record<string, unknown>;
+    columns: string[];
+}
+
+export interface ReportResponse {
+    reportId?: string;
+    format: string;
+    status: string;
+    downloadUrl: string;
+    generatedAt: string;
+    rowCount: number;
+    size?: string;
+    generatedBy?: string;
+    type?: string;
+}
+
+export interface ReportHistory {
+    totalReports: number;
+    limit: number;
+    offset: number;
+    reports: ReportResponse[];
+}
+
+// ─── Bulk Operations ──────────────────────────────────────────────────────────
+export interface ImportJobStatus {
+    jobId: string;
+    status: string;
+    totalRows: number;
+    successCount: number;
+    errorCount: number;
+    warnings: { rowNumber: number; message: string; }[];
+    startedAt: string;
+    completedAt: string | null;
+    downloadErrorReportUrl: string | null;
+}
+
+export interface ExportJobRequest {
+    format: string;
+    filters: Record<string, unknown>;
+    columns: string[];
+}
+
+export interface ExportJobResponse {
+    jobId: string;
+    status: string;
+    format: string;
+    downloadUrl: string;
+    startedAt: string;
+    estimatedRows: number;
+}
+
+// ─── Webhooks ─────────────────────────────────────────────────────────────────
+export interface Webhook {
+    id: string;
+    name: string;
+    url?: string;
+    events: string[];
+    active: boolean;
+    secret?: string;
+    createdAt?: string;
+    lastTriggeredAt?: string | null;
+    deliveryCount: number;
+    failureCount?: number;
+    lastFailureAt?: string;
+}
+
+export interface WebhookDelivery {
+    deliveryId: string;
+    timestamp: string;
+    event: string;
+    status: string;
+    statusCode: number;
+    responseTime: number;
+    attempts: number;
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+export interface Notification {
+    notificationId: string;
+    type: string;
+    title: string;
+    message: string;
+    entityId?: string;
+    createdAt: string;
+    read: boolean;
+    actionUrl?: string;
+}
+
+export interface NotificationPreferences {
+    emailNotifications: Record<string, boolean>;
+    pushNotifications?: boolean;
+    inAppNotifications?: boolean;
+    dailyDigest: boolean;
+    digestTime: string;
+}
+
+export interface NotificationSummary {
+    totalNotifications?: number;
+    unreadCount?: number;
+    byType?: Record<string, number>;
+}
+
+// ─── Health & Monitoring ──────────────────────────────────────────────────────
+export interface SystemHealth {
+    status: string;
+    timestamp: string;
+    components: Record<string, unknown>;
+}
+
+export interface DetailedHealth extends SystemHealth {
+    uptime: string;
+    version: string;
+}
+
+export interface ApiMetrics {
+    period: string;
+    timestamp: string;
+    totalRequests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    successRate: string;
+    averageLatency: number;
+    p50Latency: number;
+    p95Latency: number;
+    p99Latency: number;
+    maxLatency: number;
+    errorRate: string;
+    topErrors: { error: string; count: number; percentage: string; }[];
+    slowestEndpoints: { endpoint: string; avgLatency: number; callCount: number; }[];
+}
+
+export interface EndpointMetric {
+    endpoint: string;
+    method: string;
+    requests: number;
+    averageLatency: number;
+    errorRate: string;
+    successRate: string;
+}
+
+export interface ThroughputMetric {
+    hour: string;
+    requestCount: number;
+    successCount: number;
+    errorCount: number;
+    averageLatency: number;
+}
+
+export interface ErrorMetric {
+    errorCode: string;
+    errorType: string;
+    count: number;
+    percentage: string;
+    lastOccurrence: string;
+}
+
+// ─── Audit Events ─────────────────────────────────────────────────────────────
+export interface AuditEvent {
+    id: string;
+    organisationId: string;
+    actorId?: string | null;
+    actorEmail?: string | null;
+    method: string;
+    path: string;
+    query?: string | null;
+    handler?: string | null;
+    responseStatus: number;
+    success: boolean;
+    message?: string | null;
+    requestId?: string | null;
+    clientIp?: string | null;
+    userAgent?: string | null;
+    createdAt: string;
+}
+
+export interface AuditEventFilterParams {
+    actorId?: string;
+    start?: string;
+    end?: string;
+    success?: boolean;
+    method?: string;
 }

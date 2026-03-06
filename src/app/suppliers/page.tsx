@@ -53,8 +53,10 @@ export default function SuppliersPage() {
             email: "",
             phone: "",
             address: "",
+            contactPerson: "",
             taxId: "",
             registrationNumber: "",
+            bankDetails: "",
             status: "ACTIVE",
         });
         setIsModalOpen(true);
@@ -67,8 +69,10 @@ export default function SuppliersPage() {
             email: supplier.email || "",
             phone: supplier.phone || "",
             address: supplier.address || "",
+            contactPerson: supplier.contactPerson || "",
             taxId: supplier.taxId || "",
             registrationNumber: supplier.registrationNumber || "",
+            bankDetails: supplier.bankDetails || "",
             status: supplier.status || "ACTIVE",
         });
         setIsModalOpen(true);
@@ -87,26 +91,33 @@ export default function SuppliersPage() {
     };
 
     const onSubmit = async (data: SupplierDto) => {
-        const isDuplicate = suppliers.some(
-            sup => sup.name.toLowerCase() === data.name.toLowerCase() && sup.id !== editingSupplier?.id
-        );
-
-        if (isDuplicate) {
-            toast.error(`Supplier "${data.name}" already exists.`);
+        const normalizedName = data.name.trim();
+        if (!normalizedName) {
+            toast.error("Company name is required");
             return;
         }
 
+        const isDuplicate = suppliers.some(
+            sup => sup.name.trim().toLowerCase() === normalizedName.toLowerCase() && sup.id !== editingSupplier?.id
+        );
+
+        if (isDuplicate) {
+            toast.error(`Supplier "${normalizedName}" already exists.`);
+            return;
+        }
+
+        const payload: SupplierDto = { ...data, name: normalizedName };
         // Remove empty optional strings
-        (Object.keys(data) as (keyof SupplierDto)[]).forEach(key => {
-            if (data[key] === "") delete (data as Partial<SupplierDto>)[key];
+        (Object.keys(payload) as (keyof SupplierDto)[]).forEach((key) => {
+            if (payload[key] === "") delete (payload as Partial<SupplierDto>)[key];
         });
 
         try {
             if (editingSupplier) {
-                await supplierService.update(editingSupplier.id, data);
+                await supplierService.update(editingSupplier.id, payload);
                 toast.success("Supplier updated");
             } else {
-                await supplierService.create(data);
+                await supplierService.create(payload);
                 toast.success("Supplier created");
             }
             setIsModalOpen(false);
@@ -183,7 +194,7 @@ export default function SuppliersPage() {
                                         </div>
                                         <div className="flex items-center gap-2 text-sm">
                                             <Phone className="h-4 w-4 text-slate-400 shrink-0" />
-                                            <span className="text-slate-700">{supplier.phone || "—"}</span>
+                                            <span className="text-slate-700">{supplier.contactPerson ? `${supplier.contactPerson} • ` : ""}{supplier.phone || "—"}</span>
                                         </div>
                                         <div className="flex items-center gap-2 text-sm">
                                             <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
@@ -197,7 +208,7 @@ export default function SuppliersPage() {
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 mt-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(supplier)} className="h-8">
                                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                     </Button>
@@ -223,7 +234,10 @@ export default function SuppliersPage() {
                         <Input
                             id="name"
                             placeholder="e.g. TechCom Ghana Ltd"
-                            {...register("name", { required: "Company name is required" })}
+                            {...register("name", {
+                                required: "Company name is required",
+                                validate: (value) => value.trim().length > 0 || "Company name is required",
+                            })}
                         />
                         {errors.name && <p className="text-sm text-red-500">{errors.name.message as string}</p>}
                     </div>
@@ -244,6 +258,11 @@ export default function SuppliersPage() {
                         <Input id="address" placeholder="Ring Road, Accra" {...register("address")} />
                     </div>
 
+                    <div className="space-y-2">
+                        <Label htmlFor="contactPerson">Contact Person</Label>
+                        <Input id="contactPerson" placeholder="e.g. John Smith" {...register("contactPerson")} />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="taxId">Tax ID</Label>
@@ -253,6 +272,11 @@ export default function SuppliersPage() {
                             <Label htmlFor="registrationNumber">Registration No.</Label>
                             <Input id="registrationNumber" placeholder="COMP-2020" {...register("registrationNumber")} />
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="bankDetails">Bank Details</Label>
+                        <Input id="bankDetails" placeholder="Account: 123456789, Routing: 123456" {...register("bankDetails")} />
                     </div>
 
                     <div className="space-y-2">

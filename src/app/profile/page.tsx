@@ -77,6 +77,7 @@ export default function ProfilePage() {
             // Preserve existing relationships that shouldn't be changed via this restricted form
             const updatePayload: UserDto = {
                 ...data,
+                organisationId: user.organisationId,
                 departmentId: user.departmentId,
                 roleId: user.roleId,
                 status: user.status

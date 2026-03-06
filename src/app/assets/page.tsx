@@ -5,11 +5,11 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import {
     Plus, Pencil, Trash2, Hexagon, Building2, Layers, Wrench, Search, Settings,
-    MapPin
+    MapPin, UserRound, UserPlus, UserMinus
 } from "lucide-react";
 
 import {
-    Asset, AssetDto, Department, Organisation, Category, Location, Supplier,
+    Asset, AssetDto, Department, Organisation, Category, Location, Supplier, User,
     AssetStatus, AssetCondition, AssetType, DepreciationMethod, PurchaseOrder
 } from "@/types";
 
@@ -20,6 +20,7 @@ import { categoryService } from "@/services/categoryService";
 import { locationService } from "@/services/locationService";
 import { supplierService } from "@/services/supplierService";
 import { purchaseOrderService } from "@/services/purchaseOrderService";
+import { userService } from "@/services/userService";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -27,10 +28,12 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
 
 
 export default function AssetsPage() {
     const [assets, setAssets] = useState<Asset[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
 
     // Master data
     const [departments, setDepartments] = useState<Department[]>([]);
@@ -42,6 +45,10 @@ export default function AssetsPage() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+    const [selectedAssetForAssignment, setSelectedAssetForAssignment] = useState<Asset | null>(null);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
     const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
     const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<AssetDto>();
@@ -56,7 +63,8 @@ export default function AssetsPage() {
                 categoryService.getAll(),
                 locationService.getAll(),
                 supplierService.getAll(),
-                purchaseOrderService.getAll()
+                purchaseOrderService.getAll(),
+                userService.getAll()
             ]);
 
             const safeGet = <T,>(result: PromiseSettledResult<T[]>, name: string): T[] => {
@@ -80,6 +88,7 @@ export default function AssetsPage() {
             setSuppliers(safeGet(results[5] as PromiseSettledResult<Supplier[]>, "suppliers"));
             const posResult = safeGet(results[6] as PromiseSettledResult<PurchaseOrder[]>, "purchase orders");
             setPurchaseOrders(Array.isArray(posResult) ? posResult : []);
+            setUsers(safeGet(results[7] as PromiseSettledResult<User[]>, "users"));
 
         } catch (error) {
             toast.error("Failed to load data");
@@ -98,6 +107,24 @@ export default function AssetsPage() {
     const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
     const catMap = useMemo(() => new Map(categories.map(c => [c.id, c.name])), [categories]);
     const locMap = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations]);
+    const userMap = useMemo(() => new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`])), [users]);
+
+    const filteredAssets = useMemo(() => {
+        const term = searchTerm.trim().toLowerCase();
+        if (!term) return assets;
+        return assets.filter((asset) => {
+            const fields = [
+                asset.name,
+                asset.assetTag,
+                String(asset.status || ""),
+                catMap.get(asset.categoryId || ""),
+                deptMap.get(asset.departmentId || ""),
+                locMap.get(asset.locationId || ""),
+                userMap.get(asset.assignedUserId || ""),
+            ];
+            return fields.some((value) => String(value || "").toLowerCase().includes(term));
+        });
+    }, [assets, searchTerm, catMap, deptMap, locMap, userMap]);
 
     const handleOpenCreate = () => {
         setEditingAsset(null);
@@ -169,6 +196,41 @@ export default function AssetsPage() {
         }
     };
 
+    const handleOpenAssignModal = (asset: Asset) => {
+        setSelectedAssetForAssignment(asset);
+        setSelectedAssigneeId(asset.assignedUserId || "");
+        setIsAssignModalOpen(true);
+    };
+
+    const handleAssignUser = async () => {
+        if (!selectedAssetForAssignment?.id || !selectedAssigneeId) {
+            toast.error("Select an employee to assign");
+            return;
+        }
+        try {
+            await assetService.assignToUser(selectedAssetForAssignment.id, selectedAssigneeId);
+            toast.success("Asset assigned to employee");
+            setIsAssignModalOpen(false);
+            fetchData();
+        } catch (error) {
+            toast.error("Failed to assign asset");
+            console.error(error);
+        }
+    };
+
+    const handleUnassignUser = async () => {
+        if (!selectedAssetForAssignment?.id) return;
+        try {
+            await assetService.unassignUser(selectedAssetForAssignment.id);
+            toast.success("Asset unassigned from employee");
+            setIsAssignModalOpen(false);
+            fetchData();
+        } catch (error) {
+            toast.error("Failed to unassign asset");
+            console.error(error);
+        }
+    };
+
     const onSubmit = async (data: AssetDto) => {
         try {
             // Clean up payload: coerce numeric fields
@@ -210,32 +272,32 @@ export default function AssetsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Asset Register</h1>
-                    <p className="text-slate-500">Comprehensive view of all organizational assets.</p>
-                </div>
-                <div className="flex items-center gap-2">
+            <PageHeader
+                title="Asset Register"
+                subtitle="Comprehensive view of all organizational assets."
+                actions={<>
                     <div className="relative">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
                         <Input
                             type="search"
                             placeholder="Search assets..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-8 w-[250px]"
                         />
                     </div>
                     <Button onClick={handleOpenCreate} className="bg-emerald-600 hover:bg-emerald-700">
                         <Plus className="mr-2 h-4 w-4" /> Add Asset
                     </Button>
-                </div>
-            </div>
+                </>}
+            />
 
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
                     </div>
-                ) : assets.length === 0 ? (
+                ) : filteredAssets.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
                         <Hexagon className="h-12 w-12 text-slate-300 mb-4" />
                         <h3 className="text-lg font-medium text-slate-900">No assets found</h3>
@@ -245,7 +307,7 @@ export default function AssetsPage() {
                         </Button>
                     </div>
                 ) : (
-                    assets.map((asset) => (
+                    filteredAssets.map((asset) => (
                         <Card key={asset.id} className="overflow-hidden hover:shadow-md transition-all group">
                             <CardHeader className="pb-3 border-b bg-slate-50/50">
                                 <div className="flex justify-between items-start gap-4">
@@ -289,6 +351,10 @@ export default function AssetsPage() {
                                             <Layers className="h-4 w-4 mr-2 text-slate-400 shrink-0" />
                                             <span className="truncate">{deptMap.get(asset.departmentId || "") || "No Department assigned"}</span>
                                         </div>
+                                        <div className="flex items-center text-slate-600">
+                                            <UserRound className="h-4 w-4 mr-2 text-slate-400 shrink-0" />
+                                            <span className="truncate">{userMap.get(asset.assignedUserId || "") || "No Employee assigned"}</span>
+                                        </div>
                                         {asset.organisationId && (
                                             <div className="flex items-center text-slate-600">
                                                 <Building2 className="h-4 w-4 mr-2 text-slate-400 shrink-0" />
@@ -298,6 +364,9 @@ export default function AssetsPage() {
                                     </div>
                                 </div>
                                 <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenAssignModal(asset)} className="h-8">
+                                        <UserPlus className="h-3.5 w-3.5 mr-1" /> Assign
+                                    </Button>
                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(asset)} className="h-8">
                                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                     </Button>
@@ -491,6 +560,48 @@ export default function AssetsPage() {
                         </Button>
                     </div>
                 </form>
+            </Modal>
+
+            <Modal
+                isOpen={isAssignModalOpen}
+                onClose={() => setIsAssignModalOpen(false)}
+                title="Employee Assignment"
+                description={selectedAssetForAssignment ? `Assign ${selectedAssetForAssignment.name} to an employee.` : "Assign asset to an employee."}
+            >
+                <div className="space-y-4">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                        <p className="font-medium text-slate-900">{selectedAssetForAssignment?.name || "Selected Asset"}</p>
+                        <p className="text-slate-500">{selectedAssetForAssignment?.assetTag || "No tag"}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="assignee">Assign To Employee</Label>
+                        <Select id="assignee" value={selectedAssigneeId} onChange={(e) => setSelectedAssigneeId(e.target.value)}>
+                            <option value="">Select Employee</option>
+                            {users.map((user) => (
+                                <option key={user.id} value={user.id}>
+                                    {user.firstName} {user.lastName} ({user.email})
+                                </option>
+                            ))}
+                        </Select>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button type="button" variant="outline" onClick={() => setIsAssignModalOpen(false)}>
+                            Cancel
+                        </Button>
+                        {selectedAssetForAssignment?.assignedUserId && (
+                            <Button type="button" variant="ghost" onClick={handleUnassignUser} className="text-amber-700 hover:text-amber-800 hover:bg-amber-50">
+                                <UserMinus className="h-4 w-4 mr-1" />
+                                Unassign
+                            </Button>
+                        )}
+                        <Button type="button" onClick={handleAssignUser} className="bg-indigo-600 hover:bg-indigo-700">
+                            <UserPlus className="h-4 w-4 mr-1" />
+                            Assign
+                        </Button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );
