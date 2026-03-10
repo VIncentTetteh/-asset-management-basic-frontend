@@ -29,6 +29,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
+import { buildPatchPayload } from "@/lib/patch";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 
 export default function AssetsPage() {
@@ -51,6 +53,7 @@ export default function AssetsPage() {
     const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
     const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
+    const { format } = useCurrency();
     const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<AssetDto>();
 
     const fetchData = async () => {
@@ -244,7 +247,12 @@ export default function AssetsPage() {
             });
 
             if (editingAsset) {
-                await assetService.update(editingAsset.id!, data);
+                const patch = buildPatchPayload<AssetDto>(editingAsset as unknown as Partial<AssetDto>, data);
+                if (Object.keys(patch).length === 0) {
+                    toast("No changes to update");
+                    return;
+                }
+                await assetService.update(editingAsset.id!, patch);
                 toast.success("Asset updated");
             } else {
                 await assetService.create(data);
@@ -333,7 +341,7 @@ export default function AssetsPage() {
                                         <div>
                                             <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Value</p>
                                             <p className="font-medium text-slate-900">
-                                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: asset.currency || 'USD' }).format(asset.purchaseCost || 0)}
+                                                {format(asset.purchaseCost, asset.currency || 'USD')}
                                             </p>
                                         </div>
                                         <div>

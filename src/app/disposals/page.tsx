@@ -11,10 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, Trash, Hexagon, Calendar, DollarSign, FileSignature } from "lucide-react";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { Plus, Pencil, Trash2, Trash, Hexagon, Calendar, FileSignature } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { buildPatchPayload } from "@/lib/patch";
 
 export default function DisposalsPage() {
+    const { format, symbol } = useCurrency();
     const [disposals, setDisposals] = useState<DisposalRecord[]>([]);
     const [assets, setAssets] = useState<Asset[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -120,7 +123,12 @@ export default function DisposalsPage() {
             };
 
             if (editingDisposal) {
-                await disposalService.update(editingDisposal.id!, payload);
+                const patch = buildPatchPayload<DisposalsDto>(editingDisposal as unknown as Partial<DisposalsDto>, payload);
+                if (Object.keys(patch).length === 0) {
+                    toast("No changes to update");
+                    return;
+                }
+                await disposalService.update(editingDisposal.id!, patch);
                 toast.success("Disposal record updated");
             } else {
                 await disposalService.create(payload);
@@ -209,8 +217,7 @@ export default function DisposalsPage() {
                                             <div className="flex justify-between items-center text-emerald-700">
                                                 <span className="text-xs font-semibold uppercase text-emerald-500">Recovered</span>
                                                 <div className="flex items-center gap-1 font-bold">
-                                                    <DollarSign className="h-3.5 w-3.5 text-emerald-500" />
-                                                    <span>{Number(disposal.saleValue).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                    <span>{format(disposal.saleValue, 'USD')}</span>
                                                 </div>
                                             </div>
                                         ) : null}
@@ -280,7 +287,7 @@ export default function DisposalsPage() {
 
                     <div className="grid grid-cols-2 gap-4 border-t pt-4 border-b pb-4">
                         <div className="space-y-2">
-                            <Label htmlFor="saleValue">Value Recovered ($)</Label>
+                            <Label htmlFor="saleValue">Value Recovered ({symbol})</Label>
                             <Input id="saleValue" type="number" step="0.01" min="0" placeholder="0.00" {...register("saleValue")} />
                             <p className="text-[10px] text-slate-500">If asset was sold or scrapped for cash.</p>
                         </div>

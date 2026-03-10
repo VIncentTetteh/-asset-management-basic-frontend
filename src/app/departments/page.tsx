@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Layers, DollarSign, Users, Building, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { buildPatchPayload } from "@/lib/patch";
 
 export default function DepartmentsPage() {
     const [departments, setDepartments] = useState<Department[]>([]);
@@ -94,7 +95,12 @@ export default function DepartmentsPage() {
 
         try {
             if (editingDept) {
-                await departmentService.update(editingDept.id!, data);
+                const patch = buildPatchPayload<DepartmentDto>(editingDept as unknown as Partial<DepartmentDto>, data);
+                if (Object.keys(patch).length === 0) {
+                    toast("No changes to update");
+                    return;
+                }
+                await departmentService.update(editingDept.id!, patch);
                 toast.success("Department updated");
             } else {
                 await departmentService.create(data);

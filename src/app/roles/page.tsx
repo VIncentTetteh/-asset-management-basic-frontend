@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Shield, Lock, ShieldAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { buildPatchPayload } from "@/lib/patch";
 
 export default function RolesPage() {
     const [roles, setRoles] = useState<Role[]>([]);
@@ -136,7 +137,12 @@ export default function RolesPage() {
                     toast.error("Cannot save edits to a System Role.");
                     return;
                 }
-                await roleService.update(editingRole.id!, data);
+                const patch = buildPatchPayload<RoleDto>(editingRole as unknown as Partial<RoleDto>, data);
+                if (Object.keys(patch).length === 0) {
+                    toast("No changes to update");
+                    return;
+                }
+                await roleService.update(editingRole.id!, patch);
                 toast.success("Role updated");
             } else {
                 await roleService.create(data);

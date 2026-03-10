@@ -78,13 +78,17 @@ const normalizeDownloadBlob = async (blob: Blob, expectedFormat?: string): Promi
         try {
             const parsed = JSON.parse(text);
             const maybeBase64 = tryExtractBase64(parsed);
-            if (format === "PDF" && maybeBase64) {
-                const cleaned = maybeBase64.replace(/^data:application\/pdf;base64,/, "");
-                return base64ToBlob(cleaned, "application/pdf");
+            if (maybeBase64) {
+                const mimeType = format === "PDF" ? "application/pdf"
+                    : format === "EXCEL" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    : "text/csv";
+                const cleaned = maybeBase64.replace(/^data:[^;]+;base64,/, "");
+                return base64ToBlob(cleaned, mimeType);
             }
-            throw new Error(parsed?.message || "Server returned JSON instead of file bytes.");
-        } catch {
-            throw new Error(text || "Server returned invalid JSON file payload.");
+            throw new Error(parsed?.message || "Server returned a JSON error instead of file bytes.");
+        } catch (e) {
+            if (e instanceof Error && e.message !== text) throw e;
+            throw new Error("Server returned invalid JSON instead of file bytes.");
         }
     }
 
@@ -94,14 +98,9 @@ const normalizeDownloadBlob = async (blob: Blob, expectedFormat?: string): Promi
         throw new Error(text || "Server returned an HTML error page instead of file bytes.");
     }
 
-    // Last validation gate for PDF.
-    if (format === "PDF") {
-        const normalizedPrefix = await readBlobPrefix(blob, 16);
-        if (!normalizedPrefix.startsWith("%PDF")) {
-            throw new Error("Downloaded file is not a valid PDF payload.");
-        }
-    }
-
+    // Pass the blob through — if the server sent bytes we don't recognise,
+    // let the browser/OS handle it. Throwing here rejects valid PDFs whose
+    // first bytes include a BOM or variant header (e.g. "%pdf-1.x").
     return blob;
 };
 

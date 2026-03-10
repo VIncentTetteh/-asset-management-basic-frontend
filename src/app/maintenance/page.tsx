@@ -12,10 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Plus, Pencil, Trash2, Wrench, Calendar, Hexagon, CheckCircle2 } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { buildPatchPayload } from "@/lib/patch";
 
 export default function MaintenancePage() {
+    const { format } = useCurrency();
     const [records, setRecords] = useState<MaintenanceRecord[]>([]);
     const [assets, setAssets] = useState<Asset[]>([]);
     const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -59,6 +62,7 @@ export default function MaintenancePage() {
             description: "",
             maintenanceType: MaintenanceType.PREVENTIVE,
             cost: 0,
+            currency: "GHS",
             vendorId: "",
             status: "SCHEDULED"
         });
@@ -74,6 +78,7 @@ export default function MaintenancePage() {
             description: record.description || "",
             maintenanceType: record.maintenanceType,
             cost: record.cost,
+            currency: record.currency || "GHS",
             vendorId: record.vendorId || "",
             status: record.status
         });
@@ -117,7 +122,12 @@ export default function MaintenancePage() {
             });
 
             if (editingRecord) {
-                await maintenanceService.update(editingRecord.id!, data);
+                const patch = buildPatchPayload<MaintenanceDto>(editingRecord as unknown as Partial<MaintenanceDto>, data);
+                if (Object.keys(patch).length === 0) {
+                    toast("No changes to update");
+                    return;
+                }
+                await maintenanceService.update(editingRecord.id!, patch);
                 toast.success("Maintenance record updated");
             } else {
                 await maintenanceService.create(data);
@@ -206,7 +216,7 @@ export default function MaintenancePage() {
                                         <div className="flex flex-col gap-1">
                                             <span className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Cost</span>
                                             <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                                                ${Number(record.cost).toLocaleString()}
+                                                {format(record.cost, record.currency || 'GHS')}
                                             </div>
                                         </div>
                                     </div>
@@ -283,7 +293,19 @@ export default function MaintenancePage() {
                             <Input id="scheduledDate" type="date" {...register("scheduledDate", { required: true })} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="cost">Estimated/Actual Cost ($)</Label>
+                            <Label htmlFor="currency">Currency</Label>
+                            <Select id="currency" {...register("currency")}>
+                                <option value="GHS">GHS</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                                <option value="GBP">GBP</option>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="cost">Estimated/Actual Cost</Label>
                             <Input id="cost" type="number" step="0.01" min="0" {...register("cost")} />
                         </div>
                     </div>

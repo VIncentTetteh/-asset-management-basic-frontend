@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Calculator, Info, CalendarClock, DollarSign } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { buildPatchPayload } from "@/lib/patch";
 
 export default function DepreciationPoliciesPage() {
     const [policies, setPolicies] = useState<DepreciationPolicy[]>([]);
@@ -97,7 +98,12 @@ export default function DepreciationPoliciesPage() {
             });
 
             if (editingPolicy) {
-                await depreciationPolicyService.update(editingPolicy.id!, data);
+                const patch = buildPatchPayload<DepreciationPolicyDto>(editingPolicy as unknown as Partial<DepreciationPolicyDto>, data);
+                if (Object.keys(patch).length === 0) {
+                    toast("No changes to update");
+                    return;
+                }
+                await depreciationPolicyService.update(editingPolicy.id!, patch);
                 toast.success("Depreciation policy updated");
             } else {
                 await depreciationPolicyService.create(data);

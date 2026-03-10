@@ -24,7 +24,17 @@ import {
     FileText,
     Webhook,
     Bell,
-    Activity
+    Activity,
+    CreditCard,
+    ShieldCheck,
+    AlertTriangle,
+    Siren,
+    Network,
+    Cpu,
+    PackageCheck,
+    ScanLine,
+    FileClock,
+    TrendingUp,
 } from "lucide-react";
 import { organisationService } from "@/services/organisationService";
 import { User } from "@/types";
@@ -96,10 +106,28 @@ export function Sidebar() {
             ]
         },
         {
+            group: "Compliance",
+            items: [
+                { href: "/compliance/controls", label: "Controls", icon: ShieldCheck, active: pathname.startsWith("/compliance/controls") },
+                { href: "/compliance/bog-controls", label: "BOG Controls", icon: Building2, active: pathname.startsWith("/compliance/bog-controls") },
+                { href: "/compliance/risks", label: "Risk Register", icon: AlertTriangle, active: pathname.startsWith("/compliance/risks") },
+                { href: "/compliance/incidents", label: "Incidents", icon: Siren, active: pathname.startsWith("/compliance/incidents") },
+                { href: "/compliance/policies", label: "Policies", icon: FileText, active: pathname.startsWith("/compliance/policies") },
+                { href: "/compliance/security-zones", label: "Security Zones", icon: Network, active: pathname.startsWith("/compliance/security-zones") },
+                { href: "/compliance/ics-assets", label: "ICS Assets", icon: Cpu, active: pathname.startsWith("/compliance/ics-assets") },
+                { href: "/compliance/patch-records", label: "Patch Records", icon: PackageCheck, active: pathname.startsWith("/compliance/patch-records") },
+                { href: "/compliance/pci-saq", label: "PCI-DSS SAQ", icon: CreditCard, active: pathname.startsWith("/compliance/pci-saq") },
+                { href: "/compliance/sla-metrics", label: "SLA Metrics", icon: TrendingUp, active: pathname.startsWith("/compliance/sla-metrics") },
+                { href: "/compliance/vulnerability-scans", label: "Vuln Scans", icon: ScanLine, active: pathname.startsWith("/compliance/vulnerability-scans") },
+                { href: "/compliance/regulatory-filings", label: "Reg. Filings", icon: FileClock, active: pathname.startsWith("/compliance/regulatory-filings") },
+            ]
+        },
+        {
             group: "System Config",
             items: [
                 { href: "/webhooks", label: "Webhooks", icon: Webhook, active: pathname.startsWith("/webhooks") },
                 { href: "/notifications", label: "Notifications", icon: Bell, active: pathname.startsWith("/notifications") },
+                { href: "/billing", label: "Billing", icon: CreditCard, active: pathname.startsWith("/billing") },
                 { href: "/audit-events", label: "Audit Events", icon: Shield, active: pathname.startsWith("/audit-events") },
                 { href: "/health", label: "System Health", icon: Activity, active: pathname.startsWith("/health") },
             ]
@@ -115,9 +143,14 @@ export function Sidebar() {
     return (
         <aside className="w-64 bg-slate-900 border-r border-slate-800 text-slate-300 hidden md:flex flex-col h-full overflow-y-auto">
             <div className="p-6">
-                <Link href="/dashboard" className="flex items-center gap-2 font-bold text-xl text-emerald-400">
-                    <Hexagon className="h-6 w-6" />
-                    <span className="truncate">{orgName}</span>
+                <Link href="/dashboard" className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-teal-400 to-emerald-600 flex items-center justify-center shrink-0">
+                        <span className="text-white font-black text-[10px] select-none">IQ</span>
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-black text-white leading-none">Asset<span className="text-teal-400">IQ</span></p>
+                        <p className="text-xs text-slate-400 truncate mt-0.5">{orgName}</p>
+                    </div>
                 </Link>
             </div>
 

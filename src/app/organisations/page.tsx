@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Organisation, OrganisationDto, OrganisationStatus, SsoConfigDto } from "@/types";
 import { organisationService } from "@/services/organisationService";
 import { ssoConfigService } from "@/services/ssoConfigService";
+import { buildPatchPayload } from "@/lib/patch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
@@ -93,7 +94,12 @@ export default function OrganisationsPage() {
         setIsSubmitting(true);
         try {
             if (editingOrg) {
-                await organisationService.update(editingOrg.id, formData as OrganisationDto);
+                const patch = buildPatchPayload<OrganisationDto>(editingOrg as unknown as Partial<OrganisationDto>, formData as Partial<OrganisationDto>);
+                if (Object.keys(patch).length === 0) {
+                    toast("No changes to update");
+                    return;
+                }
+                await organisationService.update(editingOrg.id, patch);
                 toast.success("Organisation updated successfully");
             }
             await loadOrganisations();

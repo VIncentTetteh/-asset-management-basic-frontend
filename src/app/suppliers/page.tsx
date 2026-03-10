@@ -20,6 +20,7 @@ import {
     Hash
 } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { buildPatchPayload } from "@/lib/patch";
 
 export default function SuppliersPage() {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -114,7 +115,12 @@ export default function SuppliersPage() {
 
         try {
             if (editingSupplier) {
-                await supplierService.update(editingSupplier.id, payload);
+                const patch = buildPatchPayload<SupplierDto>(editingSupplier as unknown as Partial<SupplierDto>, payload);
+                if (Object.keys(patch).length === 0) {
+                    toast("No changes to update");
+                    return;
+                }
+                await supplierService.update(editingSupplier.id, patch);
                 toast.success("Supplier updated");
             } else {
                 await supplierService.create(payload);

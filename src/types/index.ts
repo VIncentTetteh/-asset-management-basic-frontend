@@ -357,6 +357,7 @@ export interface MaintenanceRecord extends BaseEntity {
     performedDate?: string;
     vendorId?: string;
     cost?: number;
+    currency?: string;
     status: MaintenanceStatus | string;
     nextDueDate?: string;
     organisationId?: string;
@@ -370,6 +371,7 @@ export interface MaintenanceDto {
     scheduledDate?: string;
     vendorId?: string;
     cost?: number;
+    currency?: string;
     status?: MaintenanceStatus | string;
     nextDueDate?: string;
     performedDate?: string;
@@ -636,22 +638,21 @@ export interface PurchaseOrderAnalytics {
 
 // ─── Reports ──────────────────────────────────────────────────────────────────
 export interface ReportRequest {
-    format: string;
-    includeDetails: boolean;
-    filters: Record<string, unknown>;
-    columns: string[];
+    format?: string;
 }
 
 export interface ReportResponse {
     reportId?: string;
     format: string;
     status: string;
-    downloadUrl: string;
-    generatedAt: string;
-    rowCount: number;
-    size?: string;
-    generatedBy?: string;
+    reportType?: string;
     type?: string;
+    downloadUrl?: string;
+    generatedAt: string;
+    rowCount?: number;
+    maintenanceRecords?: number;
+    pages?: number;
+    size?: string;
 }
 
 export interface ReportHistory {
@@ -794,6 +795,44 @@ export interface ErrorMetric {
     lastOccurrence: string;
 }
 
+// ─── Billing ──────────────────────────────────────────────────────────────────
+export interface BillingPlan {
+    code: string;
+    name: string;
+    tier: string;
+    interval: "MONTHLY" | "YEARLY" | string;
+    amountMinor: number;
+    currency: string;
+    maxAssets: number;
+    maxEmployees: number;
+    analyticsEnabled: boolean;
+    auditRetentionDays: number;
+}
+
+export interface Subscription {
+    id: string;
+    organisationId: string;
+    plan: BillingPlan;
+    status: string;
+    autoRenew: boolean;
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+    nextBillingAt?: string | null;
+    currentAssetCount: number;
+    currentEmployeeCount: number;
+}
+
+export interface CheckoutInitRequest {
+    planCode: string;
+    callbackUrl: string;
+}
+
+export interface CheckoutInitResponse {
+    authorizationUrl: string;
+    accessCode: string;
+    reference: string;
+}
+
 // ─── Audit Events ─────────────────────────────────────────────────────────────
 export interface AuditEvent {
     id: string;
@@ -819,4 +858,393 @@ export interface AuditEventFilterParams {
     end?: string;
     success?: boolean;
     method?: string;
+}
+
+// ─── Compliance ────────────────────────────────────────────────────────────────
+export type ComplianceFramework = "ISO_27001" | "SOC2" | "PCI_DSS" | "ICS" | "BOG";
+export type ControlStatus = "NOT_IMPLEMENTED" | "PARTIAL" | "IMPLEMENTED" | "NOT_APPLICABLE";
+export type RiskStatus = "OPEN" | "IN_TREATMENT" | "CLOSED" | "ACCEPTED";
+export type RiskTreatment = "ACCEPT" | "MITIGATE" | "TRANSFER" | "AVOID";
+export type IncidentStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+export type IncidentSeverity = "P1_CRITICAL" | "P2_HIGH" | "P3_MEDIUM" | "P4_LOW";
+export type PolicyStatus = "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "RETIRED";
+export type VendorSupportStatus = "SUPPORTED" | "END_OF_LIFE" | "END_OF_SUPPORT" | "UNKNOWN";
+export type PatchStatus = "PLANNED" | "APPLIED" | "FAILED" | "ROLLED_BACK";
+export type ComplianceAnswer = "YES" | "NO" | "NOT_APPLICABLE" | "COMPENSATING_CONTROL";
+export type ScanType = "INTERNAL" | "EXTERNAL" | "ASV" | "ICS_OT";
+export type ScanStatus = "PASS" | "FAIL" | "PENDING_REMEDIATION";
+export type FilingStatus = "PENDING" | "SUBMITTED" | "OVERDUE" | "ACKNOWLEDGED" | "REJECTED";
+
+// 1) Compliance Controls
+export interface ComplianceControl {
+    id: string;
+    organisationId: string;
+    framework: ComplianceFramework;
+    controlRef: string;
+    controlName: string;
+    controlDescription?: string | null;
+    status: ControlStatus;
+    justification?: string | null;
+    evidenceUrl?: string | null;
+    gapDescription?: string | null;
+    remediationPlan?: string | null;
+    ownerId?: string | null;
+    ownerEmail?: string | null;
+    reviewDueDate?: string | null;
+    lastReviewedAt?: string | null;
+    lastReviewedByEmail?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ComplianceControlDto {
+    framework: ComplianceFramework;
+    controlRef: string;
+    controlName: string;
+    controlDescription?: string | null;
+    status?: ControlStatus;
+    justification?: string | null;
+    evidenceUrl?: string | null;
+    gapDescription?: string | null;
+    remediationPlan?: string | null;
+    ownerId?: string | null;
+    reviewDueDate?: string | null;
+    lastReviewedAt?: string | null;
+    lastReviewedByEmail?: string | null;
+}
+
+// 2) BOG Controls
+export interface BOGControl {
+    id: string;
+    organisationId: string;
+    directiveRef: string;
+    requirement: string;
+    status: ControlStatus;
+    evidenceUrl?: string | null;
+    gapDescription?: string | null;
+    remediationPlan?: string | null;
+    targetDate?: string | null;
+    ownerId?: string | null;
+    ownerEmail?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface BOGControlDto {
+    directiveRef: string;
+    requirement: string;
+    status?: ControlStatus;
+    evidenceUrl?: string | null;
+    gapDescription?: string | null;
+    remediationPlan?: string | null;
+    targetDate?: string | null;
+    ownerId?: string | null;
+}
+
+// 3) Risk Register
+export interface Risk {
+    id: string;
+    organisationId: string;
+    framework?: ComplianceFramework | null;
+    riskId?: string | null;
+    title: string;
+    description?: string | null;
+    likelihood: number;
+    impact: number;
+    riskScore: number;
+    treatment?: RiskTreatment | null;
+    mitigationPlan?: string | null;
+    residualRisk?: number | null;
+    status: RiskStatus;
+    ownerId?: string | null;
+    ownerEmail?: string | null;
+    reviewDate?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface RiskDto {
+    framework?: ComplianceFramework | null;
+    riskId?: string | null;
+    title: string;
+    description?: string | null;
+    likelihood: number;
+    impact: number;
+    treatment?: RiskTreatment | null;
+    mitigationPlan?: string | null;
+    residualRisk?: number | null;
+    status?: RiskStatus;
+    ownerId?: string | null;
+    reviewDate?: string | null;
+}
+
+// 4) Security Incidents
+export interface SecurityIncident {
+    id: string;
+    organisationId: string;
+    title: string;
+    description?: string | null;
+    severity: IncidentSeverity;
+    category?: string | null;
+    reportedById?: string | null;
+    reportedByEmail?: string | null;
+    assignedToId?: string | null;
+    assignedToEmail?: string | null;
+    detectedAt?: string | null;
+    resolvedAt?: string | null;
+    rootCause?: string | null;
+    lessonsLearned?: string | null;
+    status: IncidentStatus;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SecurityIncidentDto {
+    title: string;
+    description?: string | null;
+    severity: IncidentSeverity;
+    category?: string | null;
+    reportedById?: string | null;
+    assignedToId?: string | null;
+    detectedAt?: string | null;
+    status?: IncidentStatus;
+    resolvedAt?: string | null;
+    rootCause?: string | null;
+    lessonsLearned?: string | null;
+}
+
+// 5) Security Policies
+export interface SecurityPolicy {
+    id: string;
+    organisationId: string;
+    title: string;
+    version?: string | null;
+    documentUrl?: string | null;
+    ownerId?: string | null;
+    ownerEmail?: string | null;
+    approvedByEmail?: string | null;
+    effectiveDate?: string | null;
+    reviewDueDate?: string | null;
+    status: PolicyStatus;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SecurityPolicyDto {
+    title: string;
+    version?: string | null;
+    documentUrl?: string | null;
+    ownerId?: string | null;
+    reviewDueDate?: string | null;
+    status?: PolicyStatus;
+    approvedByEmail?: string | null;
+    effectiveDate?: string | null;
+}
+
+// 6) Security Zones
+export interface SecurityZone {
+    id: string;
+    organisationId: string;
+    name: string;
+    purdueLevel: number;
+    description?: string | null;
+    allowedProtocols?: string | null;
+    assetCount?: number;
+    networkRange?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SecurityZoneDto {
+    name: string;
+    purdueLevel: number;
+    description?: string | null;
+    allowedProtocols?: string | null;
+    networkRange?: string | null;
+    assetCount?: number;
+}
+
+// 7) ICS Assets
+export interface ICSAsset {
+    id: string;
+    organisationId: string;
+    assetId: string;
+    assetName?: string | null;
+    securityZoneId?: string | null;
+    securityZoneName?: string | null;
+    firmwareVersion?: string | null;
+    protocol?: string | null;
+    vendorSupportStatus?: VendorSupportStatus | null;
+    lastPatchedAt?: string | null;
+    knownVulnerabilities?: string | null;
+    isolated?: boolean;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ICSAssetDto {
+    assetId: string;
+    securityZoneId?: string | null;
+    firmwareVersion?: string | null;
+    protocol?: string | null;
+    vendorSupportStatus?: VendorSupportStatus | null;
+    lastPatchedAt?: string | null;
+    knownVulnerabilities?: string | null;
+    isolated?: boolean;
+    notes?: string | null;
+}
+
+// 8) Patch Records
+export interface PatchRecord {
+    id: string;
+    organisationId: string;
+    assetId: string;
+    assetName?: string | null;
+    patchName: string;
+    version?: string | null;
+    appliedAt?: string | null;
+    appliedByEmail?: string | null;
+    testEnvironmentValidated?: boolean;
+    rollbackPlan?: string | null;
+    status: PatchStatus;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface PatchRecordDto {
+    assetId: string;
+    patchName: string;
+    version?: string | null;
+    appliedAt?: string | null;
+    appliedByEmail?: string | null;
+    testEnvironmentValidated?: boolean;
+    rollbackPlan?: string | null;
+    status?: PatchStatus;
+    notes?: string | null;
+}
+
+// 9) PCI SAQ Records
+export interface PCISAQRecord {
+    id: string;
+    organisationId: string;
+    requirementNumber: string;
+    requirementText?: string | null;
+    complianceStatus?: ComplianceAnswer | null;
+    compensatingControl?: string | null;
+    evidenceUrl?: string | null;
+    targetDate?: string | null;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface PCISAQDto {
+    requirementNumber: string;
+    requirementText?: string | null;
+    complianceStatus?: ComplianceAnswer | null;
+    compensatingControl?: string | null;
+    evidenceUrl?: string | null;
+    targetDate?: string | null;
+    notes?: string | null;
+}
+
+// 10) SLA Metrics
+export interface SLAMetric {
+    id: string;
+    organisationId: string;
+    month: number;
+    year: number;
+    uptimePercent: number;
+    plannedDowntimeMinutes?: number;
+    unplannedDowntimeMinutes?: number;
+    incidentCount?: number;
+    rtoMinutes?: number;
+    rpoMinutes?: number;
+    slaBreached?: boolean;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SLAMetricDto {
+    month: number;
+    year: number;
+    uptimePercent: number;
+    plannedDowntimeMinutes?: number;
+    unplannedDowntimeMinutes?: number;
+    incidentCount?: number;
+    rtoMinutes?: number;
+    rpoMinutes?: number;
+    slaBreached?: boolean;
+    notes?: string | null;
+}
+
+// 11) Vulnerability Scans
+export interface VulnerabilityScan {
+    id: string;
+    organisationId: string;
+    scanDate: string;
+    scannerTool?: string | null;
+    scanType: ScanType;
+    criticalCount?: number;
+    highCount?: number;
+    mediumCount?: number;
+    lowCount?: number;
+    status?: ScanStatus | null;
+    reportUrl?: string | null;
+    nextScanDue?: string | null;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface VulnerabilityScanDto {
+    scanDate: string;
+    scannerTool?: string | null;
+    scanType: ScanType;
+    criticalCount?: number;
+    highCount?: number;
+    mediumCount?: number;
+    lowCount?: number;
+    status?: ScanStatus | null;
+    reportUrl?: string | null;
+    nextScanDue?: string | null;
+    notes?: string | null;
+}
+
+// 12) Regulatory Filings
+export interface RegulatoryFiling {
+    id: string;
+    organisationId: string;
+    filingType: string;
+    regulator: string;
+    dueDate: string;
+    submittedAt?: string | null;
+    reference?: string | null;
+    status: FilingStatus;
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface RegulatoryFilingDto {
+    filingType: string;
+    regulator: string;
+    dueDate: string;
+    status?: FilingStatus;
+    submittedAt?: string | null;
+    reference?: string | null;
+    notes?: string | null;
+}
+
+export interface PaginatedResponse<T> {
+    content: T[];
+    totalElements: number;
+    totalPages: number;
+    number: number;
+    size: number;
+    first?: boolean;
+    last?: boolean;
 }

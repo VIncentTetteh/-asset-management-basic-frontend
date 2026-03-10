@@ -30,6 +30,15 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use((response) => {
     return response;
 }, (error) => {
+    if (typeof window !== "undefined" && error.response?.status === 403) {
+        const message = String(error.response?.data?.message || "").toLowerCase();
+        if (message.includes("plan") || message.includes("subscription") || message.includes("limit")) {
+            window.dispatchEvent(new CustomEvent("plan-limit-error", {
+                detail: { message: error.response?.data?.message || "Plan limit reached" }
+            }));
+        }
+    }
+
     if (error.response?.status === 401) {
         if (typeof window !== "undefined" && window.location.pathname !== "/login" && window.location.pathname !== "/register") {
             // Clear expired/invalid token and force re-login

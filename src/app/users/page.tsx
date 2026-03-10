@@ -15,6 +15,7 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, UserX, UsersIcon, Shield, Layers, Briefcase, Mail, Lock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
+import { buildPatchPayload } from "@/lib/patch";
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -109,13 +110,20 @@ export default function UsersPage() {
                 const { roleId, ...profileData } = updateData;
 
                 // Update base profile fields first.
-                await userService.update(editingUser.id!, profileData);
+                const patch = buildPatchPayload<UserDto>(editingUser as unknown as Partial<UserDto>, profileData);
+                if (Object.keys(patch).length > 0) {
+                    await userService.update(editingUser.id!, patch);
+                }
 
                 // Role changes must go through /users/{id}/role.
                 if (roleId && roleId !== editingUser.roleId) {
                     await userService.assignRole(editingUser.id!, roleId);
                 }
 
+                if (Object.keys(patch).length === 0 && roleId === editingUser.roleId) {
+                    toast("No changes to update");
+                    return;
+                }
                 toast.success("Profile updated");
             } else {
                 if (!payload.password) {

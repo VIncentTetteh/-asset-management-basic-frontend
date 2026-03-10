@@ -13,11 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { Plus, Pencil, Trash2, ShoppingCart, Building2, CheckCircle2, XCircle, MoreHorizontal, Layers } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { buildPatchPayload } from "@/lib/patch";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
 
 export default function PurchaseOrdersPage() {
+    const { format } = useCurrency();
     const [orders, setOrders] = useState<PurchaseOrder[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
@@ -167,7 +170,13 @@ export default function PurchaseOrdersPage() {
                     organisationId,
                 };
 
-                const updated = await purchaseOrderService.update(editingOrder.id!, updatePayload);
+                const patch = buildPatchPayload<PurchaseOrderDto>(editingOrder as unknown as Partial<PurchaseOrderDto>, updatePayload);
+                if (Object.keys(patch).length === 0) {
+                    toast("No changes to update");
+                    return;
+                }
+
+                const updated = await purchaseOrderService.update(editingOrder.id!, patch);
                 let finalStatus = normalizePoStatus(updated.status);
 
                 // Backend may ignore direct status edits; apply explicit workflow endpoints when available.
@@ -267,7 +276,7 @@ export default function PurchaseOrdersPage() {
                             <CardContent className="p-4 flex-1 flex flex-col">
                                 <div className="space-y-3 text-sm text-slate-600 flex-1">
                                     <div className="text-xl font-bold text-slate-900">
-                                        {order.currency || "GHS"} {Number(order.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        {format(order.totalAmount, order.currency || 'GHS')}
                                     </div>
                                     <div className="flex items-center gap-2 truncate text-slate-700" title={supplierMap.get(order.supplierId || "") || "Unknown Supplier"}>
                                         <Building2 className="h-4 w-4 text-slate-400 shrink-0" />

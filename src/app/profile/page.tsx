@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "react-hot-toast";
 import { useForm } from "react-hook-form";
 import { UserCircle, Mail, Phone, Building, Briefcase, Shield, Save } from "lucide-react";
+import { buildPatchPayload } from "@/lib/patch";
 
 export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
@@ -83,7 +84,13 @@ export default function ProfilePage() {
                 status: user.status
             };
 
-            const updatedUser = await userService.update(user.id!, updatePayload);
+            const patch = buildPatchPayload<UserDto>(user as unknown as Partial<UserDto>, updatePayload);
+            if (Object.keys(patch).length === 0) {
+                toast("No changes to update");
+                return;
+            }
+
+            const updatedUser = await userService.update(user.id!, patch);
 
             // Update local storage so changes persist across refresh
             localStorage.setItem("user", JSON.stringify(updatedUser));

@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, MapPin, Building2, Layers, Navigation, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { buildPatchPayload } from "@/lib/patch";
 
 export default function LocationsPage() {
     const [locations, setLocations] = useState<Location[]>([]);
@@ -92,7 +93,12 @@ export default function LocationsPage() {
 
         try {
             if (editingLocation) {
-                await locationService.update(editingLocation.id!, data);
+                const patch = buildPatchPayload<LocationDto>(editingLocation as unknown as Partial<LocationDto>, data);
+                if (Object.keys(patch).length === 0) {
+                    toast("No changes to update");
+                    return;
+                }
+                await locationService.update(editingLocation.id!, patch);
                 toast.success("Location updated");
             } else {
                 await locationService.create(data);

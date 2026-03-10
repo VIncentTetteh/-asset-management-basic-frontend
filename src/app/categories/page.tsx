@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Tags, Shield, Clock } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { buildPatchPayload } from "@/lib/patch";
 
 export default function CategoriesPage() {
     const [categories, setCategories] = useState<Category[]>([]);
@@ -91,7 +92,12 @@ export default function CategoriesPage() {
 
         try {
             if (editingCategory) {
-                await categoryService.update(editingCategory.id!, data);
+                const patch = buildPatchPayload<CategoryDto>(editingCategory as unknown as Partial<CategoryDto>, data);
+                if (Object.keys(patch).length === 0) {
+                    toast("No changes to update");
+                    return;
+                }
+                await categoryService.update(editingCategory.id!, patch);
                 toast.success("Category updated");
             } else {
                 await categoryService.create(data);
