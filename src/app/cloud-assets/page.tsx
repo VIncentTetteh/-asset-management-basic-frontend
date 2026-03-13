@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -377,7 +378,7 @@ export default function CloudAssetsPage() {
                     </div>
                     <div className="space-y-2">
                         <Label>Description</Label>
-                        <Input placeholder="Optional description" {...assetForm.register("description")} />
+                        <Textarea placeholder="Optional description" {...assetForm.register("description")} />
                     </div>
                     <div className="flex justify-end gap-2 pt-4 border-t">
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>

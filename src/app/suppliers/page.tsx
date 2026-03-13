@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -265,7 +266,7 @@ export default function SuppliersPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="address">Physical Address</Label>
-                        <Input id="address" placeholder="Ring Road, Accra" {...register("address")} />
+                        <Textarea id="address" placeholder="Ring Road, Accra" {...register("address")} />
                     </div>
 
                     <div className="space-y-2">
@@ -286,7 +287,7 @@ export default function SuppliersPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="bankDetails">Bank Details</Label>
-                        <Input id="bankDetails" placeholder="Account: 123456789, Routing: 123456" {...register("bankDetails")} />
+                        <Textarea id="bankDetails" placeholder="Account: 123456789, Routing: 123456" {...register("bankDetails")} />
                     </div>
 
                     <div className="space-y-2">

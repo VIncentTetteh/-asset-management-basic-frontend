@@ -42,7 +42,7 @@ export default function VendorReviewsPage() {
     useEffect(() => {
         const vals = [q, d, s].map(Number).filter(v => !isNaN(v) && v > 0);
         if (vals.length === 3) {
-            setValue("overallScore", parseFloat((vals.reduce((a, b) => a + b, 0) / 3).toFixed(2)));
+            setValue("rating", parseFloat((vals.reduce((a, b) => a + b, 0) / 3).toFixed(2)));
         }
     }, [q, d, s, setValue]);
 
@@ -80,7 +80,7 @@ export default function VendorReviewsPage() {
 
     const handleOpenCreate = () => {
         setEditingReview(null);
-        reset({ supplierId: selectedSupplierId || "", reviewPeriod: "", qualityScore: 0, deliveryScore: 0, supportScore: 0, reviewDate: "" });
+        reset({ supplierId: selectedSupplierId || "", reviewPeriod: "", rating: 0, qualityScore: 0, deliveryScore: 0, supportScore: 0, reviewDate: "" });
         setIsModalOpen(true);
     };
 
@@ -88,13 +88,12 @@ export default function VendorReviewsPage() {
         setEditingReview(review);
         reset({
             supplierId: review.supplierId,
-            reviewPeriod: review.reviewPeriod,
-            qualityScore: review.qualityScore,
-            deliveryScore: review.deliveryScore,
-            supportScore: review.supportScore,
-            overallScore: review.overallScore,
-            comments: review.comments || "",
-            reviewDate: review.reviewDate,
+            reviewPeriod: "",
+            rating: review.rating,
+            qualityScore: review.qualityScore ?? undefined,
+            deliveryScore: review.deliveryScore ?? undefined,
+            supportScore: review.supportScore ?? undefined,
+            reviewDate: "",
         });
         setIsModalOpen(true);
     };
@@ -111,7 +110,15 @@ export default function VendorReviewsPage() {
     };
 
     const onSubmit = async (data: VendorReviewDto) => {
-        const payload = { ...data, qualityScore: Number(data.qualityScore), deliveryScore: Number(data.deliveryScore), supportScore: Number(data.supportScore), overallScore: Number(data.overallScore) };
+        const avg = parseFloat(([data.qualityScore, data.deliveryScore, data.supportScore].map(Number).reduce((a, b) => a + b, 0) / 3).toFixed(2));
+        const payload = {
+            ...data,
+            rating: Number(data.rating) || avg,
+            qualityScore: Number(data.qualityScore),
+            deliveryScore: Number(data.deliveryScore),
+            supportScore: Number(data.supportScore),
+            overallScore: Number(data.overallScore) || avg,
+        };
         try {
             if (editingReview) {
                 await vendorReviewService.update(editingReview.id, payload);
@@ -194,12 +201,10 @@ export default function VendorReviewsPage() {
                                 <thead>
                                     <tr className="border-b border-slate-100 bg-slate-50/50">
                                         <th className="text-left py-3 px-4 font-medium text-slate-600">Supplier</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Period</th>
                                         <th className="text-left py-3 px-4 font-medium text-slate-600">Quality</th>
                                         <th className="text-left py-3 px-4 font-medium text-slate-600">Delivery</th>
                                         <th className="text-left py-3 px-4 font-medium text-slate-600">Support</th>
                                         <th className="text-left py-3 px-4 font-medium text-slate-600">Overall</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Date</th>
                                         <th className="text-right py-3 px-4 font-medium text-slate-600">Actions</th>
                                     </tr>
                                 </thead>
@@ -207,12 +212,10 @@ export default function VendorReviewsPage() {
                                     {reviews.map((r) => (
                                         <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                                             <td className="py-3 px-4 font-medium text-slate-900">{r.supplierName || supplierName(r.supplierId)}</td>
-                                            <td className="py-3 px-4 text-slate-600">{r.reviewPeriod}</td>
-                                            <td className="py-3 px-4"><ScoreBadge score={r.qualityScore} /></td>
-                                            <td className="py-3 px-4"><ScoreBadge score={r.deliveryScore} /></td>
-                                            <td className="py-3 px-4"><ScoreBadge score={r.supportScore} /></td>
-                                            <td className="py-3 px-4"><ScoreBadge score={r.overallScore} /></td>
-                                            <td className="py-3 px-4 text-slate-600">{new Date(r.reviewDate).toLocaleDateString()}</td>
+                                            <td className="py-3 px-4">{r.qualityScore != null ? <ScoreBadge score={r.qualityScore} /> : "—"}</td>
+                                            <td className="py-3 px-4">{r.deliveryScore != null ? <ScoreBadge score={r.deliveryScore} /> : "—"}</td>
+                                            <td className="py-3 px-4">{r.supportScore != null ? <ScoreBadge score={r.supportScore} /> : "—"}</td>
+                                            <td className="py-3 px-4"><ScoreBadge score={r.rating} /></td>
                                             <td className="py-3 px-4">
                                                 <div className="flex justify-end gap-2">
                                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(r)} className="h-7 px-2">
@@ -239,6 +242,7 @@ export default function VendorReviewsPage() {
                 description="Rate supplier performance across key dimensions."
             >
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+                    <input type="hidden" {...register("rating", { valueAsNumber: true })} />
                     <div className="space-y-2">
                         <Label htmlFor="supplierId">Supplier <span className="text-red-500">*</span></Label>
                         <Select id="supplierId" {...register("supplierId", { required: "Supplier is required" })}>

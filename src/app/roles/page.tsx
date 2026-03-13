@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Shield, Lock, ShieldAlert } from "lucide-react";
@@ -276,7 +277,7 @@ export default function RolesPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="description">Profile Description</Label>
-                        <Input id="description" placeholder="Read-only access to POs and Audits..." {...register("description")} disabled={!!(editingRole?.isSystemRole)} />
+                        <Textarea id="description" placeholder="Read-only access to POs and Audits..." {...register("description")} disabled={!!(editingRole?.isSystemRole)} />
                     </div>
 
                     <div className="space-y-3 border-t pt-4 border-b pb-4">

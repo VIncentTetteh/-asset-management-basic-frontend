@@ -8,7 +8,7 @@ import {
     Hexagon, Building2, Users, Wrench, AlertTriangle, CheckCircle2,
     ShoppingCart, Clock, Mail, Phone, MapPin, Hash, Receipt,
     ArrowRight, ShieldCheck, TrendingUp, PackageCheck, ScanLine,
-    Cpu, BarChart3, FileText, Activity
+    Cpu, BarChart3, FileText, Activity, Webhook
 } from "lucide-react";
 import { assetService } from "@/services/assetService";
 import { organisationService } from "@/services/organisationService";
@@ -17,6 +17,7 @@ import { purchaseOrderService } from "@/services/purchaseOrderService";
 import { maintenanceService } from "@/services/maintenanceService";
 import { authService } from "@/services/authService";
 import { dashboardService } from "@/services/dashboardService";
+import { webhookService } from "@/services/webhookService";
 import { Organisation, AssetsByDepartment, DepreciationSummary } from "@/types";
 
 interface DashboardStats {
@@ -30,6 +31,8 @@ interface DashboardStats {
     approvedPOs: number;
     scheduledMaintenance: number;
     inProgressMaintenance: number;
+    totalWebhooks: number;
+    activeWebhooks: number;
 }
 
 const QUICK_LINKS = [
@@ -49,6 +52,7 @@ export default function DashboardPage() {
         totalAssets: 0, activeAssets: 0, inMaintenanceAssets: 0, disposedAssets: 0,
         totalOrganisations: 0, totalUsers: 0, pendingPOs: 0, approvedPOs: 0,
         scheduledMaintenance: 0, inProgressMaintenance: 0,
+        totalWebhooks: 0, activeWebhooks: 0,
     });
     const [myOrg, setMyOrg] = useState<Organisation | null>(null);
     const [assetStatusBreakdown, setAssetStatusBreakdown] = useState<{ label: string; count: number; color: string }[]>([]);
@@ -68,6 +72,7 @@ export default function DashboardPage() {
                     userService.getAll(),
                     purchaseOrderService.getAll(),
                     maintenanceService.getAll(),
+                    webhookService.list(),
                 ];
                 if (orgId) promises.push(organisationService.get(orgId));
 
@@ -80,10 +85,11 @@ export default function DashboardPage() {
                 const users = get(results[2] as PromiseSettledResult<any[]>, []);
                 const pos = get(results[3] as PromiseSettledResult<any[]>, []);
                 const maint = get(results[4] as PromiseSettledResult<any[]>, []);
+                const webhooksMeta = get(results[5] as PromiseSettledResult<any>, { totalWebhooks: 0, activeWebhooks: 0 });
                 const safePos = Array.isArray(pos) ? pos : [];
 
-                if (orgId && results[5]?.status === "fulfilled") {
-                    setMyOrg(results[5].value as unknown as Organisation);
+                if (orgId && results[6]?.status === "fulfilled") {
+                    setMyOrg(results[6].value as unknown as Organisation);
                 }
 
                 const statusGroups: Record<string, { label: string; color: string }> = {
@@ -111,6 +117,8 @@ export default function DashboardPage() {
                     approvedPOs: safePos.filter((p: any) => p.status === "APPROVED").length,
                     scheduledMaintenance: maint.filter((m: any) => m.status === "SCHEDULED").length,
                     inProgressMaintenance: maint.filter((m: any) => m.status === "IN_PROGRESS").length,
+                    totalWebhooks: webhooksMeta.totalWebhooks ?? (webhooksMeta.webhooks?.length ?? 0),
+                    activeWebhooks: webhooksMeta.activeWebhooks ?? 0,
                 });
                 // Fetch additional dashboard data (non-blocking)
                 const [deptResult, deprResult] = await Promise.allSettled([
@@ -221,7 +229,7 @@ export default function DashboardPage() {
                 </Card>
             )}
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <Card className="border-0 shadow-sm bg-gradient-to-br from-indigo-500 to-indigo-700 text-white">
                     <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-5">
                         <p className="text-xs font-semibold text-indigo-200 uppercase tracking-wide">Total Assets</p>
@@ -261,6 +269,19 @@ export default function DashboardPage() {
                     <CardContent className="px-5 pb-4">
                         <div className="text-4xl font-black">{stats.totalUsers.toLocaleString()}</div>
                         <p className="text-xs text-blue-200 mt-1">{stats.totalOrganisations} organisation{stats.totalOrganisations !== 1 ? "s" : ""} registered</p>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-700 to-slate-900 text-white">
+                    <CardHeader className="flex flex-row items-center justify-between pb-1 pt-4 px-5">
+                        <p className="text-xs font-semibold text-slate-200 uppercase tracking-wide">Webhooks</p>
+                        <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center">
+                            <Webhook className="h-4 w-4 text-white" />
+                        </div>
+                    </CardHeader>
+                    <CardContent className="px-5 pb-4">
+                        <div className="text-4xl font-black">{stats.totalWebhooks.toLocaleString()}</div>
+                        <p className="text-xs text-slate-200 mt-1">{stats.activeWebhooks} active</p>
                     </CardContent>
                 </Card>
 

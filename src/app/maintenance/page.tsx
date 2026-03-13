@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -290,7 +291,7 @@ export default function MaintenancePage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="description">Task Description / Issue</Label>
-                        <Input id="description" placeholder="Replace battery and clean fans..." {...register("description")} />
+                        <Textarea id="description" placeholder="Replace battery and clean fans..." {...register("description")} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 border-t pt-4">

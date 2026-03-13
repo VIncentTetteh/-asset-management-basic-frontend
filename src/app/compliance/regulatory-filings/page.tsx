@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -101,9 +102,19 @@ export default function RegulatoryFilingsPage() {
 
     const onSubmit = async (data: RegulatoryFilingDto) => {
         try {
-            const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== "")) as RegulatoryFilingDto;
+            const normalized: RegulatoryFilingDto = {
+                ...data,
+                dueDate: data.dueDate ? new Date(`${data.dueDate}T00:00:00Z`).toISOString() : undefined,
+                submittedAt: data.submittedAt ? new Date(`${data.submittedAt}T00:00:00Z`).toISOString() : undefined,
+            };
+            const clean = Object.fromEntries(Object.entries(normalized).filter(([, v]) => v !== "" && v !== undefined && v !== null)) as RegulatoryFilingDto;
             if (editing) {
-                const patch = buildPatchPayload<RegulatoryFilingDto>(editing as unknown as Partial<RegulatoryFilingDto>, clean);
+                const editingNormalized: Partial<RegulatoryFilingDto> = {
+                    ...(editing as unknown as Partial<RegulatoryFilingDto>),
+                    dueDate: editing.dueDate ? new Date(editing.dueDate).toISOString() : undefined,
+                    submittedAt: editing.submittedAt ? new Date(editing.submittedAt).toISOString() : undefined,
+                };
+                const patch = buildPatchPayload<RegulatoryFilingDto>(editingNormalized, clean);
                 if (!Object.keys(patch).length) { toast("No changes"); return; }
                 await regulatoryFilingService.update(editing.id, patch);
                 toast.success("Updated");
@@ -249,7 +260,7 @@ export default function RegulatoryFilingsPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Notes</Label>
-                        <Input {...register("notes")} placeholder="Filing notes..." />
+                        <Textarea {...register("notes")} placeholder="Filing notes..." />
                     </div>
                     <div className="flex justify-end gap-2 pt-4 border-t">
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>

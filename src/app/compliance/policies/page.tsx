@@ -107,9 +107,23 @@ export default function PoliciesPage() {
 
     const onSubmit = async (data: SecurityPolicyDto) => {
         try {
-            const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== "")) as SecurityPolicyDto;
+            const normalized: SecurityPolicyDto = {
+                ...data,
+                effectiveDate: data.effectiveDate
+                    ? new Date(`${data.effectiveDate}T00:00:00Z`).toISOString()
+                    : undefined,
+                reviewDueDate: data.reviewDueDate
+                    ? new Date(`${data.reviewDueDate}T00:00:00Z`).toISOString()
+                    : undefined,
+            };
+            const clean = Object.fromEntries(Object.entries(normalized).filter(([, v]) => v !== "" && v !== undefined && v !== null)) as SecurityPolicyDto;
             if (editing) {
-                const patch = buildPatchPayload<SecurityPolicyDto>(editing as unknown as Partial<SecurityPolicyDto>, clean);
+                const editingNormalized: Partial<SecurityPolicyDto> = {
+                    ...(editing as unknown as Partial<SecurityPolicyDto>),
+                    effectiveDate: editing.effectiveDate ? new Date(editing.effectiveDate).toISOString() : undefined,
+                    reviewDueDate: editing.reviewDueDate ? new Date(editing.reviewDueDate).toISOString() : undefined,
+                };
+                const patch = buildPatchPayload<SecurityPolicyDto>(editingNormalized, clean);
                 if (!Object.keys(patch).length) { toast("No changes to save"); return; }
                 await policyService.update(editing.id, patch);
                 toast.success("Policy updated");

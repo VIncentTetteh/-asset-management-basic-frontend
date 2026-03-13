@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -383,7 +384,7 @@ export default function PurchaseOrdersPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="remarks">Remarks</Label>
-                        <Input id="remarks" placeholder="IT equipment batch, urgent order..." {...register("remarks")} />
+                        <Textarea id="remarks" placeholder="IT equipment batch, urgent order..." {...register("remarks")} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 border-t pt-4">

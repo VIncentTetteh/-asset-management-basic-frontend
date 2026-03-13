@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -193,11 +194,11 @@ export default function SecurityZonesPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Description</Label>
-                        <Input {...register("description")} placeholder="Zone purpose and scope..." />
+                        <Textarea {...register("description")} placeholder="Zone purpose and scope..." />
                     </div>
                     <div className="space-y-1.5">
                         <Label>Allowed Protocols</Label>
-                        <Input {...register("allowedProtocols")} placeholder="Modbus, HART, DNP3..." />
+                        <Textarea {...register("allowedProtocols")} placeholder="Modbus, HART, DNP3..." />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">

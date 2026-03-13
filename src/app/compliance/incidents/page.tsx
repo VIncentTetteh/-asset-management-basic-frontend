@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -117,9 +118,23 @@ export default function IncidentsPage() {
 
     const onSubmit = async (data: SecurityIncidentDto) => {
         try {
-            const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== "")) as SecurityIncidentDto;
+            const normalized: SecurityIncidentDto = {
+                ...data,
+                detectedAt: data.detectedAt
+                    ? new Date(`${data.detectedAt}T00:00:00Z`).toISOString()
+                    : undefined,
+                resolvedAt: data.resolvedAt
+                    ? new Date(`${data.resolvedAt}T00:00:00Z`).toISOString()
+                    : undefined,
+            };
+            const clean = Object.fromEntries(Object.entries(normalized).filter(([, v]) => v !== "" && v !== undefined && v !== null)) as SecurityIncidentDto;
             if (editing) {
-                const patch = buildPatchPayload<SecurityIncidentDto>(editing as unknown as Partial<SecurityIncidentDto>, clean);
+                const editingNormalized: Partial<SecurityIncidentDto> = {
+                    ...(editing as unknown as Partial<SecurityIncidentDto>),
+                    detectedAt: editing.detectedAt ? new Date(editing.detectedAt).toISOString() : undefined,
+                    resolvedAt: editing.resolvedAt ? new Date(editing.resolvedAt).toISOString() : undefined,
+                };
+                const patch = buildPatchPayload<SecurityIncidentDto>(editingNormalized, clean);
                 if (!Object.keys(patch).length) { toast("No changes to save"); return; }
                 await incidentService.update(editing.id, patch);
                 toast.success("Incident updated");
@@ -245,7 +260,7 @@ export default function IncidentsPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Description</Label>
-                        <Input {...register("description")} placeholder="Describe what happened..." />
+                        <Textarea {...register("description")} placeholder="Describe what happened..." />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
@@ -295,11 +310,11 @@ export default function IncidentsPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Root Cause</Label>
-                        <Input {...register("rootCause")} placeholder="Root cause analysis..." />
+                        <Textarea {...register("rootCause")} placeholder="Root cause analysis..." />
                     </div>
                     <div className="space-y-1.5">
                         <Label>Lessons Learned</Label>
-                        <Input {...register("lessonsLearned")} placeholder="What was learned..." />
+                        <Textarea {...register("lessonsLearned")} placeholder="What was learned..." />
                     </div>
                     <div className="flex justify-end gap-2 pt-4 border-t">
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>

@@ -10,19 +10,41 @@ const withOrgParams = (params?: Record<string, string | number | boolean | undef
     organisationId: getOrgId(),
 });
 
+const normalizeLicense = (license: any): SoftwareLicense => {
+    if (!license) return license as SoftwareLicense;
+    return {
+        ...license,
+        productName: license.productName ?? license.name ?? "",
+    } as SoftwareLicense;
+};
+
+const normalizeLicenseList = (data: any): SoftwareLicense[] => {
+    const list = extractList<SoftwareLicense>(data);
+    return list.map(normalizeLicense);
+};
+
+const normalizePayload = (data: Partial<SoftwareLicenseDto>) => {
+    const payload: Record<string, unknown> = { ...data };
+    if (payload.productName && !payload.name) {
+        payload.name = payload.productName;
+    }
+    delete payload.productName;
+    return payload;
+};
+
 export const licenseService = {
     /** POST /licenses */
     create: async (data: SoftwareLicenseDto): Promise<SoftwareLicense> => {
-        const response = await api.post<SoftwareLicense>("/licenses", data, {
+        const response = await api.post<SoftwareLicense>("/licenses", normalizePayload(data), {
             params: withOrgParams(),
         });
-        return response.data;
+        return normalizeLicense(response.data);
     },
 
     /** GET /licenses */
     getAll: async (): Promise<SoftwareLicense[]> => {
         const response = await api.get("/licenses", { params: withOrgParams() });
-        return extractList<SoftwareLicense>(response.data);
+        return normalizeLicenseList(response.data);
     },
 
     /** GET /licenses/expiring-soon?days=30 */
@@ -30,7 +52,7 @@ export const licenseService = {
         const response = await api.get("/licenses/expiring-soon", {
             params: withOrgParams({ days }),
         });
-        return extractList<SoftwareLicense>(response.data);
+        return normalizeLicenseList(response.data);
     },
 
     /** GET /licenses/over-allocated */
@@ -38,7 +60,7 @@ export const licenseService = {
         const response = await api.get("/licenses/over-allocated", {
             params: withOrgParams(),
         });
-        return extractList<SoftwareLicense>(response.data);
+        return normalizeLicenseList(response.data);
     },
 
     /** GET /licenses/utilization */
@@ -51,10 +73,10 @@ export const licenseService = {
 
     /** PATCH /licenses/{id} */
     update: async (id: string, data: Partial<SoftwareLicenseDto>): Promise<SoftwareLicense> => {
-        const response = await api.patch<SoftwareLicense>(`/licenses/${id}`, data, {
+        const response = await api.patch<SoftwareLicense>(`/licenses/${id}`, normalizePayload(data), {
             params: withOrgParams(),
         });
-        return response.data;
+        return normalizeLicense(response.data);
     },
 
     /** DELETE /licenses/{id} */

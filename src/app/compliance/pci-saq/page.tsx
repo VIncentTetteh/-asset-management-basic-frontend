@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -87,9 +88,19 @@ export default function PCISAQPage() {
 
     const onSubmit = async (data: PCISAQDto) => {
         try {
-            const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== "")) as PCISAQDto;
+            const normalized: PCISAQDto = {
+                ...data,
+                targetDate: data.targetDate
+                    ? new Date(`${data.targetDate}T00:00:00Z`).toISOString()
+                    : undefined,
+            };
+            const clean = Object.fromEntries(Object.entries(normalized).filter(([, v]) => v !== "" && v !== undefined && v !== null)) as PCISAQDto;
             if (editing) {
-                const patch = buildPatchPayload<PCISAQDto>(editing as unknown as Partial<PCISAQDto>, clean);
+                const editingNormalized: Partial<PCISAQDto> = {
+                    ...(editing as unknown as Partial<PCISAQDto>),
+                    targetDate: editing.targetDate ? new Date(editing.targetDate).toISOString() : undefined,
+                };
+                const patch = buildPatchPayload<PCISAQDto>(editingNormalized, clean);
                 if (!Object.keys(patch).length) { toast("No changes"); return; }
                 await pciSaqService.update(editing.id, patch);
                 toast.success("Updated");
@@ -217,12 +228,12 @@ export default function PCISAQPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Requirement Text</Label>
-                        <Input {...register("requirementText")} placeholder="Describe the PCI-DSS requirement..." />
+                        <Textarea {...register("requirementText")} placeholder="Describe the PCI-DSS requirement..." />
                     </div>
                     {complianceStatus === "COMPENSATING_CONTROL" && (
                         <div className="space-y-1.5">
                             <Label>Compensating Control</Label>
-                            <Input {...register("compensatingControl")} placeholder="Describe the compensating control..." />
+                            <Textarea {...register("compensatingControl")} placeholder="Describe the compensating control..." />
                         </div>
                     )}
                     <div className="space-y-1.5">
@@ -235,7 +246,7 @@ export default function PCISAQPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Notes</Label>
-                        <Input {...register("notes")} placeholder="Additional notes..." />
+                        <Textarea {...register("notes")} placeholder="Additional notes..." />
                     </div>
                     <div className="flex justify-end gap-2 pt-4 border-t">
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>

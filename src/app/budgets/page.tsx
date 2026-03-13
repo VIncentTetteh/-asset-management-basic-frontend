@@ -46,13 +46,13 @@ export default function BudgetsPage() {
 
     useEffect(() => { fetchAll(); }, []);
 
-    const totalAllocated = budgets.reduce((s, b) => s + (b.allocatedAmount || 0), 0);
+    const totalAllocated = budgets.reduce((s, b) => s + (b.totalAmount || 0), 0);
     const totalSpent = budgets.reduce((s, b) => s + (b.spentAmount || 0), 0);
     const totalRemaining = budgets.reduce((s, b) => s + (b.remainingAmount || 0), 0);
 
     const handleOpenCreate = () => {
         setEditingBudget(null);
-        reset({ name: "", status: "ACTIVE", allocatedAmount: 0, currency: "USD" });
+        reset({ name: "", status: "ACTIVE", totalAmount: 0, currency: "USD" });
         setIsModalOpen(true);
     };
 
@@ -61,12 +61,12 @@ export default function BudgetsPage() {
         reset({
             name: budget.name,
             status: budget.status,
-            allocatedAmount: budget.allocatedAmount,
+            totalAmount: budget.totalAmount,
             currency: budget.currency || "USD",
             fiscalYear: budget.fiscalYear || undefined,
             departmentId: budget.departmentId || "",
-            startDate: budget.startDate || "",
-            endDate: budget.endDate || "",
+            periodStart: budget.periodStart || "",
+            periodEnd: budget.periodEnd || "",
         });
         setIsModalOpen(true);
     };
@@ -137,8 +137,8 @@ export default function BudgetsPage() {
     };
 
     const spendPct = (budget: Budget) => {
-        if (!budget.allocatedAmount) return 0;
-        return Math.min(100, (budget.spentAmount / budget.allocatedAmount) * 100);
+        if (!budget.totalAmount) return 0;
+        return Math.min(100, (budget.spentAmount / budget.totalAmount) * 100);
     };
 
     const deptName = (id?: string | null) => departments.find(d => d.id === id)?.name || "—";
@@ -235,7 +235,7 @@ export default function BudgetsPage() {
                                                 <td className="py-3 px-4 font-medium text-slate-900">{b.name}</td>
                                                 <td className="py-3 px-4 text-slate-600">{deptName(b.departmentId)}</td>
                                                 <td className="py-3 px-4 text-slate-600">{b.fiscalYear || "—"}</td>
-                                                <td className="py-3 px-4 text-slate-700">{(b.currency || "USD")} {b.allocatedAmount.toLocaleString()}</td>
+                                                <td className="py-3 px-4 text-slate-700">{(b.currency || "USD")} {b.totalAmount.toLocaleString()}</td>
                                                 <td className="py-3 px-4">
                                                     <div className="space-y-1">
                                                         <div className={`flex items-center gap-1 ${exceeded ? "text-red-600" : "text-slate-700"}`}>
@@ -325,8 +325,8 @@ export default function BudgetsPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="allocatedAmount">Allocated Amount <span className="text-red-500">*</span></Label>
-                            <Input id="allocatedAmount" type="number" step="0.01" placeholder="0.00" {...register("allocatedAmount", { required: true, valueAsNumber: true })} />
+                            <Label htmlFor="totalAmount">Allocated Amount <span className="text-red-500">*</span></Label>
+                            <Input id="totalAmount" type="number" step="0.01" placeholder="0.00" {...register("totalAmount", { required: true, valueAsNumber: true })} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="currency">Currency</Label>
@@ -364,12 +364,12 @@ export default function BudgetsPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="startDate">Start Date</Label>
-                            <Input id="startDate" type="date" {...register("startDate")} />
+                            <Label htmlFor="periodStart">Start Date</Label>
+                            <Input id="periodStart" type="date" {...register("periodStart")} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="endDate">End Date</Label>
-                            <Input id="endDate" type="date" {...register("endDate")} />
+                            <Label htmlFor="periodEnd">End Date</Label>
+                            <Input id="periodEnd" type="date" {...register("periodEnd")} />
                         </div>
                     </div>
 

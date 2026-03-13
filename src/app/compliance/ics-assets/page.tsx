@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -108,9 +109,19 @@ export default function ICSAssetsPage() {
 
     const onSubmit = async (data: ICSAssetDto) => {
         try {
-            const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== "")) as ICSAssetDto;
+            const normalized: ICSAssetDto = {
+                ...data,
+                lastPatchedAt: data.lastPatchedAt
+                    ? new Date(`${data.lastPatchedAt}T00:00:00Z`).toISOString()
+                    : undefined,
+            };
+            const clean = Object.fromEntries(Object.entries(normalized).filter(([, v]) => v !== "" && v !== undefined && v !== null)) as ICSAssetDto;
             if (editing) {
-                const patch = buildPatchPayload<ICSAssetDto>(editing as unknown as Partial<ICSAssetDto>, clean);
+                const editingNormalized: Partial<ICSAssetDto> = {
+                    ...(editing as unknown as Partial<ICSAssetDto>),
+                    lastPatchedAt: editing.lastPatchedAt ? new Date(editing.lastPatchedAt).toISOString() : undefined,
+                };
+                const patch = buildPatchPayload<ICSAssetDto>(editingNormalized, clean);
                 if (!Object.keys(patch).length) { toast("No changes to save"); return; }
                 await icsAssetService.update(editing.id, patch);
                 toast.success("Updated");
@@ -268,11 +279,11 @@ export default function ICSAssetsPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Known Vulnerabilities (CVEs)</Label>
-                        <Input {...register("knownVulnerabilities")} placeholder="CVE-2021-37185, ..." />
+                        <Textarea {...register("knownVulnerabilities")} placeholder="CVE-2021-37185, ..." />
                     </div>
                     <div className="space-y-1.5">
                         <Label>Notes</Label>
-                        <Input {...register("notes")} placeholder="Maintenance windows, restrictions..." />
+                        <Textarea {...register("notes")} placeholder="Maintenance windows, restrictions..." />
                     </div>
                     <div className="flex items-center gap-2 py-1">
                         <input type="checkbox" id="isolated" {...register("isolated")} className="h-4 w-4 accent-teal-600 rounded" />

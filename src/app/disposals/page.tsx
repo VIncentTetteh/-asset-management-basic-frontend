@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -282,7 +283,7 @@ export default function DisposalsPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="reason">Primary Reason <span className="text-red-500">*</span></Label>
-                        <Input id="reason" placeholder="e.g. End of Life, Irreparable damage, Obsolete" {...register("reason", { required: true })} />
+                        <Textarea id="reason" placeholder="e.g. End of Life, Irreparable damage, Obsolete" {...register("reason", { required: true })} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 border-t pt-4 border-b pb-4">
@@ -295,7 +296,7 @@ export default function DisposalsPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="complianceDocumentUrl">Additional Notes / Document References</Label>
-                        <Input id="complianceDocumentUrl" placeholder="Certificate of destruction #12345 attached via email..." {...register("complianceDocumentUrl")} />
+                        <Textarea id="complianceDocumentUrl" placeholder="Certificate of destruction #12345 attached via email..." {...register("complianceDocumentUrl")} />
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">

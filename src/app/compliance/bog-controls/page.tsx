@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -105,9 +106,19 @@ export default function BOGControlsPage() {
 
     const onSubmit = async (data: BOGControlDto) => {
         try {
-            const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== "")) as BOGControlDto;
+            const normalized: BOGControlDto = {
+                ...data,
+                targetDate: data.targetDate
+                    ? new Date(`${data.targetDate}T00:00:00Z`).toISOString()
+                    : undefined,
+            };
+            const clean = Object.fromEntries(Object.entries(normalized).filter(([, v]) => v !== "" && v !== undefined && v !== null)) as BOGControlDto;
             if (editing) {
-                const patch = buildPatchPayload<BOGControlDto>(editing as unknown as Partial<BOGControlDto>, clean);
+                const editingNormalized: Partial<BOGControlDto> = {
+                    ...(editing as unknown as Partial<BOGControlDto>),
+                    targetDate: editing.targetDate ? new Date(editing.targetDate).toISOString() : undefined,
+                };
+                const patch = buildPatchPayload<BOGControlDto>(editingNormalized, clean);
                 if (!Object.keys(patch).length) { toast("No changes to save"); return; }
                 await bogControlService.update(editing.id, patch);
                 toast.success("Control updated");
@@ -240,7 +251,7 @@ export default function BOGControlsPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Requirement <span className="text-red-500">*</span></Label>
-                        <Input {...register("requirement", { required: true })} placeholder="Requirement text..." />
+                        <Textarea {...register("requirement", { required: true })} placeholder="Requirement text..." />
                         {errors.requirement && <p className="text-xs text-red-500">Required</p>}
                     </div>
                     <div className="space-y-1.5">
@@ -254,11 +265,11 @@ export default function BOGControlsPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Gap Description</Label>
-                        <Input {...register("gapDescription")} placeholder="Describe any gaps..." />
+                        <Textarea {...register("gapDescription")} placeholder="Describe any gaps..." />
                     </div>
                     <div className="space-y-1.5">
                         <Label>Remediation Plan</Label>
-                        <Input {...register("remediationPlan")} placeholder="Remediation steps..." />
+                        <Textarea {...register("remediationPlan")} placeholder="Remediation steps..." />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -109,9 +110,19 @@ export default function PatchRecordsPage() {
 
     const onSubmit = async (data: PatchRecordDto) => {
         try {
-            const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== "")) as PatchRecordDto;
+            const normalized: PatchRecordDto = {
+                ...data,
+                appliedAt: data.appliedAt
+                    ? new Date(`${data.appliedAt}T00:00:00Z`).toISOString()
+                    : undefined,
+            };
+            const clean = Object.fromEntries(Object.entries(normalized).filter(([, v]) => v !== "" && v !== undefined && v !== null)) as PatchRecordDto;
             if (editing) {
-                const patch = buildPatchPayload<PatchRecordDto>(editing as unknown as Partial<PatchRecordDto>, clean);
+                const editingNormalized: Partial<PatchRecordDto> = {
+                    ...(editing as unknown as Partial<PatchRecordDto>),
+                    appliedAt: editing.appliedAt ? new Date(editing.appliedAt).toISOString() : undefined,
+                };
+                const patch = buildPatchPayload<PatchRecordDto>(editingNormalized, clean);
                 if (!Object.keys(patch).length) { toast("No changes"); return; }
                 await patchRecordService.update(editing.id, patch);
                 toast.success("Updated");
@@ -256,11 +267,11 @@ export default function PatchRecordsPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Rollback Plan</Label>
-                        <Input {...register("rollbackPlan")} placeholder="Steps to rollback if patch fails..." />
+                        <Textarea {...register("rollbackPlan")} placeholder="Steps to rollback if patch fails..." />
                     </div>
                     <div className="space-y-1.5">
                         <Label>Notes</Label>
-                        <Input {...register("notes")} placeholder="Additional notes..." />
+                        <Textarea {...register("notes")} placeholder="Additional notes..." />
                     </div>
                     <div className="flex items-center gap-2 py-1">
                         <input type="checkbox" id="testValidated" {...register("testEnvironmentValidated")} className="h-4 w-4 accent-teal-600 rounded" />

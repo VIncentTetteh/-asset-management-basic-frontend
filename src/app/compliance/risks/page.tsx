@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -118,12 +119,24 @@ export default function RisksPage() {
 
     const onSubmit = async (data: RiskDto) => {
         try {
-            data.likelihood = Number(data.likelihood);
-            data.impact = Number(data.impact);
-            if (data.residualRisk !== undefined) data.residualRisk = Number(data.residualRisk);
-            const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== "")) as RiskDto;
+            const normalized: RiskDto = {
+                ...data,
+                likelihood: Number(data.likelihood),
+                impact: Number(data.impact),
+                residualRisk: data.residualRisk !== undefined && data.residualRisk !== null && data.residualRisk !== ""
+                    ? Number(data.residualRisk)
+                    : undefined,
+                reviewDate: data.reviewDate
+                    ? new Date(`${data.reviewDate}T00:00:00Z`).toISOString()
+                    : undefined,
+            };
+            const clean = Object.fromEntries(Object.entries(normalized).filter(([, v]) => v !== "" && v !== undefined && v !== null)) as RiskDto;
             if (editing) {
-                const patch = buildPatchPayload<RiskDto>(editing as unknown as Partial<RiskDto>, clean);
+                const editingNormalized: Partial<RiskDto> = {
+                    ...(editing as unknown as Partial<RiskDto>),
+                    reviewDate: editing.reviewDate ? new Date(editing.reviewDate).toISOString() : undefined,
+                };
+                const patch = buildPatchPayload<RiskDto>(editingNormalized, clean);
                 if (!Object.keys(patch).length) { toast("No changes to save"); return; }
                 await riskService.update(editing.id, patch);
                 toast.success("Risk updated");
@@ -271,7 +284,7 @@ export default function RisksPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Description</Label>
-                        <Input {...register("description")} placeholder="Describe the risk..." />
+                        <Textarea {...register("description")} placeholder="Describe the risk..." />
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-1.5">
@@ -304,7 +317,7 @@ export default function RisksPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Mitigation Plan</Label>
-                        <Input {...register("mitigationPlan")} placeholder="Steps to mitigate..." />
+                        <Textarea {...register("mitigationPlan")} placeholder="Steps to mitigate..." />
                     </div>
                     <div className="space-y-1.5">
                         <Label>Risk Owner</Label>

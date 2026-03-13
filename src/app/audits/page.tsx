@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -290,7 +291,7 @@ export default function AuditsPage() {
 
                     <div className="space-y-2 col-span-2">
                         <Label htmlFor="remarks">Audit Notes / Findings</Label>
-                        <Input id="remarks" placeholder="Any initial remarks or findings observed during the audit..." {...register("remarks")} />
+                        <Textarea id="remarks" placeholder="Any initial remarks or findings observed during the audit..." {...register("remarks")} />
                     </div>
 
                     <div className="flex justify-end gap-2 pt-4 border-t mt-4">

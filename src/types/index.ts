@@ -1376,15 +1376,15 @@ export interface Budget {
     id: string;
     name: string;
     status: BudgetStatus;
-    allocatedAmount: number;
+    totalAmount: number;
     spentAmount: number;
     remainingAmount: number;
     currency?: string | null;
     fiscalYear?: number | null;
     departmentId?: string | null;
     departmentName?: string | null;
-    startDate?: string | null;
-    endDate?: string | null;
+    periodStart?: string | null;
+    periodEnd?: string | null;
     organisationId?: string | null;
     createdAt: string;
     updatedAt: string;
@@ -1393,12 +1393,12 @@ export interface Budget {
 export interface BudgetDto {
     name: string;
     status?: BudgetStatus;
-    allocatedAmount: number;
+    totalAmount: number;
     currency?: string | null;
     fiscalYear?: number | null;
     departmentId?: string | null;
-    startDate?: string | null;
-    endDate?: string | null;
+    periodStart?: string | null;
+    periodEnd?: string | null;
 }
 
 export interface BudgetSpendDto {
@@ -1411,26 +1411,22 @@ export interface VendorReview {
     id: string;
     supplierId: string;
     supplierName?: string | null;
-    reviewPeriod: string;
-    qualityScore: number;
-    deliveryScore: number;
-    supportScore: number;
-    overallScore: number;
-    comments?: string | null;
+    rating: number;
+    qualityScore?: number | null;
+    deliveryScore?: number | null;
+    supportScore?: number | null;
     reviewedById?: string | null;
-    reviewDate: string;
-    organisationId?: string | null;
-    createdAt: string;
-    updatedAt: string;
+    reviewedByEmail?: string | null;
 }
 
 export interface VendorReviewDto {
     supplierId: string;
     reviewPeriod: string;
-    qualityScore: number;
-    deliveryScore: number;
-    supportScore: number;
-    overallScore?: number;
+    rating: number;
+    qualityScore?: number | null;
+    deliveryScore?: number | null;
+    supportScore?: number | null;
+    overallScore?: number | null;
     comments?: string | null;
     reviewedById?: string | null;
     reviewDate: string;

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -388,7 +389,7 @@ export default function TransfersPage() {
 
                     <div className="space-y-2 pt-2">
                         <Label htmlFor="reason">Reason / Notes</Label>
-                        <Input id="reason" placeholder="Department relocation / project requirement" {...register("reason")} />
+                        <Textarea id="reason" placeholder="Department relocation / project requirement" {...register("reason")} />
                     </div>
 
                     <div className="flex justify-end gap-2 pt-4 border-t mt-4">

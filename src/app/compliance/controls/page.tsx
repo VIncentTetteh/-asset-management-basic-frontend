@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
@@ -122,9 +123,19 @@ export default function ComplianceControlsPage() {
 
     const onSubmit = async (data: ComplianceControlDto) => {
         try {
-            const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== "")) as ComplianceControlDto;
+            const normalized: ComplianceControlDto = {
+                ...data,
+                reviewDueDate: data.reviewDueDate
+                    ? new Date(`${data.reviewDueDate}T00:00:00Z`).toISOString()
+                    : undefined,
+            };
+            const clean = Object.fromEntries(Object.entries(normalized).filter(([, v]) => v !== "" && v !== undefined && v !== null)) as ComplianceControlDto;
             if (editing) {
-                const patch = buildPatchPayload<ComplianceControlDto>(editing as unknown as Partial<ComplianceControlDto>, clean);
+                const editingNormalized: Partial<ComplianceControlDto> = {
+                    ...(editing as unknown as Partial<ComplianceControlDto>),
+                    reviewDueDate: editing.reviewDueDate ? new Date(editing.reviewDueDate).toISOString() : undefined,
+                };
+                const patch = buildPatchPayload<ComplianceControlDto>(editingNormalized, clean);
                 if (!Object.keys(patch).length) { toast("No changes to save"); return; }
                 await complianceControlService.update(editing.id, patch);
                 toast.success("Control updated");
@@ -285,7 +296,7 @@ export default function ComplianceControlsPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Description</Label>
-                        <Input {...register("controlDescription")} placeholder="Brief description of the control..." />
+                        <Textarea {...register("controlDescription")} placeholder="Brief description of the control..." />
                     </div>
                     <div className="space-y-1.5">
                         <Label>Control Owner</Label>
@@ -298,7 +309,7 @@ export default function ComplianceControlsPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Justification</Label>
-                        <Input {...register("justification")} placeholder="Justification for current status..." />
+                        <Textarea {...register("justification")} placeholder="Justification for current status..." />
                     </div>
                     <div className="space-y-1.5">
                         <Label>Evidence URL</Label>
@@ -306,11 +317,11 @@ export default function ComplianceControlsPage() {
                     </div>
                     <div className="space-y-1.5">
                         <Label>Gap Description</Label>
-                        <Input {...register("gapDescription")} placeholder="Describe any gaps in implementation..." />
+                        <Textarea {...register("gapDescription")} placeholder="Describe any gaps in implementation..." />
                     </div>
                     <div className="space-y-1.5">
                         <Label>Remediation Plan</Label>
-                        <Input {...register("remediationPlan")} placeholder="Steps and timeline to remediate..." />
+                        <Textarea {...register("remediationPlan")} placeholder="Steps and timeline to remediate..." />
                     </div>
                     <div className="flex justify-end gap-2 pt-4 border-t">
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
