@@ -23,6 +23,7 @@ export default function UsersPage() {
     const [roles, setRoles] = useState<Role[]>([]);
 
     const [isLoading, setIsLoading] = useState(true);
+    const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
 
@@ -85,6 +86,7 @@ export default function UsersPage() {
 
     const handleDeactivate = async (user: User) => {
         if (!confirm(`Deactivate ${user.firstName} ${user.lastName}? They will lose access.`)) return;
+        setDeactivatingId(user.id!);
         try {
             await userService.deactivate(user.id!);
             toast.success("User deactivated");
@@ -92,6 +94,8 @@ export default function UsersPage() {
         } catch (error) {
             toast.error("Failed to deactivate user");
             console.error(error);
+        } finally {
+            setDeactivatingId(null);
         }
     };
 
@@ -226,6 +230,7 @@ export default function UsersPage() {
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleDeactivate(user)}
+                                        isLoading={deactivatingId === user.id}
                                         className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                                         title="Deactivate user"
                                         disabled={user.status === "INACTIVE"}

@@ -21,10 +21,17 @@ export default function RegisterTenantPage() {
         setIsLoading(true);
         try {
             const response = await authService.registerTenant(data);
-            // POST /tenant/register returns { organisationId, adminUserId, message }
-            // — no JWT. The admin must log in separately.
-            toast.success(response.message || "Workspace created successfully! Please log in.");
-            router.push("/login");
+            // API returns token + user info directly — auto-login the admin
+            localStorage.setItem("token", response.token);
+            localStorage.setItem("user", JSON.stringify({
+                id: response.userId,
+                firstName: response.firstName,
+                lastName: response.lastName,
+                email: response.email,
+                role: response.role,
+            }));
+            toast.success(`Workspace "${response.organisationName}" created! Welcome, ${response.firstName}.`);
+            router.push("/dashboard");
         } catch (error: any) {
             toast.error(error.response?.data?.message || "Registration failed. Please try again.");
         } finally {
@@ -44,28 +51,17 @@ export default function RegisterTenantPage() {
                 <form onSubmit={handleSubmit(onSubmit)}>
                     <CardContent className="space-y-6">
                         <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="organisationName">Organization Name</Label>
-                                    <Input
-                                        id="organisationName"
-                                        placeholder="Acme Corp"
-                                        {...register("organisationName", { required: "Organization name is required" })}
-                                        className={errors.organisationName ? "border-red-500" : ""}
-                                    />
-                                    {errors.organisationName && (
-                                        <p className="text-sm text-red-500">{errors.organisationName.message as string}</p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="organisationContactEmail">Contact Email</Label>
-                                    <Input
-                                        id="organisationContactEmail"
-                                        placeholder="admin@acme.com"
-                                        {...register("organisationContactEmail")}
-                                        className={errors.organisationContactEmail ? "border-red-500" : ""}
-                                    />
-                                </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="organisationName">Organization Name</Label>
+                                <Input
+                                    id="organisationName"
+                                    placeholder="Acme Corp"
+                                    {...register("organisationName", { required: "Organization name is required" })}
+                                    className={errors.organisationName ? "border-red-500" : ""}
+                                />
+                                {errors.organisationName && (
+                                    <p className="text-sm text-red-500">{errors.organisationName.message as string}</p>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -73,16 +69,17 @@ export default function RegisterTenantPage() {
                                     <Label htmlFor="country">Country</Label>
                                     <Input
                                         id="country"
-                                        placeholder="USA"
+                                        placeholder="Ghana"
                                         {...register("country")}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="timezone">Timezone</Label>
+                                    <Label htmlFor="phone">Phone</Label>
                                     <Input
-                                        id="timezone"
-                                        placeholder="UTC"
-                                        {...register("timezone")}
+                                        id="phone"
+                                        type="tel"
+                                        placeholder="+233201234567"
+                                        {...register("phone")}
                                     />
                                 </div>
                             </div>

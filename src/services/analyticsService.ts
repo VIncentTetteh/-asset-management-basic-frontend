@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { AssetAnalytics, FinancialAnalytics, PurchaseOrderAnalytics } from "@/types";
+import { AssetAnalytics, FinancialAnalytics, PurchaseOrderAnalytics, MaintenanceAnalytics, DepreciationTrend } from "@/types";
 
 export interface AnalyticsFilterParams {
     period?: "month" | "quarter" | "year";
@@ -18,5 +18,13 @@ export const analyticsService = {
     getPurchaseOrderAnalytics: async (params?: { period?: "month" | "quarter" | "year" }): Promise<PurchaseOrderAnalytics> => {
         const response = await api.get<PurchaseOrderAnalytics>("/analytics/purchase-orders", { params });
         return response.data;
-    }
+    },
+    getMaintenanceAnalytics: async (params?: { period?: "month" | "quarter" | "year" }): Promise<MaintenanceAnalytics> => {
+        const response = await api.get<MaintenanceAnalytics>("/analytics/maintenance", { params });
+        return response.data;
+    },
+    getDepreciationTrends: async (params?: { months?: number }): Promise<DepreciationTrend> => {
+        const response = await api.get<DepreciationTrend>("/analytics/depreciation-trends", { params });
+        return response.data;
+    },
 };

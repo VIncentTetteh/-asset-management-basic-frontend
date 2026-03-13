@@ -17,8 +17,8 @@ const ibmPlexSans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Enterprise Asset Management",
-  description: "Enterprise multi-tenancy asset management platform.",
+  title: "AssetIQ — Enterprise Asset Management",
+  description: "AssetIQ is the enterprise asset management platform for tracking, depreciation, maintenance, and compliance across your entire organisation.",
 };
 
 export default function RootLayout({

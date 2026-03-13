@@ -4,14 +4,41 @@ import { useEffect, useState } from "react";
 import { webhookService } from "@/services/webhookService";
 import { Webhook } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { Loader2, Webhook as WebhookIcon, Plus, CheckCircle, XCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, Webhook as WebhookIcon, Plus, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { useForm } from "react-hook-form";
+
+const AVAILABLE_EVENTS = [
+    "asset.created", "asset.updated", "asset.deleted",
+    "asset.assigned", "asset.disposed", "asset.maintenance_due",
+    "maintenance.created", "maintenance.completed",
+    "purchase_order.created", "purchase_order.approved",
+    "licence.expiring", "contract.expiring",
+    "budget.exceeded", "user.created",
+];
+
+interface WebhookFormData {
+    name: string;
+    url: string;
+    secret?: string;
+}
 
 export default function WebhooksPage() {
     const [webhooks, setWebhooks] = useState<Webhook[]>([]);
     const [stats, setStats] = useState({ total: 0, active: 0 });
     const [loading, setLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
+    const [eventsError, setEventsError] = useState(false);
+    const [testingId, setTestingId] = useState<string | null>(null);
+    const [togglingId, setTogglingId] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<WebhookFormData>();
 
     useEffect(() => {
         fetchWebhooks();
@@ -20,116 +47,280 @@ export default function WebhooksPage() {
     const fetchWebhooks = async () => {
         try {
             const data = await webhookService.list();
-            setWebhooks(data.webhooks);
-            setStats({ total: data.totalWebhooks, active: data.activeWebhooks });
-        } catch (e) {
+            setWebhooks(data.webhooks ?? []);
+            setStats({ total: data.totalWebhooks ?? 0, active: data.activeWebhooks ?? 0 });
+        } catch {
             toast.error("Failed to fetch webhooks");
         } finally {
             setLoading(false);
         }
     };
 
+    const handleOpenCreate = () => {
+        reset({ name: "", url: "", secret: "" });
+        setSelectedEvents([]);
+        setEventsError(false);
+        setIsModalOpen(true);
+    };
+
+    const toggleEvent = (event: string) => {
+        setSelectedEvents(prev =>
+            prev.includes(event) ? prev.filter(e => e !== event) : [...prev, event]
+        );
+        setEventsError(false);
+    };
+
+    const onSubmit = async (data: WebhookFormData) => {
+        if (selectedEvents.length === 0) {
+            setEventsError(true);
+            return;
+        }
+        try {
+            const payload: Partial<Webhook> = {
+                name: data.name,
+                url: data.url,
+                events: selectedEvents,
+                active: true,
+                ...(data.secret ? { secret: data.secret } : {}),
+            };
+            await webhookService.create(payload);
+            toast.success("Webhook created");
+            setIsModalOpen(false);
+            fetchWebhooks();
+        } catch {
+            toast.error("Failed to create webhook");
+        }
+    };
+
     const toggleWebhook = async (id: string, currentStatus: boolean) => {
+        setTogglingId(id);
         try {
             await webhookService.update(id, { active: !currentStatus });
-            toast.success(`Webhook ${!currentStatus ? 'activated' : 'deactivated'}`);
-      fetchWebhooks();
-    } catch {
-      toast.error("Failed to update webhook");
-    }
-  };
+            toast.success(`Webhook ${!currentStatus ? "activated" : "deactivated"}`);
+            fetchWebhooks();
+        } catch {
+            toast.error("Failed to update webhook");
+        } finally {
+            setTogglingId(null);
+        }
+    };
 
-  const testWebhook = async (id: string) => {
-    try {
-      await webhookService.testWebhook(id);
-      toast.success("Test payload sent successfully");
-      fetchWebhooks();
-    } catch {
-      toast.error("Test delivery failed");
-    }
-  };
+    const handleDelete = async (id: string) => {
+        if (!confirm("Delete this webhook?")) return;
+        setDeletingId(id);
+        try {
+            await webhookService.delete(id);
+            toast.success("Webhook deleted");
+            fetchWebhooks();
+        } catch {
+            toast.error("Failed to delete webhook");
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
-  if (loading) return <div className="flex p-10 justify-center"><Loader2 className="animate-spin w-8 h-8" /></div>;
+    const testWebhook = async (id: string) => {
+        setTestingId(id);
+        try {
+            await webhookService.testWebhook(id);
+            toast.success("Test payload sent successfully");
+        } catch {
+            toast.error("Test delivery failed");
+        } finally {
+            setTestingId(null);
+        }
+    };
 
-  return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-          <WebhookIcon className="text-indigo-500" /> Webhooks Integrations
-        </h1>
-        <Button><Plus className="w-4 h-4 mr-2" /> Add Webhook</Button>
-      </div>
+    if (loading) return (
+        <div className="flex p-10 justify-center">
+            <Loader2 className="animate-spin w-8 h-8 text-slate-400" />
+        </div>
+    );
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-sm text-muted-foreground">Total Configured Webhooks</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-600">{stats.active}</div>
-            <p className="text-sm text-muted-foreground">Active Webhooks</p>
-          </CardContent>
-        </Card>
-      </div>
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Webhooks</h1>
+                    <p className="text-slate-500">Receive real-time HTTP notifications for events in your organisation.</p>
+                </div>
+                <Button onClick={handleOpenCreate} className="bg-indigo-600 hover:bg-indigo-700">
+                    <Plus className="w-4 h-4 mr-2" /> Add Webhook
+                </Button>
+            </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Configured Endpoints</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="relative overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs uppercase bg-muted text-muted-foreground">
-                <tr>
-                  <th className="px-6 py-3">Name & URL</th>
-                  <th className="px-6 py-3">Events</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3">Deliveries</th>
-                  <th className="px-6 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {webhooks.map((w) => (
-                  <tr key={w.id} className="border-b">
-                    <td className="px-6 py-4">
-                      <div className="font-bold">{w.name}</div>
-                      <div className="text-xs text-muted-foreground">{w.url || "Omitted URL"}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-1 flex-wrap">
-                        {w.events.map(e => (
-                          <span key={e} className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs">{e}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {w.active ? <span className="flex items-center text-green-600 text-xs font-bold"><CheckCircle className="w-3 h-3 mr-1"/> ACTIVE</span> : <span className="flex items-center text-slate-400 text-xs font-bold"><XCircle className="w-3 h-3 mr-1"/> INACTIVE</span>}
-                    </td>
-                    <td className="px-6 py-4 text-xs">
-                      {w.deliveryCount} total<br/>
-                      <span className="text-muted-foreground">Last: {w.lastTriggeredAt ? new Date(w.lastTriggeredAt).toLocaleString() : 'Never'}</span>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => testWebhook(w.id)}>Test</Button>
-                      <Button variant={w.active ? "secondary" : "default"} size="sm" onClick={() => toggleWebhook(w.id, w.active)}>
-                        {w.active ? "Disable" : "Enable"}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-                {!webhooks.length && (
-                  <tr>
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">No webhooks configured</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="border-slate-200">
+                    <CardContent className="p-4 flex items-center gap-3">
+                        <div className="p-2 bg-indigo-100 rounded-lg"><WebhookIcon className="h-5 w-5 text-indigo-600" /></div>
+                        <div>
+                            <p className="text-xs text-slate-500">Total Webhooks</p>
+                            <p className="text-xl font-bold text-slate-900">{stats.total}</p>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className="border-slate-200">
+                    <CardContent className="p-4 flex items-center gap-3">
+                        <div className="p-2 bg-emerald-100 rounded-lg"><CheckCircle className="h-5 w-5 text-emerald-600" /></div>
+                        <div>
+                            <p className="text-xs text-slate-500">Active</p>
+                            <p className="text-xl font-bold text-slate-900">{stats.active}</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <Card className="border-slate-200">
+                <CardHeader className="pb-0">
+                    <CardTitle className="text-base font-semibold text-slate-700">Configured Endpoints</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-100 bg-slate-50/50">
+                                    <th className="text-left py-3 px-4 font-medium text-slate-600">Name & URL</th>
+                                    <th className="text-left py-3 px-4 font-medium text-slate-600">Events</th>
+                                    <th className="text-left py-3 px-4 font-medium text-slate-600">Status</th>
+                                    <th className="text-left py-3 px-4 font-medium text-slate-600">Deliveries</th>
+                                    <th className="text-right py-3 px-4 font-medium text-slate-600">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {webhooks.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5}>
+                                            <div className="flex flex-col items-center justify-center p-12 text-center">
+                                                <WebhookIcon className="h-12 w-12 text-slate-300 mb-4" />
+                                                <h3 className="text-lg font-medium text-slate-900">No webhooks configured</h3>
+                                                <p className="text-slate-500 mt-1">Add a webhook to receive real-time event notifications.</p>
+                                                <Button onClick={handleOpenCreate} className="mt-4 bg-indigo-600 hover:bg-indigo-700">
+                                                    <Plus className="w-4 h-4 mr-2" /> Add Webhook
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    webhooks.map((w) => (
+                                        <tr key={w.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                            <td className="py-3 px-4">
+                                                <div className="font-medium text-slate-900">{w.name}</div>
+                                                <div className="text-xs font-mono text-slate-400 truncate max-w-[220px]">{w.url || "—"}</div>
+                                            </td>
+                                            <td className="py-3 px-4">
+                                                <div className="flex gap-1 flex-wrap max-w-[240px]">
+                                                    {w.events.map(e => (
+                                                        <span key={e} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-mono">{e}</span>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-4">
+                                                {w.active
+                                                    ? <span className="flex items-center gap-1 text-emerald-600 text-xs font-bold"><CheckCircle className="w-3.5 h-3.5" /> Active</span>
+                                                    : <span className="flex items-center gap-1 text-slate-400 text-xs font-bold"><XCircle className="w-3.5 h-3.5" /> Inactive</span>
+                                                }
+                                            </td>
+                                            <td className="py-3 px-4 text-xs text-slate-600">
+                                                <span className="font-medium">{w.deliveryCount}</span> total
+                                                <div className="text-slate-400">
+                                                    Last: {w.lastTriggeredAt ? new Date(w.lastTriggeredAt).toLocaleString() : "Never"}
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-4">
+                                                <div className="flex justify-end gap-1">
+                                                    <Button variant="outline" size="sm" onClick={() => testWebhook(w.id)} isLoading={testingId === w.id} className="h-7 px-2 text-xs">Test</Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => toggleWebhook(w.id, w.active)}
+                                                        isLoading={togglingId === w.id}
+                                                        className={`h-7 px-2 text-xs ${w.active ? "text-amber-600 border-amber-200 hover:bg-amber-50" : "text-emerald-700 border-emerald-200 hover:bg-emerald-50"}`}
+                                                    >
+                                                        {w.active ? "Disable" : "Enable"}
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(w.id)} isLoading={deletingId === w.id} className="h-7 px-2 text-red-600 hover:bg-red-50">
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Modal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                title="Add Webhook"
+                description="Configure an endpoint to receive event notifications."
+            >
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+                    <div className="space-y-2">
+                        <Label htmlFor="wh-name">Name <span className="text-red-500">*</span></Label>
+                        <Input
+                            id="wh-name"
+                            placeholder="e.g. Slack Alerts"
+                            {...register("name", { required: "Name is required" })}
+                        />
+                        {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="wh-url">Endpoint URL <span className="text-red-500">*</span></Label>
+                        <Input
+                            id="wh-url"
+                            type="url"
+                            placeholder="https://hooks.example.com/webhook"
+                            {...register("url", { required: "URL is required" })}
+                        />
+                        {errors.url && <p className="text-sm text-red-500">{errors.url.message}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="wh-secret">
+                            Secret <span className="text-xs text-slate-400">(optional — used for HMAC signature verification)</span>
+                        </Label>
+                        <Input
+                            id="wh-secret"
+                            type="password"
+                            placeholder="my-webhook-secret"
+                            {...register("secret")}
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Events <span className="text-red-500">*</span></Label>
+                        <div className="grid grid-cols-2 gap-1.5 p-3 border border-slate-200 rounded-md bg-slate-50/50 max-h-48 overflow-y-auto">
+                            {AVAILABLE_EVENTS.map(event => (
+                                <label key={event} className="flex items-center gap-2 text-xs cursor-pointer text-slate-600 hover:text-slate-900 py-0.5">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedEvents.includes(event)}
+                                        onChange={() => toggleEvent(event)}
+                                        className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600"
+                                    />
+                                    <span className="font-mono">{event}</span>
+                                </label>
+                            ))}
+                        </div>
+                        {eventsError && <p className="text-sm text-red-500">Select at least one event.</p>}
+                        {selectedEvents.length > 0 && (
+                            <p className="text-xs text-slate-500">{selectedEvents.length} event{selectedEvents.length !== 1 ? "s" : ""} selected</p>
+                        )}
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4 border-t">
+                        <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                        <Button type="submit" isLoading={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700">
+                            Create Webhook
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+        </div>
+    );
 }

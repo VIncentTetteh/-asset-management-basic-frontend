@@ -3,29 +3,25 @@ import { User, UserDto, LoginResponse } from "@/types";
 
 /** Full tenant registration payload — POST /tenant/register */
 export interface TenantRegistrationDto {
-    // Organisation fields
-    organisationName: string;               // required
-    organisationContactEmail: string;       // required
+    organisationName: string;
+    adminEmail: string;
+    adminFirstName: string;
+    adminLastName: string;
+    password: string;
+    phone?: string;
     country?: string;
-    address?: string;
-    timezone?: string;
-    industry?: string;
-    registrationNumber?: string;
-    taxId?: string;
-    contactPhone?: string;
-    // Admin user fields
-    adminFirstName: string;                 // required
-    adminLastName: string;                  // required
-    adminEmail: string;                     // required
-    adminPhone?: string;
-    adminJobTitle?: string;
-    password: string;                       // required, min 8 chars
 }
 
 export interface TenantRegistrationResponse {
     organisationId: string;
-    adminUserId: string;
-    message: string;
+    organisationName: string;
+    userId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+    token: string;
+    expiresIn: number;
 }
 
 export const authService = {
@@ -42,7 +38,7 @@ export const authService = {
     },
 
     /** POST /auth/login */
-    login: async (data: { email: string; password: string }): Promise<LoginResponse> => {
+    login: async (data: { email: string; password: string; organisationId?: string }): Promise<LoginResponse> => {
         const response = await api.post<LoginResponse>("/auth/login", data);
         return response.data;
     },
@@ -54,8 +50,8 @@ export const authService = {
     },
 
     /** POST /auth/refresh — refreshes the JWT expiry to 24 h */
-    refreshToken: async (): Promise<{ token: string; expiresIn: number; tokenType: string }> => {
-        const response = await api.post<{ token: string; expiresIn: number; tokenType: string }>("/auth/refresh");
+    refreshToken: async (): Promise<{ token: string; expiresIn: number }> => {
+        const response = await api.post<{ token: string; expiresIn: number }>("/auth/refresh");
         return response.data;
     },
 

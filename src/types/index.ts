@@ -223,6 +223,19 @@ export interface AssetDto {
     currentBookValue?: number;
 }
 
+// ─── Asset Import ─────────────────────────────────────────────────────────────
+export interface AssetImportRowError {
+    row: number;
+    message: string;
+}
+
+export interface AssetImportResult {
+    totalRows: number;
+    imported: number;
+    skipped: number;
+    errors: AssetImportRowError[];
+}
+
 // ─── Category ─────────────────────────────────────────────────────────────────
 export interface Category extends BaseEntity {
     name: string;
@@ -716,18 +729,41 @@ export interface WebhookDelivery {
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
+export type NotificationType =
+    | "DEPRECATION"
+    | "MAINTENANCE"
+    | "APPROVAL"
+    | "SYSTEM"
+    | "TRANSFER"
+    | "DISPOSAL"
+    | "PURCHASE_ORDER";
+
+export const NOTIFICATION_TYPES: NotificationType[] = [
+    "DEPRECATION",
+    "MAINTENANCE",
+    "APPROVAL",
+    "SYSTEM",
+    "TRANSFER",
+    "DISPOSAL",
+    "PURCHASE_ORDER",
+];
+
 export interface Notification {
-    notificationId: string;
-    type: string;
+    /** Backend may return either field name */
+    id?: string;
+    notificationId?: string;
+    type: NotificationType | string;
     title: string;
     message: string;
     entityId?: string;
     createdAt: string;
     read: boolean;
+    readAt?: string;
     actionUrl?: string;
 }
 
 export interface NotificationPreferences {
+    /** Per-type email toggle keyed by NotificationType */
     emailNotifications: Record<string, boolean>;
     pushNotifications?: boolean;
     inAppNotifications?: boolean;
@@ -1247,4 +1283,411 @@ export interface PaginatedResponse<T> {
     size: number;
     first?: boolean;
     last?: boolean;
+}
+
+// ─── Software Licenses ───────────────────────────────────────────────────────
+
+export type LicenseType = "SUBSCRIPTION" | "PERPETUAL" | "VOLUME" | "NODE_LOCKED" | "OPEN_SOURCE" | "TRIAL" | "ENTERPRISE" | "OEM";
+export type LicenseStatus = "ACTIVE" | "EXPIRING_SOON" | "EXPIRED" | "SUSPENDED" | "CANCELLED";
+
+export interface SoftwareLicense {
+    id: string;
+    productName: string;
+    licenseType: LicenseType;
+    status: LicenseStatus;
+    licenseKey?: string | null;
+    vendor?: string | null;
+    seats: number;
+    allocatedSeats: number;
+    purchaseDate?: string | null;
+    expiryDate?: string | null;
+    monthlyCost?: number | null;
+    currency?: string | null;
+    supplierId?: string | null;
+    organisationId?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SoftwareLicenseDto {
+    productName: string;
+    licenseType: LicenseType;
+    status?: LicenseStatus;
+    licenseKey?: string | null;
+    vendor?: string | null;
+    seats: number;
+    allocatedSeats?: number;
+    purchaseDate?: string | null;
+    expiryDate?: string | null;
+    monthlyCost?: number | null;
+    currency?: string | null;
+    supplierId?: string | null;
+}
+
+export interface LicenseUtilization {
+    totalLicenses: number;
+    totalSeats: number;
+    totalAllocated: number;
+    utilizationPct: number;
+    overAllocatedCount: number;
+}
+
+// ─── Contracts ────────────────────────────────────────────────────────────────
+
+export type ContractType = "PURCHASE" | "LEASE" | "MAINTENANCE" | "SERVICE_LEVEL_AGREEMENT" | "WARRANTY" | "INSURANCE" | "OTHER";
+export type ContractStatus = "DRAFT" | "ACTIVE" | "EXPIRING_SOON" | "EXPIRED" | "TERMINATED" | "RENEWED";
+
+export interface Contract {
+    id: string;
+    title: string;
+    contractType: ContractType;
+    status: ContractStatus;
+    supplierId?: string | null;
+    supplierName?: string | null;
+    startDate: string;
+    endDate: string;
+    value: number;
+    currency?: string | null;
+    autoRenew: boolean;
+    terms?: string | null;
+    organisationId?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ContractDto {
+    title: string;
+    contractType: ContractType;
+    status?: ContractStatus;
+    supplierId?: string | null;
+    startDate: string;
+    endDate: string;
+    value: number;
+    currency?: string | null;
+    autoRenew?: boolean;
+    terms?: string | null;
+}
+
+// ─── Budgets ──────────────────────────────────────────────────────────────────
+
+export type BudgetStatus = "DRAFT" | "ACTIVE" | "EXCEEDED" | "CLOSED";
+
+export interface Budget {
+    id: string;
+    name: string;
+    status: BudgetStatus;
+    allocatedAmount: number;
+    spentAmount: number;
+    remainingAmount: number;
+    currency?: string | null;
+    fiscalYear?: number | null;
+    departmentId?: string | null;
+    departmentName?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    organisationId?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface BudgetDto {
+    name: string;
+    status?: BudgetStatus;
+    allocatedAmount: number;
+    currency?: string | null;
+    fiscalYear?: number | null;
+    departmentId?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+}
+
+export interface BudgetSpendDto {
+    amount: number;
+}
+
+// ─── Vendor Reviews ───────────────────────────────────────────────────────────
+
+export interface VendorReview {
+    id: string;
+    supplierId: string;
+    supplierName?: string | null;
+    reviewPeriod: string;
+    qualityScore: number;
+    deliveryScore: number;
+    supportScore: number;
+    overallScore: number;
+    comments?: string | null;
+    reviewedById?: string | null;
+    reviewDate: string;
+    organisationId?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface VendorReviewDto {
+    supplierId: string;
+    reviewPeriod: string;
+    qualityScore: number;
+    deliveryScore: number;
+    supportScore: number;
+    overallScore?: number;
+    comments?: string | null;
+    reviewedById?: string | null;
+    reviewDate: string;
+}
+
+export interface VendorReviewSummary {
+    supplierId: string;
+    supplierName?: string | null;
+    totalReviews: number;
+    avgQualityScore: number;
+    avgDeliveryScore: number;
+    avgSupportScore: number;
+    avgOverallScore: number;
+}
+
+// ─── MFA ──────────────────────────────────────────────────────────────────────
+
+export interface MfaSetupResponse {
+    secret: string;
+    qrCodeImage: string;
+    message: string;
+}
+
+export interface MfaVerifyDto {
+    code: string;
+}
+
+export interface MfaDisableDto {
+    code: string;
+}
+
+// ─── SSO Configuration (org-scoped) ──────────────────────────────────────────
+
+export interface OrgSsoConfig {
+    id?: string | null;
+    provider?: string | null;
+    enabled: boolean;
+    clientId?: string | null;
+    issuerUri?: string | null;
+    scopes?: string[] | null;
+    redirectUri?: string | null;
+    idpMetadataUrl?: string | null;
+    spEntityId?: string | null;
+    assertionConsumerServiceUrl?: string | null;
+}
+
+export interface SsoOAuth2Dto {
+    provider: string;
+    clientId: string;
+    clientSecret: string;
+    issuerUri: string;
+    scopes?: string[];
+    redirectUri?: string | null;
+}
+
+export interface SsoSamlDto {
+    provider: string;
+    idpMetadataUrl: string;
+    spEntityId: string;
+    assertionConsumerServiceUrl: string;
+}
+
+export interface SsoToggleDto {
+    enabled: boolean;
+}
+
+// ─── Dashboard Additions ──────────────────────────────────────────────────────
+
+export interface AssetsByDepartment {
+    data: {
+        departmentId: string;
+        departmentName: string;
+        count: number;
+        value: number;
+        percentage?: number;
+    }[];
+    total: number;
+    totalValue: number;
+}
+
+export interface DepreciationSummary {
+    totalDepreciation: number;
+    netBookValue: number;
+    assetsFullyDepreciated: number;
+    monthlyDepreciation: number;
+    byMethod?: Record<string, { count: number; totalDepreciation: number }>;
+}
+
+// ─── Analytics Additions ──────────────────────────────────────────────────────
+
+export interface MaintenanceAnalytics {
+    period?: string;
+    totalMaintenanceCost: number;
+    averageCost: number;
+    completionRate: number;
+    overdueCount: number;
+    byType: Record<string, { count: number; cost: number }>;
+}
+
+export interface DepreciationTrendPoint {
+    month: string;
+    totalDepreciation: number;
+    netBookValue: number;
+    newDepreciation?: number;
+}
+
+export interface DepreciationTrend {
+    period?: string;
+    data: DepreciationTrendPoint[];
+}
+
+// ─── IT Asset Discovery ───────────────────────────────────────────────────────
+
+export type DiscoveredDeviceStatus = "ONLINE" | "OFFLINE" | "UNKNOWN" | "PROMOTED";
+
+export interface DiscoveredDevice {
+    id: string;
+    ipAddress: string;
+    hostname?: string | null;
+    macAddress?: string | null;
+    deviceType?: string | null;
+    openPorts?: number[] | null;
+    discoveryMethod?: string | null;
+    status: DiscoveredDeviceStatus;
+    osHint?: string | null;
+    responseTimeMs?: number | null;
+    lastSeenAt?: string | null;
+    promotedAssetId?: string | null;
+    organisationId?: string | null;
+    createdAt: string;
+    updatedAt?: string | null;
+}
+
+export interface DiscoveryScanDto {
+    cidrRange?: string | null;
+    ipAddresses?: string[] | null;
+    portScan?: boolean;
+    ports?: number[] | null;
+    timeoutMs?: number | null;
+}
+
+export interface DiscoverySummary {
+    total: number;
+    online: number;
+    offline: number;
+    promoted: number;
+}
+
+// ─── Cloud Assets ─────────────────────────────────────────────────────────────
+
+export type CloudProvider = "AWS" | "AZURE" | "GCP" | "ALIBABA" | "ORACLE_CLOUD" | "IBM_CLOUD" | "OTHER";
+export type CloudResourceType =
+    | "VIRTUAL_MACHINE"
+    | "STORAGE_BUCKET"
+    | "DATABASE"
+    | "LOAD_BALANCER"
+    | "CONTAINER"
+    | "SERVERLESS_FUNCTION"
+    | "NETWORK"
+    | "CDN"
+    | "DNS"
+    | "KUBERNETES_CLUSTER"
+    | "VPN_GATEWAY"
+    | "CACHE"
+    | "MESSAGE_QUEUE"
+    | "OTHER";
+export type CloudEnvironment = "PROD" | "STAGING" | "DEV";
+export type CloudAssetStatus = "RUNNING" | "STOPPED" | "TERMINATED" | "PENDING" | "UNKNOWN";
+
+export interface CloudAsset {
+    id: string;
+    name: string;
+    provider: CloudProvider;
+    region: string;
+    resourceId: string;
+    resourceType: CloudResourceType;
+    status: CloudAssetStatus;
+    accountId?: string | null;
+    monthlyCostEstimate?: number | null;
+    currency?: string | null;
+    environment: CloudEnvironment;
+    tags?: string | null;
+    description?: string | null;
+    lastSyncAt?: string | null;
+    organisationId?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CloudAssetDto {
+    name: string;
+    provider: CloudProvider;
+    region: string;
+    resourceId: string;
+    resourceType: CloudResourceType;
+    status?: CloudAssetStatus;
+    accountId?: string | null;
+    monthlyCostEstimate?: number | null;
+    currency?: string | null;
+    environment: CloudEnvironment;
+    tags?: string | null;
+    description?: string | null;
+}
+
+export interface CloudCostSummary {
+    totalMonthlyCost: number;
+    currency: string;
+    costByProvider: Record<string, number>;
+    costByEnvironment: Record<string, number>;
+    topAssets?: { assetName: string; resourceType: string; monthlyCost: number }[];
+}
+
+export interface CloudMonthlyCostDto {
+    billingMonth: string;
+    amount: number;
+    serviceName?: string | null;
+}
+
+// ─── AI / Predictive Intelligence ────────────────────────────────────────────
+
+export type InsightType =
+    | "MAINTENANCE_DUE"
+    | "FAILURE_RISK"
+    | "WARRANTY_EXPIRY"
+    | "DEPRECIATION_COMPLETE"
+    | "ASSET_AGING"
+    | "ANOMALY"
+    | "UNDERUTILIZED"
+    | "LICENSE_EXPIRY";
+
+export type InsightSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+export interface PredictiveInsight {
+    id: string;
+    assetId: string;
+    assetName?: string | null;
+    assetTag?: string | null;
+    insightType: InsightType;
+    severity: InsightSeverity;
+    title: string;
+    description: string;
+    confidence: number;
+    predictedDate?: string | null;
+    resolved: boolean;
+    resolvedAt?: string | null;
+    organisationId?: string | null;
+    createdAt: string;
+    updatedAt?: string | null;
+}
+
+export interface InsightSummary {
+    totalUnresolved: number;
+    bySeverity: Record<InsightSeverity, number>;
+}
+
+export interface InsightFilterParams {
+    type?: InsightType;
+    severity?: InsightSeverity;
+    unresolvedOnly?: boolean;
 }

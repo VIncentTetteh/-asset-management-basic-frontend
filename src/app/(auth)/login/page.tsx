@@ -86,6 +86,16 @@ export default function LoginPage() {
                                 <p className="text-sm text-red-500">{errors.password.message as string}</p>
                             )}
                         </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="organisationId" className="text-slate-600">
+                                Organization ID <span className="text-slate-400 font-normal">(optional — only if your email exists in multiple orgs)</span>
+                            </Label>
+                            <Input
+                                id="organisationId"
+                                placeholder="e.g. 18571af6-3a7e-4a9e-a85f-754fccb96715"
+                                {...register("organisationId")}
+                            />
+                        </div>
                     </CardContent>
                     <CardFooter className="flex flex-col space-y-4">
                         <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isLoading}>

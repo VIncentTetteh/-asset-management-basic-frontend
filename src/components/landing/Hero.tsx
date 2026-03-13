@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, PlayCircle, ShieldCheck, Package, CheckCircle2, TrendingUp, AlertTriangle } from "lucide-react";
-
-const socialProof = [
-    { value: "50K+", label: "Assets Tracked" },
-    { value: "1,200+", label: "Organizations" },
-    { value: "99.9%", label: "Uptime SLA" },
-    { value: "$2B+", label: "Assets Under Management" },
-];
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 const mockAssets = [
     { name: 'MacBook Pro 16" M3', tag: "IT-0421", dept: "Engineering", status: "Active", statusClass: "text-emerald-400 bg-emerald-500/10" },
@@ -19,6 +13,21 @@ const mockAssets = [
 ];
 
 export function Hero() {
+    const { currency, convert } = useCurrency();
+
+    // AUM is $2B USD; convert to active currency for display
+    const aumUSD = 2_000_000_000;
+    const aumDisplay = currency === "GHS"
+        ? `₵${(convert(aumUSD, "USD") / 1_000_000_000).toFixed(1)}B+`
+        : "$2B+";
+
+    const socialProof = [
+        { value: "50K+", label: "Assets Tracked" },
+        { value: "1,200+", label: "Organizations" },
+        { value: "99.9%", label: "Uptime SLA" },
+        { value: aumDisplay, label: "Assets Under Management" },
+    ];
+
     return (
         <section className="relative overflow-hidden pt-32 pb-20 md:pt-48 md:pb-32">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[600px] w-full max-w-7xl">

@@ -16,7 +16,8 @@ import { userService } from "@/services/userService";
 import { purchaseOrderService } from "@/services/purchaseOrderService";
 import { maintenanceService } from "@/services/maintenanceService";
 import { authService } from "@/services/authService";
-import { Organisation } from "@/types";
+import { dashboardService } from "@/services/dashboardService";
+import { Organisation, AssetsByDepartment, DepreciationSummary } from "@/types";
 
 interface DashboardStats {
     totalAssets: number;
@@ -51,6 +52,8 @@ export default function DashboardPage() {
     });
     const [myOrg, setMyOrg] = useState<Organisation | null>(null);
     const [assetStatusBreakdown, setAssetStatusBreakdown] = useState<{ label: string; count: number; color: string }[]>([]);
+    const [assetsByDepartment, setAssetsByDepartment] = useState<AssetsByDepartment | null>(null);
+    const [depreciationSummary, setDepreciationSummary] = useState<DepreciationSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -109,6 +112,13 @@ export default function DashboardPage() {
                     scheduledMaintenance: maint.filter((m: any) => m.status === "SCHEDULED").length,
                     inProgressMaintenance: maint.filter((m: any) => m.status === "IN_PROGRESS").length,
                 });
+                // Fetch additional dashboard data (non-blocking)
+                const [deptResult, deprResult] = await Promise.allSettled([
+                    dashboardService.getAssetsByDepartment(),
+                    dashboardService.getDepreciationSummary(),
+                ]);
+                if (deptResult.status === "fulfilled") setAssetsByDepartment(deptResult.value);
+                if (deprResult.status === "fulfilled") setDepreciationSummary(deprResult.value);
             } catch (err) {
                 console.error("Dashboard load failed:", err);
             } finally {
@@ -365,6 +375,70 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {(assetsByDepartment || depreciationSummary) && (
+                <div className="grid gap-6 md:grid-cols-2">
+                    {assetsByDepartment && assetsByDepartment.data?.length > 0 && (
+                        <Card className="border-slate-200">
+                            <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                                        <Building2 className="h-4 w-4 text-blue-500" /> Assets by Department
+                                    </CardTitle>
+                                    <Link href="/assets">
+                                        <Button variant="ghost" size="sm" className="text-xs text-slate-500 h-7 gap-1">
+                                            View All <ArrowRight className="h-3 w-3" />
+                                        </Button>
+                                    </Link>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-5 space-y-3">
+                                {assetsByDepartment.data.slice(0, 6).map((d, i) => {
+                                    const pct = assetsByDepartment.total ? Math.round(d.count / assetsByDepartment.total * 100) : 0;
+                                    return (
+                                        <div key={d.departmentId ?? d.departmentName ?? i}>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-sm text-slate-600 font-medium truncate max-w-[60%]">{d.departmentName}</span>
+                                                <span className="text-sm font-bold text-slate-800">{d.count} <span className="text-xs font-normal text-slate-400">({pct}%)</span></span>
+                                            </div>
+                                            <div className="w-full bg-slate-100 rounded-full h-2">
+                                                <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {depreciationSummary && (
+                        <Card className="border-slate-200">
+                            <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100">
+                                <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                                    <TrendingUp className="h-4 w-4 text-purple-500" /> Depreciation Summary
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-5">
+                                <div className="grid grid-cols-2 gap-4">
+                                    {[
+                                        { label: "Total Depreciation", value: depreciationSummary.totalDepreciation, prefix: "$" },
+                                        { label: "Net Book Value", value: depreciationSummary.netBookValue, prefix: "$" },
+                                        { label: "Monthly Depreciation", value: depreciationSummary.monthlyDepreciation, prefix: "$" },
+                                        { label: "Fully Depreciated", value: depreciationSummary.assetsFullyDepreciated, prefix: "" },
+                                    ].map(item => (
+                                        <div key={item.label} className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                            <p className="text-xs text-slate-500 mb-1">{item.label}</p>
+                                            <p className="text-lg font-bold text-slate-800">
+                                                {item.prefix}{typeof item.value === "number" ? item.value.toLocaleString() : "—"}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            )}
 
             <Card className="border-slate-200">
                 <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100">

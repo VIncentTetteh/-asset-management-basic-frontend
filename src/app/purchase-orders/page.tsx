@@ -25,6 +25,8 @@ export default function PurchaseOrdersPage() {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [actioningId, setActioningId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
 
@@ -92,6 +94,7 @@ export default function PurchaseOrdersPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this purchase order?")) return;
+        setDeletingId(id);
         try {
             await purchaseOrderService.delete(id);
             toast.success("Purchase order deleted");
@@ -99,10 +102,13 @@ export default function PurchaseOrdersPage() {
         } catch (error) {
             toast.error("Failed to delete purchase order");
             console.error(error);
+        } finally {
+            setDeletingId(null);
         }
     };
 
     const handleUpdateStatus = async (id: string, action: "approve" | "reject") => {
+        setActioningId(id);
         try {
             if (action === "approve") await purchaseOrderService.approve(id);
             else await purchaseOrderService.reject(id);
@@ -111,6 +117,8 @@ export default function PurchaseOrdersPage() {
         } catch (error) {
             toast.error(`Failed to ${action} purchase order`);
             console.error(error);
+        } finally {
+            setActioningId(null);
         }
     };
 
@@ -300,7 +308,7 @@ export default function PurchaseOrdersPage() {
                                         {(order.status === POStatus.SUBMITTED || order.status === "PENDING") && (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700 hover:bg-slate-50">
+                                                    <Button variant="ghost" size="sm" isLoading={actioningId === order.id} className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700 hover:bg-slate-50">
                                                         <MoreHorizontal className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
@@ -325,7 +333,7 @@ export default function PurchaseOrdersPage() {
                                         <Button variant="outline" size="sm" onClick={() => handleOpenEdit(order)} className="h-8 w-8 p-0">
                                             <Pencil className="h-3.5 w-3.5" />
                                         </Button>
-                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(order.id!)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(order.id!)} isLoading={deletingId === order.id} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>

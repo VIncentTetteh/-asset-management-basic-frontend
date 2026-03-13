@@ -17,6 +17,7 @@ import { buildPatchPayload } from "@/lib/patch";
 export default function DepartmentsPage() {
     const [departments, setDepartments] = useState<Department[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDept, setEditingDept] = useState<Department | null>(null);
 
@@ -67,6 +68,7 @@ export default function DepartmentsPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this department?")) return;
+        setDeletingId(id);
         try {
             await departmentService.delete(id);
             toast.success("Department deleted");
@@ -74,6 +76,8 @@ export default function DepartmentsPage() {
         } catch (error) {
             toast.error("Failed to delete department");
             console.error(error);
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -230,7 +234,7 @@ export default function DepartmentsPage() {
                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(dept)} className="h-8">
                                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(dept.id!)} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(dept.id!)} isLoading={deletingId === dept.id} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
                                         <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                                     </Button>
                                 </div>

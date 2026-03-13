@@ -23,6 +23,8 @@ export default function MaintenancePage() {
     const [assets, setAssets] = useState<Asset[]>([]);
     const [suppliers, setSuppliers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [completingId, setCompletingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
 
@@ -87,6 +89,7 @@ export default function MaintenancePage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this maintenance log?")) return;
+        setDeletingId(id);
         try {
             await maintenanceService.delete(id);
             toast.success("Record deleted");
@@ -94,18 +97,21 @@ export default function MaintenancePage() {
         } catch (error) {
             toast.error("Failed to delete record");
             console.error(error);
+        } finally {
+            setDeletingId(null);
         }
     };
 
     const handleComplete = async (id: string) => {
-        // Optimistically ask for cost & performed by, or just use backend defaults
-        // For simplicity, we'll mark as complete via the service directly
+        setCompletingId(id);
         try {
             await maintenanceService.complete(id);
             toast.success("Maintenance marked as completed");
             fetchData();
         } catch (error) {
             toast.error("Failed to complete maintenance");
+        } finally {
+            setCompletingId(null);
         }
     };
 
@@ -224,7 +230,7 @@ export default function MaintenancePage() {
                                 <div className="flex justify-between items-center gap-2 pt-4 border-t border-slate-100 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <div>
                                         {record.status !== 'COMPLETED' && (
-                                            <Button variant="ghost" size="sm" onClick={() => handleComplete(record.id!)} className="h-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50">
+                                            <Button variant="ghost" size="sm" onClick={() => handleComplete(record.id!)} isLoading={completingId === record.id} className="h-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50">
                                                 <CheckCircle2 className="h-4 w-4 mr-1" /> Mark Done
                                             </Button>
                                         )}
@@ -233,7 +239,7 @@ export default function MaintenancePage() {
                                         <Button variant="outline" size="sm" onClick={() => handleOpenEdit(record)} className="h-8 w-8 p-0">
                                             <Pencil className="h-3.5 w-3.5" />
                                         </Button>
-                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(record.id!)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(record.id!)} isLoading={deletingId === record.id} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>

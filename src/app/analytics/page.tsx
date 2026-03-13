@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { analyticsService } from "@/services/analyticsService";
-import { AssetAnalytics, FinancialAnalytics, PurchaseOrderAnalytics } from "@/types";
+import { AssetAnalytics, FinancialAnalytics, PurchaseOrderAnalytics, MaintenanceAnalytics, DepreciationTrend } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lock, TrendingUp, DollarSign, ShoppingCart, BarChart3, Wrench, ArrowUpRight, RefreshCw } from "lucide-react";
@@ -43,20 +43,26 @@ export default function AnalyticsPage() {
     const [assetAnalytics, setAssetAnalytics] = useState<AssetAnalytics | null>(null);
     const [financialAnalytics, setFinancialAnalytics] = useState<FinancialAnalytics | null>(null);
     const [poAnalytics, setPOAnalytics] = useState<PurchaseOrderAnalytics | null>(null);
+    const [maintenanceAnalytics, setMaintenanceAnalytics] = useState<MaintenanceAnalytics | null>(null);
+    const [depreciationTrend, setDepreciationTrend] = useState<DepreciationTrend | null>(null);
 
     const fetchData = async (isRefresh = false) => {
         try {
             if (isRefresh) setRefreshing(true);
             else setLoading(true);
 
-            const [asset, financial, po] = await Promise.all([
+            const [asset, financial, po, maint, deprTrend] = await Promise.all([
                 analyticsService.getAssetAnalytics({ period, groupBy }),
                 analyticsService.getFinancialAnalytics({ period }),
                 analyticsService.getPurchaseOrderAnalytics({ period }),
+                analyticsService.getMaintenanceAnalytics({ period }).catch(() => null),
+                analyticsService.getDepreciationTrends({ months: 12 }).catch(() => null),
             ]);
             setAssetAnalytics(asset);
             setFinancialAnalytics(financial);
             setPOAnalytics(po);
+            setMaintenanceAnalytics(maint);
+            setDepreciationTrend(deprTrend);
         } catch (err: any) {
             if (err?.response?.status === 403) { setPaywall(true); return; }
             toast.error("Failed to load analytics");
@@ -366,6 +372,91 @@ export default function AnalyticsPage() {
                             </CardContent>
                         </Card>
                     </div>
+
+                    {/* Maintenance Analytics */}
+                    {maintenanceAnalytics && (
+                        <div className="grid gap-6 md:grid-cols-2">
+                            <Card className="border-slate-200">
+                                <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100">
+                                    <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                                        <Wrench className="h-4 w-4 text-teal-500" /> Maintenance Analytics
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-5 space-y-4">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                            <p className="text-xs text-slate-500">Total Cost</p>
+                                            <p className="text-lg font-bold text-slate-800">{formatCurrency(maintenanceAnalytics.totalMaintenanceCost)}</p>
+                                        </div>
+                                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                            <p className="text-xs text-slate-500">Avg Cost</p>
+                                            <p className="text-lg font-bold text-slate-800">{formatCurrency(maintenanceAnalytics.averageCost)}</p>
+                                        </div>
+                                        <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                                            <p className="text-xs text-slate-500">Completion Rate</p>
+                                            <p className="text-lg font-bold text-emerald-700">{(maintenanceAnalytics.completionRate * 100).toFixed(1)}%</p>
+                                        </div>
+                                        <div className="p-3 bg-red-50 rounded-lg border border-red-100">
+                                            <p className="text-xs text-slate-500">Overdue</p>
+                                            <p className="text-lg font-bold text-red-700">{maintenanceAnalytics.overdueCount}</p>
+                                        </div>
+                                    </div>
+                                    {maintenanceAnalytics.byType && Object.keys(maintenanceAnalytics.byType).length > 0 && (
+                                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">By Type</p>
+                                            {Object.entries(maintenanceAnalytics.byType).map(([type, data], idx) => {
+                                                const maxCount = Math.max(...Object.values(maintenanceAnalytics.byType).map(d => d.count), 1);
+                                                return (
+                                                    <div key={type}>
+                                                        <div className="flex justify-between text-xs mb-1">
+                                                            <span className="text-slate-600 font-medium">{type}</span>
+                                                            <span className="text-slate-500">{data.count} · {formatCurrency(data.cost)}</span>
+                                                        </div>
+                                                        <div className="w-full bg-slate-100 rounded-full h-1.5">
+                                                            <div className={`${BAR_COLORS[idx % BAR_COLORS.length]} h-1.5 rounded-full`} style={{ width: `${Math.round(data.count / maxCount * 100)}%` }} />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Depreciation Trends */}
+                            {depreciationTrend && depreciationTrend.data?.length > 0 && (
+                                <Card className="border-slate-200">
+                                    <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100">
+                                        <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                                            <TrendingUp className="h-4 w-4 text-purple-500" /> Depreciation Trends (12 months)
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b border-slate-100 bg-slate-50/50">
+                                                        <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-2">Month</th>
+                                                        <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-2">Depreciation</th>
+                                                        <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-2">Net Book Value</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-50">
+                                                    {depreciationTrend.data.slice(0, 12).map((row) => (
+                                                        <tr key={row.month} className="hover:bg-slate-50/50 transition-colors">
+                                                            <td className="px-4 py-2 text-slate-700 font-medium">{row.month}</td>
+                                                            <td className="px-4 py-2 text-right text-amber-700">{formatCurrency(row.totalDepreciation)}</td>
+                                                            <td className="px-4 py-2 text-right font-semibold text-slate-800">{formatCurrency(row.netBookValue)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    )}
 
                     {/* Financial breakdown by category */}
                     {categoryBreakdown.length > 0 && (

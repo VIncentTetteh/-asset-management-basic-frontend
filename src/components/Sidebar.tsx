@@ -35,6 +35,13 @@ import {
     ScanLine,
     FileClock,
     TrendingUp,
+    Key,
+    FileSignature,
+    Wallet,
+    Star,
+    KeyRound,
+    Cloud,
+    Brain,
 } from "lucide-react";
 import { organisationService } from "@/services/organisationService";
 import { User } from "@/types";
@@ -103,6 +110,15 @@ export function Sidebar() {
             items: [
                 { href: "/suppliers", label: "Suppliers", icon: Truck, active: pathname.startsWith("/suppliers") },
                 { href: "/purchase-orders", label: "Purchase Orders", icon: ShoppingCart, active: pathname.startsWith("/purchase-orders") },
+                { href: "/contracts", label: "Contracts", icon: FileSignature, active: pathname.startsWith("/contracts") },
+                { href: "/budgets", label: "Budgets", icon: Wallet, active: pathname.startsWith("/budgets") },
+                { href: "/vendor-reviews", label: "Vendor Reviews", icon: Star, active: pathname.startsWith("/vendor-reviews") },
+            ]
+        },
+        {
+            group: "Software & Licensing",
+            items: [
+                { href: "/licenses", label: "Software Licenses", icon: Key, active: pathname.startsWith("/licenses") },
             ]
         },
         {
@@ -123,8 +139,17 @@ export function Sidebar() {
             ]
         },
         {
+            group: "Infrastructure",
+            items: [
+                { href: "/discovery", label: "Asset Discovery", icon: ScanLine, active: pathname.startsWith("/discovery") },
+                { href: "/cloud-assets", label: "Cloud Assets", icon: Cloud, active: pathname.startsWith("/cloud-assets") },
+                { href: "/ai-insights", label: "AI Insights", icon: Brain, active: pathname.startsWith("/ai-insights") },
+            ]
+        },
+        {
             group: "System Config",
             items: [
+                { href: "/sso-configuration", label: "SSO Configuration", icon: KeyRound, active: pathname.startsWith("/sso-configuration") },
                 { href: "/webhooks", label: "Webhooks", icon: Webhook, active: pathname.startsWith("/webhooks") },
                 { href: "/notifications", label: "Notifications", icon: Bell, active: pathname.startsWith("/notifications") },
                 { href: "/billing", label: "Billing", icon: CreditCard, active: pathname.startsWith("/billing") },

@@ -17,6 +17,7 @@ import { buildPatchPayload } from "@/lib/patch";
 export default function CategoriesPage() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
@@ -60,6 +61,7 @@ export default function CategoriesPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this category?")) return;
+        setDeletingId(id);
         try {
             await categoryService.delete(id);
             toast.success("Category deleted");
@@ -67,6 +69,8 @@ export default function CategoriesPage() {
         } catch (error) {
             toast.error("Failed to delete category");
             console.error(error);
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -81,6 +85,7 @@ export default function CategoriesPage() {
         }
 
         // Clean up payload
+        if (!data.description) delete data.description;
         if (!data.parentCategoryId) delete data.parentCategoryId;
         if (!data.depreciationPolicyId) delete data.depreciationPolicyId;
         if (!data.assetPrefixCode) delete data.assetPrefixCode;
@@ -189,7 +194,7 @@ export default function CategoriesPage() {
                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(category)} className="h-8">
                                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(category.id!)} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(category.id!)} isLoading={deletingId === category.id} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
                                         <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                                     </Button>
                                 </div>
@@ -218,9 +223,11 @@ export default function CategoriesPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="description">Description</Label>
-                        <Input
+                        <textarea
                             id="description"
+                            rows={3}
                             placeholder="All computers, servers, and peripherals"
+                            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
                             {...register("description")}
                         />
                     </div>

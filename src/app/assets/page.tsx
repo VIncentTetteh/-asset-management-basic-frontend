@@ -4,13 +4,15 @@ import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import {
-    Plus, Pencil, Trash2, Hexagon, Building2, Layers, Wrench, Search, Settings,
-    MapPin, UserRound, UserPlus, UserMinus
+    Plus, Pencil, Trash2, Hexagon, Building2, Layers, Search,
+    MapPin, UserRound, UserPlus, UserMinus, Loader2, Upload, FileSpreadsheet,
+    CheckCircle2, AlertTriangle, XCircle
 } from "lucide-react";
 
 import {
-    Asset, AssetDto, Department, Organisation, Category, Location, Supplier, User,
-    AssetStatus, AssetCondition, AssetType, DepreciationMethod, PurchaseOrder
+    Asset, AssetDto, AssetImportResult, Department, Organisation, Category,
+    Location, Supplier, User, AssetStatus, AssetCondition, AssetType,
+    DepreciationMethod, PurchaseOrder
 } from "@/types";
 
 import { assetService } from "@/services/assetService";
@@ -46,15 +48,22 @@ export default function AssetsPage() {
     const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
 
     const [isLoading, setIsLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [isAssigning, setIsAssigning] = useState(false);
+    const [isUnassigning, setIsUnassigning] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [importFile, setImportFile] = useState<File | null>(null);
+    const [importResult, setImportResult] = useState<AssetImportResult | null>(null);
+    const [isImporting, setIsImporting] = useState(false);
     const [selectedAssetForAssignment, setSelectedAssetForAssignment] = useState<Asset | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
     const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
     const { format } = useCurrency();
-    const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<AssetDto>();
+    const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<AssetDto>();
 
     const fetchData = async () => {
         try {
@@ -189,6 +198,7 @@ export default function AssetsPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this asset?")) return;
+        setDeletingId(id);
         try {
             await assetService.delete(id);
             toast.success("Asset deleted");
@@ -196,6 +206,8 @@ export default function AssetsPage() {
         } catch (error) {
             toast.error("Failed to delete asset");
             console.error(error);
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -210,6 +222,7 @@ export default function AssetsPage() {
             toast.error("Select an employee to assign");
             return;
         }
+        setIsAssigning(true);
         try {
             await assetService.assignToUser(selectedAssetForAssignment.id, selectedAssigneeId);
             toast.success("Asset assigned to employee");
@@ -218,11 +231,14 @@ export default function AssetsPage() {
         } catch (error) {
             toast.error("Failed to assign asset");
             console.error(error);
+        } finally {
+            setIsAssigning(false);
         }
     };
 
     const handleUnassignUser = async () => {
         if (!selectedAssetForAssignment?.id) return;
+        setIsUnassigning(true);
         try {
             await assetService.unassignUser(selectedAssetForAssignment.id);
             toast.success("Asset unassigned from employee");
@@ -231,6 +247,8 @@ export default function AssetsPage() {
         } catch (error) {
             toast.error("Failed to unassign asset");
             console.error(error);
+        } finally {
+            setIsUnassigning(false);
         }
     };
 
@@ -266,6 +284,22 @@ export default function AssetsPage() {
         }
     };
 
+    const handleImport = async () => {
+        if (!importFile) { toast.error("Select an .xlsx file first"); return; }
+        try {
+            setIsImporting(true);
+            setImportResult(null);
+            const result = await assetService.importFromExcel(importFile);
+            setImportResult(result);
+            if (result.imported > 0) fetchData();
+            toast.success(`Imported ${result.imported} of ${result.totalRows} rows`);
+        } catch {
+            toast.error("Import failed");
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     const getStatusStyles = (status: string) => {
         switch (status) {
             case 'IN_STOCK': return "bg-emerald-100 text-emerald-700 border-emerald-200";
@@ -294,6 +328,9 @@ export default function AssetsPage() {
                             className="pl-8 w-[250px]"
                         />
                     </div>
+                    <Button variant="outline" onClick={() => { setImportFile(null); setImportResult(null); setIsImportModalOpen(true); }}>
+                        <FileSpreadsheet className="mr-2 h-4 w-4" /> Import Excel
+                    </Button>
                     <Button onClick={handleOpenCreate} className="bg-emerald-600 hover:bg-emerald-700">
                         <Plus className="mr-2 h-4 w-4" /> Add Asset
                     </Button>
@@ -378,7 +415,7 @@ export default function AssetsPage() {
                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(asset)} className="h-8">
                                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(asset.id!)} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(asset.id!)} isLoading={deletingId === asset.id} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
                                         <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                 </div>
@@ -563,7 +600,8 @@ export default function AssetsPage() {
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                             Cancel
                         </Button>
-                        <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
+                        <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700">
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {editingAsset ? "Save Changes" : "Create Asset"}
                         </Button>
                     </div>
@@ -599,14 +637,100 @@ export default function AssetsPage() {
                             Cancel
                         </Button>
                         {selectedAssetForAssignment?.assignedUserId && (
-                            <Button type="button" variant="ghost" onClick={handleUnassignUser} className="text-amber-700 hover:text-amber-800 hover:bg-amber-50">
+                            <Button type="button" variant="ghost" onClick={handleUnassignUser} isLoading={isUnassigning} className="text-amber-700 hover:text-amber-800 hover:bg-amber-50">
                                 <UserMinus className="h-4 w-4 mr-1" />
                                 Unassign
                             </Button>
                         )}
-                        <Button type="button" onClick={handleAssignUser} className="bg-indigo-600 hover:bg-indigo-700">
+                        <Button type="button" onClick={handleAssignUser} isLoading={isAssigning} className="bg-indigo-600 hover:bg-indigo-700">
                             <UserPlus className="h-4 w-4 mr-1" />
                             Assign
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Import Modal */}
+            <Modal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Import Assets from Excel"
+                description="Upload an .xlsx file to bulk-import assets. Bad rows are skipped and reported without aborting the batch."
+            >
+                <div className="space-y-5">
+                    {/* Column reference */}
+                    <details className="rounded-lg border border-slate-200 bg-slate-50 text-xs">
+                        <summary className="cursor-pointer px-3 py-2 font-semibold text-slate-600 select-none">
+                            Expected column order (row 1 = header)
+                        </summary>
+                        <div className="px-3 pb-3 pt-2 space-y-3">
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-slate-500 font-mono">
+                                {[
+                                    "1 · name *","2 · assetTag","3 · serialNumber","4 · description",
+                                    "5 · assetType","6 · manufacturer","7 · model","8 · purchaseDate",
+                                    "9 · purchaseCost","10 · currency","11 · depreciationMethod","12 · usefulLifeMonths",
+                                    "13 · residualValue","14 · warrantyExpiryDate","15 · status","16 · condition",
+                                    "17 · categoryName","18 · locationName","19 · supplierName","20 · departmentName",
+                                    "21 · assignedUserEmail","22 · invoiceId","23 · insurancePolicyId",
+                                ].map(col => <span key={col}>{col}</span>)}
+                            </div>
+                            <div className="border-t border-slate-200 pt-2 space-y-1 text-[10px] text-slate-400">
+                                <p><span className="font-semibold text-slate-500">categoryName</span> — exact category name as created in your org</p>
+                                <p><span className="font-semibold text-slate-500">locationName</span> — exact location name as created in your org</p>
+                                <p><span className="font-semibold text-slate-500">supplierName</span> — exact supplier name as created in your org</p>
+                                <p><span className="font-semibold text-slate-500">departmentName</span> — department name <em>or</em> department code</p>
+                                <p><span className="font-semibold text-slate-500">assignedUserEmail</span> — user email <em>or</em> employeeId</p>
+                            </div>
+                        </div>
+                    </details>
+
+                    {/* File picker */}
+                    <div className="space-y-2">
+                        <Label htmlFor="importFile">Excel File (.xlsx)</Label>
+                        <Input
+                            id="importFile"
+                            type="file"
+                            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); setImportResult(null); }}
+                        />
+                    </div>
+
+                    {/* Results */}
+                    {importResult && (
+                        <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3 text-sm">
+                            <div className="grid grid-cols-3 gap-3 text-center">
+                                <div className="rounded-lg bg-slate-50 border border-slate-100 py-2">
+                                    <p className="text-xs text-slate-400 uppercase tracking-wide">Total Rows</p>
+                                    <p className="text-xl font-bold text-slate-800">{importResult.totalRows}</p>
+                                </div>
+                                <div className="rounded-lg bg-emerald-50 border border-emerald-100 py-2">
+                                    <p className="text-xs text-emerald-600 uppercase tracking-wide flex items-center justify-center gap-1"><CheckCircle2 className="h-3 w-3" />Imported</p>
+                                    <p className="text-xl font-bold text-emerald-700">{importResult.imported}</p>
+                                </div>
+                                <div className="rounded-lg bg-amber-50 border border-amber-100 py-2">
+                                    <p className="text-xs text-amber-600 uppercase tracking-wide flex items-center justify-center gap-1"><AlertTriangle className="h-3 w-3" />Skipped</p>
+                                    <p className="text-xl font-bold text-amber-700">{importResult.skipped}</p>
+                                </div>
+                            </div>
+
+                            {importResult.errors.length > 0 && (
+                                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                    <p className="text-xs font-semibold text-red-600 flex items-center gap-1"><XCircle className="h-3.5 w-3.5" /> Row errors</p>
+                                    {importResult.errors.map((e, i) => (
+                                        <div key={i} className="flex gap-2 text-xs bg-red-50 border border-red-100 rounded px-2.5 py-1.5">
+                                            <span className="font-mono font-bold text-red-500 shrink-0">Row {e.row}</span>
+                                            <span className="text-red-700">{e.message}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-2 border-t">
+                        <Button variant="outline" onClick={() => setIsImportModalOpen(false)}>Close</Button>
+                        <Button onClick={handleImport} disabled={!importFile || isImporting} className="bg-emerald-600 hover:bg-emerald-700">
+                            {isImporting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Importing…</> : <><Upload className="mr-2 h-4 w-4" />Import</>}
                         </Button>
                     </div>
                 </div>

@@ -19,6 +19,7 @@ export default function DepreciationPoliciesPage() {
     const [policies, setPolicies] = useState<DepreciationPolicy[]>([]);
     const [orgId, setOrgId] = useState<string>("");
     const [isLoading, setIsLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingPolicy, setEditingPolicy] = useState<DepreciationPolicy | null>(null);
 
@@ -73,6 +74,7 @@ export default function DepreciationPoliciesPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this policy? Assets using it may be affected.")) return;
+        setDeletingId(id);
         try {
             await depreciationPolicyService.delete(id);
             toast.success("Depreciation policy deleted");
@@ -80,6 +82,8 @@ export default function DepreciationPoliciesPage() {
         } catch (error) {
             toast.error("Failed to delete policy");
             console.error(error);
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -199,7 +203,7 @@ export default function DepreciationPoliciesPage() {
                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(policy)} className="h-8 w-8 p-0">
                                         <Pencil className="h-3.5 w-3.5" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(policy.id!)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(policy.id!)} isLoading={deletingId === policy.id} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
                                         <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                 </div>

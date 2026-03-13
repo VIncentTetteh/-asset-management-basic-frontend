@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { Asset, AssetDto } from "@/types";
+import { Asset, AssetDto, AssetImportResult } from "@/types";
 import { extractList } from "@/services/responseUtils";
 
 export interface AssetFilterParams {
@@ -57,5 +57,15 @@ export const assetService = {
     /** DELETE /assets/{id} — soft delete */
     delete: async (id: string): Promise<void> => {
         await api.delete(`/assets/${id}`);
+    },
+
+    /** POST /assets/import — multipart .xlsx bulk import */
+    importFromExcel: async (file: File): Promise<AssetImportResult> => {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await api.post<AssetImportResult>("/assets/import", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        return response.data;
     },
 };

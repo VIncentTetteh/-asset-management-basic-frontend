@@ -1,16 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, UserDto } from "@/types";
+import { User, UserDto, MfaSetupResponse } from "@/types";
 import { userService } from "@/services/userService";
 import { organisationService } from "@/services/organisationService";
+import { mfaService } from "@/services/mfaService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
 import { toast } from "react-hot-toast";
 import { useForm } from "react-hook-form";
-import { UserCircle, Mail, Phone, Building, Briefcase, Shield, Save } from "lucide-react";
+import { UserCircle, Mail, Phone, Building, Briefcase, Shield, Save, ShieldCheck, ShieldOff } from "lucide-react";
 import { buildPatchPayload } from "@/lib/patch";
 
 export default function ProfilePage() {
@@ -18,7 +20,63 @@ export default function ProfilePage() {
     const [isLoading, setIsLoading] = useState(true);
     const [organisatonName, setOrganisationName] = useState<string>("Loading...");
 
+    // MFA state
+    const [mfaEnabled, setMfaEnabled] = useState(false);
+    const [mfaSetupData, setMfaSetupData] = useState<MfaSetupResponse | null>(null);
+    const [mfaSetupStep, setMfaSetupStep] = useState<"idle" | "scan" | "verify">("idle");
+    const [mfaCode, setMfaCode] = useState("");
+    const [isMfaLoading, setIsMfaLoading] = useState(false);
+    const [isDisableMfaModalOpen, setIsDisableMfaModalOpen] = useState(false);
+    const [disableMfaCode, setDisableMfaCode] = useState("");
+
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<UserDto>();
+
+    const handleStartMfaSetup = async () => {
+        setIsMfaLoading(true);
+        try {
+            const data = await mfaService.setup();
+            setMfaSetupData(data);
+            setMfaSetupStep("scan");
+            setMfaCode("");
+        } catch {
+            toast.error("Failed to start MFA setup");
+        } finally {
+            setIsMfaLoading(false);
+        }
+    };
+
+    const handleVerifyMfa = async () => {
+        if (!mfaCode) { toast.error("Enter the 6-digit code"); return; }
+        setIsMfaLoading(true);
+        try {
+            await mfaService.verify({ code: mfaCode });
+            toast.success("MFA enabled successfully");
+            setMfaEnabled(true);
+            setMfaSetupStep("idle");
+            setMfaSetupData(null);
+            setMfaCode("");
+        } catch {
+            toast.error("Invalid code. Please try again.");
+        } finally {
+            setIsMfaLoading(false);
+        }
+    };
+
+    const handleDisableMfa = async () => {
+        if (!disableMfaCode) { toast.error("Enter your current TOTP code"); return; }
+        setIsMfaLoading(true);
+        try {
+            await mfaService.disable({ code: disableMfaCode });
+            toast.success("MFA disabled");
+            setMfaEnabled(false);
+            setIsDisableMfaModalOpen(false);
+            setDisableMfaCode("");
+        } catch {
+            toast.error("Invalid code. MFA not disabled.");
+        } finally {
+            setIsMfaLoading(false);
+        }
+    };
 
     useEffect(() => {
         // Fetch current user from local storage
@@ -28,6 +86,9 @@ export default function ProfilePage() {
                 if (storedUserStr) {
                     const storedUser = JSON.parse(storedUserStr) as User;
                     setUser(storedUser);
+                    if ((storedUser as User & { mfaEnabled?: boolean }).mfaEnabled) {
+                        setMfaEnabled(true);
+                    }
 
                     // Initialize form with user data
                     reset({
@@ -246,6 +307,133 @@ export default function ProfilePage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* MFA Card */}
+            <Card className="shadow-sm border-slate-200">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <ShieldCheck className="h-5 w-5 text-indigo-500" />
+                        Two-Factor Authentication
+                    </CardTitle>
+                    <CardDescription>
+                        Add an extra layer of security using a TOTP authenticator app (e.g. Google Authenticator, Authy).
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {mfaEnabled ? (
+                        <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                            <div className="flex items-center gap-3">
+                                <ShieldCheck className="h-6 w-6 text-emerald-600" />
+                                <div>
+                                    <p className="font-semibold text-emerald-800">MFA is enabled</p>
+                                    <p className="text-sm text-emerald-600">Your account is protected with two-factor authentication.</p>
+                                </div>
+                            </div>
+                            <Button
+                                variant="outline"
+                                onClick={() => { setIsDisableMfaModalOpen(true); setDisableMfaCode(""); }}
+                                className="border-red-200 text-red-600 hover:bg-red-50"
+                            >
+                                <ShieldOff className="h-4 w-4 mr-2" />
+                                Disable MFA
+                            </Button>
+                        </div>
+                    ) : mfaSetupStep === "idle" ? (
+                        <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                            <div className="flex items-center gap-3">
+                                <Shield className="h-6 w-6 text-slate-400" />
+                                <div>
+                                    <p className="font-semibold text-slate-700">MFA is not enabled</p>
+                                    <p className="text-sm text-slate-500">Enable MFA to secure your account with a TOTP code.</p>
+                                </div>
+                            </div>
+                            <Button
+                                onClick={handleStartMfaSetup}
+                                isLoading={isMfaLoading}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                                <ShieldCheck className="h-4 w-4 mr-2" />
+                                Enable MFA
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+                                Scan the QR code below with your authenticator app, then enter the 6-digit code to confirm.
+                            </div>
+                            {mfaSetupData && (
+                                <div className="flex flex-col items-center gap-4">
+                                    <img
+                                        src={`data:image/png;base64,${mfaSetupData.qrCodeImage}`}
+                                        alt="MFA QR Code"
+                                        className="w-48 h-48 border border-slate-200 rounded-lg"
+                                    />
+                                    <div className="text-center">
+                                        <p className="text-xs text-slate-500 mb-1">Manual entry key:</p>
+                                        <code className="text-sm font-mono bg-slate-100 px-3 py-1 rounded-md border border-slate-200 tracking-widest">
+                                            {mfaSetupData.secret}
+                                        </code>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="space-y-2">
+                                <Label htmlFor="mfaCode">Verification Code</Label>
+                                <div className="flex gap-3">
+                                    <Input
+                                        id="mfaCode"
+                                        placeholder="000000"
+                                        maxLength={6}
+                                        value={mfaCode}
+                                        onChange={e => setMfaCode(e.target.value.replace(/\D/g, ""))}
+                                        className="max-w-[160px] text-center text-lg tracking-widest font-mono"
+                                    />
+                                    <Button onClick={handleVerifyMfa} isLoading={isMfaLoading} className="bg-indigo-600 hover:bg-indigo-700">
+                                        Verify & Enable
+                                    </Button>
+                                    <Button variant="outline" onClick={() => { setMfaSetupStep("idle"); setMfaSetupData(null); setMfaCode(""); }}>
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Disable MFA Modal */}
+            <Modal
+                isOpen={isDisableMfaModalOpen}
+                onClose={() => setIsDisableMfaModalOpen(false)}
+                title="Disable Two-Factor Authentication"
+                description="Enter your current TOTP code to confirm disabling MFA."
+            >
+                <div className="space-y-4">
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                        Disabling MFA will reduce your account security. Make sure this is intentional.
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="disableMfaCode">Current TOTP Code</Label>
+                        <Input
+                            id="disableMfaCode"
+                            placeholder="000000"
+                            maxLength={6}
+                            value={disableMfaCode}
+                            onChange={e => setDisableMfaCode(e.target.value.replace(/\D/g, ""))}
+                            className="max-w-[160px] text-center text-lg tracking-widest font-mono"
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2 border-t">
+                        <Button variant="outline" onClick={() => setIsDisableMfaModalOpen(false)}>Cancel</Button>
+                        <Button
+                            isLoading={isMfaLoading}
+                            onClick={handleDisableMfa}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            Disable MFA
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

@@ -4,6 +4,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
 import { FeaturesGrid } from "@/components/landing/FeaturesGrid";
 import { PricingSection } from "@/components/landing/PricingSection";
+import { Testimonials } from "@/components/landing/Testimonials";
 import { ContactForm } from "@/components/landing/ContactForm";
 import { Footer } from "@/components/landing/Footer";
 import { Mail, Phone } from "lucide-react";
@@ -78,6 +79,8 @@ export default function LandingPage() {
                 </section>
 
                 <FeaturesGrid />
+
+                <Testimonials />
 
                 <PricingSection />
 

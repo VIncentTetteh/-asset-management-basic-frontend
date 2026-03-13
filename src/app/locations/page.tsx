@@ -10,17 +10,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, MapPin, Building2, Layers, Navigation, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, MapPin, Building2, Layers, Navigation, AlertCircle, LocateFixed, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
 
 export default function LocationsPage() {
     const [locations, setLocations] = useState<Location[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+    const [geoDetecting, setGeoDetecting] = useState(false);
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<LocationDto>();
+    const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<LocationDto>();
 
     const fetchData = async () => {
         try {
@@ -38,6 +40,44 @@ export default function LocationsPage() {
     useEffect(() => {
         fetchData();
     }, []);
+
+    const detectLocation = () => {
+        if (!navigator.geolocation) {
+            toast.error("Geolocation is not supported by your browser");
+            return;
+        }
+        setGeoDetecting(true);
+        navigator.geolocation.getCurrentPosition(
+            async ({ coords }) => {
+                const { latitude, longitude } = coords;
+                setValue("geoCoordinates", `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+                try {
+                    const res = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+                        { headers: { "Accept-Language": "en" } }
+                    );
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.address?.city || data.address?.town || data.address?.village) {
+                            setValue("city", data.address.city || data.address.town || data.address.village);
+                        }
+                        if (data.address?.country) {
+                            setValue("country", data.address.country);
+                        }
+                    }
+                } catch {
+                    // Reverse geocode failed — coordinates are still set
+                }
+                setGeoDetecting(false);
+                toast.success("Location detected");
+            },
+            (err) => {
+                setGeoDetecting(false);
+                toast.error(err.code === 1 ? "Location access denied" : "Could not detect location");
+            },
+            { timeout: 10000 }
+        );
+    };
 
     const handleOpenCreate = () => {
         setEditingLocation(null);
@@ -62,6 +102,7 @@ export default function LocationsPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this location?")) return;
+        setDeletingId(id);
         try {
             await locationService.delete(id);
             toast.success("Location deleted");
@@ -69,6 +110,8 @@ export default function LocationsPage() {
         } catch (error) {
             toast.error("Failed to delete location");
             console.error(error);
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -227,7 +270,7 @@ export default function LocationsPage() {
                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(location)} className="h-8">
                                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(location.id!)} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(location.id!)} isLoading={deletingId === location.id} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
                                         <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                                     </Button>
                                 </div>
@@ -288,7 +331,14 @@ export default function LocationsPage() {
 
                     <div className="space-y-1.5">
                         <Label htmlFor="geoCoordinates">Geo Coordinates</Label>
-                        <Input id="geoCoordinates" placeholder="5.6037° N, 0.1870° W" {...register("geoCoordinates")} className="font-mono text-sm" />
+                        <div className="flex gap-2">
+                            <Input id="geoCoordinates" placeholder="5.603700, -0.187000" {...register("geoCoordinates")} className="font-mono text-sm flex-1" />
+                            <Button type="button" variant="outline" size="sm" onClick={detectLocation} disabled={geoDetecting} className="shrink-0 gap-1.5">
+                                {geoDetecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}
+                                {geoDetecting ? "Detecting…" : "Detect"}
+                            </Button>
+                        </div>
+                        <p className="text-[11px] text-slate-400">Click Detect to auto-fill from your device's GPS and reverse-geocode city &amp; country.</p>
                     </div>
 
                     <div className="space-y-1.5 pt-2 border-t">

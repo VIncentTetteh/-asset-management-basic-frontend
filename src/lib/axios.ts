@@ -13,7 +13,8 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
     if (typeof window !== "undefined") {
         const token = localStorage.getItem("token");
-        if (token && config.headers) {
+        const isAuthEndpoint = config.url?.includes("/auth/login") || config.url?.includes("/auth/register");
+        if (token && config.headers && !isAuthEndpoint) {
             config.headers["Authorization"] = `Bearer ${token}`;
         }
         const organisationId = getOrganisationIdFromStorage();
