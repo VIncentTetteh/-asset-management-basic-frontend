@@ -469,17 +469,17 @@ export default function DashboardPage() {
                                 <div className="grid min-w-[220px] gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
                                     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                                         <p className="text-xs uppercase tracking-wide text-slate-400">People</p>
-                                        <p className="mt-1 text-2xl font-bold text-white">{stats.totalUsers.toLocaleString()}</p>
+                                        <p className="mt-1 text-2xl font-bold text-white">{stats.totalUsers?.toLocaleString() ?? "0"}</p>
                                     </div>
                                     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                                         <p className="text-xs uppercase tracking-wide text-slate-400">Webhooks</p>
-                                        <p className="mt-1 text-2xl font-bold text-white">{stats.activeWebhooks.toLocaleString()}</p>
-                                        <p className="text-xs text-slate-400">{stats.totalWebhooks.toLocaleString()} configured</p>
+                                        <p className="mt-1 text-2xl font-bold text-white">{stats.activeWebhooks?.toLocaleString() ?? "0"}</p>
+                                        <p className="text-xs text-slate-400">{stats.totalWebhooks?.toLocaleString() ?? "0"} configured</p>
                                     </div>
                                     <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                                         <p className="text-xs uppercase tracking-wide text-slate-400">Alerts</p>
-                                        <p className="mt-1 text-2xl font-bold text-white">{maintenanceLoad.toLocaleString()}</p>
-                                        <p className="text-xs text-slate-400">{stats.expiredLicenses.toLocaleString()} expired licenses</p>
+                                        <p className="mt-1 text-2xl font-bold text-white">{maintenanceLoad?.toLocaleString() ?? "0"}</p>
+                                        <p className="text-xs text-slate-400">{stats.expiredLicenses?.toLocaleString() ?? "0"} expired licenses</p>
                                     </div>
                                 </div>
                             </div>
@@ -491,32 +491,32 @@ export default function DashboardPage() {
                                         {heroPortfolioValue}
                                     </p>
                                     <p className="mt-2 text-xs text-slate-300">
-                                        Full value: {format(stats.totalAssetValue)} · {stats.totalAssets.toLocaleString()} tracked assets
+                                        Full value: {format(stats.totalAssetValue)} · {stats.totalAssets?.toLocaleString() ?? "0"} tracked assets
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Assets In Service</p>
                                     <p className="mt-2 text-[2rem] font-black leading-none text-white lg:text-[2.25rem]">{assetUtilization}%</p>
                                     <p className="mt-1 text-xs text-slate-300">
-                                        {stats.activeAssets.toLocaleString()} active · {inactiveAssets.toLocaleString()} not active
+                                        {stats.activeAssets?.toLocaleString() ?? "0"} active · {inactiveAssets?.toLocaleString() ?? "0"} not active
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Approval Queue</p>
                                     <p className="mt-2 text-[2rem] font-black leading-none text-white lg:text-[2.25rem]">
-                                        {stats.pendingApprovals.toLocaleString()}
+                                        {stats.pendingApprovals?.toLocaleString() ?? "0"}
                                     </p>
                                     <p className="mt-1 text-xs text-slate-300">
-                                        {stats.openPurchaseOrders.toLocaleString()} open purchase orders
+                                        {stats.openPurchaseOrders?.toLocaleString() ?? "0"} open purchase orders
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Maintenance Pressure</p>
                                     <p className="mt-2 text-[2rem] font-black leading-none text-white lg:text-[2.25rem]">
-                                        {maintenanceLoad.toLocaleString()}
+                                        {maintenanceLoad?.toLocaleString() ?? "0"}
                                     </p>
                                     <p className="mt-1 text-xs text-slate-300">
-                                        {stats.overdueMaintenanceCount.toLocaleString()} overdue · {stats.upcomingMaintenanceCount.toLocaleString()} upcoming
+                                        {stats.overdueMaintenanceCount?.toLocaleString() ?? "0"} overdue · {stats.upcomingMaintenanceCount?.toLocaleString() ?? "0"} upcoming
                                     </p>
                                 </div>
                             </div>
@@ -587,7 +587,7 @@ export default function DashboardPage() {
                                                     {department.departmentName}
                                                 </span>
                                                 <span className="text-xs font-semibold text-slate-500">
-                                                    {department.count.toLocaleString()} assets
+                                                    {department.count?.toLocaleString() ?? "0"} assets
                                                 </span>
                                             </div>
                                             <div className="h-2 rounded-full bg-slate-200">
@@ -611,9 +611,9 @@ export default function DashboardPage() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-slate-900">{stats.totalAssets.toLocaleString()}</div>
+                        <div className="text-3xl font-black text-slate-900">{stats.totalAssets?.toLocaleString() ?? "0"}</div>
                         <p className="mt-1 text-xs text-slate-500">
-                            {stats.activeAssets.toLocaleString()} active · {inactiveAssets.toLocaleString()} inactive
+                            {stats.activeAssets?.toLocaleString() ?? "0"} active · {inactiveAssets?.toLocaleString() ?? "0"} inactive
                         </p>
                     </CardContent>
                 </Card>
@@ -626,7 +626,7 @@ export default function DashboardPage() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-slate-900">{format(stats.totalAssetValue)}</div>
+                        <div className="text-3xl font-black text-slate-900">{format(stats.totalAssetValue || 0)}</div>
                         <p className="mt-1 text-xs text-slate-500">
                             Net book value: {format(depreciationSummary?.netBookValue ?? 0)}
                         </p>
@@ -641,9 +641,9 @@ export default function DashboardPage() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-slate-900">{maintenanceLoad.toLocaleString()}</div>
+                        <div className="text-3xl font-black text-slate-900">{maintenanceLoad?.toLocaleString() ?? "0"}</div>
                         <p className="mt-1 text-xs text-slate-500">
-                            {stats.overdueMaintenanceCount.toLocaleString()} overdue · {stats.upcomingMaintenanceCount.toLocaleString()} upcoming
+                            {stats.overdueMaintenanceCount?.toLocaleString() ?? "0"} overdue · {stats.upcomingMaintenanceCount?.toLocaleString() ?? "0"} upcoming
                         </p>
                     </CardContent>
                 </Card>
@@ -656,9 +656,9 @@ export default function DashboardPage() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-slate-900">{stats.expiredLicenses.toLocaleString()}</div>
+                        <div className="text-3xl font-black text-slate-900">{stats.expiredLicenses?.toLocaleString() ?? "0"}</div>
                         <p className="mt-1 text-xs text-slate-500">
-                            {stats.activeWebhooks.toLocaleString()} active webhooks · {stats.totalUsers.toLocaleString()} users
+                            {stats.activeWebhooks?.toLocaleString() ?? "0"} active webhooks · {stats.totalUsers?.toLocaleString() ?? "0"} users
                         </p>
                     </CardContent>
                 </Card>
@@ -688,7 +688,7 @@ export default function DashboardPage() {
                                     <div className="mb-1 flex items-center justify-between">
                                         <span className="text-sm font-medium text-slate-600">{item.label}</span>
                                         <span className="text-sm font-bold text-slate-800">
-                                            {item.count.toLocaleString()}{" "}
+                                            {item.count?.toLocaleString() ?? "0"}{" "}
                                             <span className="text-xs font-normal text-slate-400">({pct}%)</span>
                                         </span>
                                     </div>
@@ -717,12 +717,12 @@ export default function DashboardPage() {
                                     <div>
                                         <p className="text-sm font-semibold text-slate-900">Purchase Orders</p>
                                         <p className="text-xs text-slate-500">
-                                            {stats.pendingApprovals.toLocaleString()} pending approvals · {stats.openPurchaseOrders.toLocaleString()} open
+                                            {stats.pendingApprovals?.toLocaleString() ?? "0"} pending approvals · {stats.openPurchaseOrders?.toLocaleString() ?? "0"} open
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xl font-bold text-sky-600">{stats.openPurchaseOrders.toLocaleString()}</span>
+                                    <span className="text-xl font-bold text-sky-600">{stats.openPurchaseOrders?.toLocaleString() ?? "0"}</span>
                                     <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500" />
                                 </div>
                             </Link>
@@ -735,13 +735,13 @@ export default function DashboardPage() {
                                     <div>
                                         <p className="text-sm font-semibold text-slate-900">Maintenance Alerts</p>
                                         <p className="text-xs text-slate-500">
-                                            {(maintenanceAlerts?.critical ?? stats.overdueMaintenanceCount).toLocaleString()} critical ·{" "}
-                                            {(maintenanceAlerts?.scheduled ?? stats.upcomingMaintenanceCount).toLocaleString()} scheduled
+                                            {(maintenanceAlerts?.critical ?? stats.overdueMaintenanceCount)?.toLocaleString() ?? "0"} critical ·{" "}
+                                            {(maintenanceAlerts?.scheduled ?? stats.upcomingMaintenanceCount)?.toLocaleString() ?? "0"} scheduled
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xl font-bold text-teal-600">{maintenanceLoad.toLocaleString()}</span>
+                                    <span className="text-xl font-bold text-teal-600">{maintenanceLoad?.toLocaleString() ?? "0"}</span>
                                     <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500" />
                                 </div>
                             </Link>
@@ -754,12 +754,12 @@ export default function DashboardPage() {
                                     <div>
                                         <p className="text-sm font-semibold text-slate-900">License Renewals</p>
                                         <p className="text-xs text-slate-500">
-                                            {stats.expiredLicenses.toLocaleString()} expired licenses need review
+                                            {stats.expiredLicenses?.toLocaleString() ?? "0"} expired licenses need review
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xl font-bold text-amber-600">{stats.expiredLicenses.toLocaleString()}</span>
+                                    <span className="text-xl font-bold text-amber-600">{stats.expiredLicenses?.toLocaleString() ?? "0"}</span>
                                     <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500" />
                                 </div>
                             </Link>
@@ -772,7 +772,7 @@ export default function DashboardPage() {
                                     <div>
                                         <p className="text-sm font-semibold text-slate-900">Automation & Integrations</p>
                                         <p className="text-xs text-slate-500">
-                                            {stats.activeWebhooks.toLocaleString()} active · {stats.totalWebhooks.toLocaleString()} configured
+                                            {stats.activeWebhooks?.toLocaleString() ?? "0"} active · {stats.totalWebhooks?.toLocaleString() ?? "0"} configured
                                         </p>
                                     </div>
                                 </div>
@@ -812,7 +812,7 @@ export default function DashboardPage() {
                                                     {department.departmentName}
                                                 </span>
                                                 <span className="text-sm font-bold text-slate-800">
-                                                    {department.count.toLocaleString()}{" "}
+                                                    {department.count?.toLocaleString() ?? "0"}{" "}
                                                     <span className="text-xs font-normal text-slate-400">({pct}%)</span>
                                                 </span>
                                             </div>
@@ -844,7 +844,7 @@ export default function DashboardPage() {
                                         <div key={item.label} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
                                             <p className="mb-1 text-xs text-slate-500">{item.label}</p>
                                             <p className="text-lg font-bold text-slate-800">
-                                                {item.isNumeric ? item.value.toLocaleString() : format(item.value)}
+                                                {item.isNumeric ? item.value?.toLocaleString() ?? "0" : format(item.value || 0)}
                                             </p>
                                         </div>
                                     ))}
