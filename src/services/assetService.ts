@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { Asset, AssetDto, AssetImportResult } from "@/types";
+import { Asset, AssetDto, AssetImportResult, AssetHistory } from "@/types";
 import { extractList } from "@/services/responseUtils";
 
 export interface AssetFilterParams {
@@ -22,6 +22,33 @@ export const assetService = {
     get: async (id: string): Promise<Asset> => {
         const response = await api.get<Asset>(`/assets/${id}`);
         return response.data;
+    },
+
+    /** PUT /assets/{id} */
+    replace: async (id: string, data: AssetDto): Promise<Asset> => {
+        const response = await api.put<Asset>(`/assets/${id}`, data);
+        return response.data;
+    },
+
+    /** GET /assets/{id}/history */
+    getHistory: async (id: string): Promise<AssetHistory[]> => {
+        const response = await api.get<AssetHistory[]>(`/assets/${id}/history`);
+        return response.data;
+    },
+
+    /** GET /assets/{id}/qrcode */
+    getQrCode: async (id: string): Promise<Blob | Record<string, unknown> | string> => {
+        const response = await api.get<Blob>(`/assets/${id}/qrcode`, { responseType: "blob" });
+        const contentType = String(response.headers["content-type"] || "").toLowerCase();
+        if (contentType.includes("image/")) {
+            return response.data;
+        }
+        const text = await response.data.text();
+        try {
+            return JSON.parse(text) as Record<string, unknown>;
+        } catch {
+            return text;
+        }
     },
 
     /** POST /assets */
@@ -66,6 +93,38 @@ export const assetService = {
         const response = await api.post<AssetImportResult>("/assets/import", formData, {
             headers: { "Content-Type": "multipart/form-data" },
         });
+        return response.data;
+    },
+
+    /** GET /assets/{id}/tco — Total Cost of Ownership breakdown. */
+    getTco: async (id: string): Promise<{
+        assetId: string;
+        assetName: string;
+        assetTag: string;
+        acquisitionCost: number;
+        totalMaintenanceCost: number;
+        totalInsuranceCost: number;
+        totalDowntimeCost: number;
+        disposalRecovery: number;
+        netTco: number;
+        currency: string;
+        calculatedAt: string;
+        maintenanceRecordCount: number;
+        downtimeDays: number;
+    }> => {
+        const response = await api.get(`/assets/${id}/tco`);
+        return response.data;
+    },
+
+    /** GET /assets/scan/{payload} — Look up an asset by its decoded QR payload. */
+    getByQrPayload: async (payload: string): Promise<Asset> => {
+        const response = await api.get<Asset>(`/assets/scan/${encodeURIComponent(payload)}`);
+        return response.data;
+    },
+
+    /** GET /assets/{id}/qrcode/payload — Enriched QR payload JSON for an asset. */
+    getQrPayload: async (id: string): Promise<Record<string, string>> => {
+        const response = await api.get<Record<string, string>>(`/assets/${id}/qrcode/payload`);
         return response.data;
     },
 };

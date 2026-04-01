@@ -37,4 +37,10 @@ export const depreciationPolicyService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/depreciation-policies/${id}`);
     },
+
+    /** PUT /depreciation-policies/{id} */
+    replace: async (id: string, data: DepreciationPolicyDto): Promise<DepreciationPolicy> => {
+        const response = await api.put<DepreciationPolicy>(`/depreciation-policies/${id}`, data);
+        return response.data;
+    },
 };

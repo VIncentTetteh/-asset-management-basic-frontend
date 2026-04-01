@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { webhookService } from "@/services/webhookService";
-import { Webhook } from "@/types";
+import { Webhook, WebhookDelivery } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Webhook as WebhookIcon, Plus, CheckCircle, XCircle, Trash2 } from "lucide-react";
+import { Loader2, Webhook as WebhookIcon, Plus, CheckCircle, XCircle, Trash2, Activity, Clock, AlertCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useForm } from "react-hook-form";
+import { formatRelativeTime } from "@/lib/time";
 
 const AVAILABLE_EVENTS = [
     "asset.created", "asset.updated", "asset.deleted",
@@ -37,6 +38,11 @@ export default function WebhooksPage() {
     const [testingId, setTestingId] = useState<string | null>(null);
     const [togglingId, setTogglingId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [selectedWebhookForDeliveries, setSelectedWebhookForDeliveries] = useState<Webhook | null>(null);
+    const [isDeliveriesModalOpen, setIsDeliveriesModalOpen] = useState(false);
+    const [deliveries, setDeliveries] = useState<WebhookDelivery[]>([]);
+    const [loadingDeliveries, setLoadingDeliveries] = useState(false);
+    const [selectedDelivery, setSelectedDelivery] = useState<WebhookDelivery | null>(null);
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<WebhookFormData>();
 
@@ -128,6 +134,30 @@ export default function WebhooksPage() {
             toast.error("Test delivery failed");
         } finally {
             setTestingId(null);
+        }
+    };
+
+    const fetchDeliveries = async (webhook: Webhook) => {
+        setSelectedWebhookForDeliveries(webhook);
+        setIsDeliveriesModalOpen(true);
+        setSelectedDelivery(null);
+        setLoadingDeliveries(true);
+        try {
+            const data = await webhookService.getDeliveries(webhook.id);
+            setDeliveries(data.deliveries || []);
+        } catch {
+            toast.error("Failed to fetch deliveries");
+        } finally {
+            setLoadingDeliveries(false);
+        }
+    };
+
+    const loadDeliveryDetail = async (webhookId: string, deliveryId: string) => {
+        try {
+            const detail = await webhookService.getDelivery(webhookId, deliveryId);
+            setSelectedDelivery(detail);
+        } catch {
+            toast.error("Failed to fetch delivery detail");
         }
     };
 
@@ -228,6 +258,9 @@ export default function WebhooksPage() {
                                             </td>
                                             <td className="py-3 px-4">
                                                 <div className="flex justify-end gap-1">
+                                                    <Button variant="outline" size="sm" onClick={() => fetchDeliveries(w)} className="h-7 px-2 text-xs">
+                                                        <Activity className="w-3 h-3 mr-1" /> History
+                                                    </Button>
                                                     <Button variant="outline" size="sm" onClick={() => testWebhook(w.id)} isLoading={testingId === w.id} className="h-7 px-2 text-xs">Test</Button>
                                                     <Button
                                                         variant="outline"
@@ -320,6 +353,85 @@ export default function WebhooksPage() {
                         </Button>
                     </div>
                 </form>
+            </Modal>
+
+            {/* Deliveries Modal */}
+            <Modal
+                isOpen={isDeliveriesModalOpen}
+                onClose={() => setIsDeliveriesModalOpen(false)}
+                title={`Delivery History: ${selectedWebhookForDeliveries?.name}`}
+                description="List of recent webhook delivery attempts and their statuses."
+            >
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1">
+                    {loadingDeliveries ? (
+                        <div className="flex justify-center p-8">
+                            <Loader2 className="animate-spin w-8 h-8 text-slate-400" />
+                        </div>
+                    ) : deliveries.length === 0 ? (
+                        <div className="text-center py-10 text-slate-400">
+                            <Clock className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                            <p className="text-sm">No delivery attempts recorded yet.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {deliveries.map((d, i) => (
+                                <button
+                                    key={d.deliveryId || i}
+                                    type="button"
+                                    onClick={() => selectedWebhookForDeliveries && loadDeliveryDetail(selectedWebhookForDeliveries.id, d.deliveryId)}
+                                    className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${selectedDelivery?.deliveryId === d.deliveryId
+                                        ? "border-indigo-300 bg-indigo-50/60"
+                                        : "border-slate-100 hover:bg-slate-50"
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-1.5 rounded-full ${d.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                                            {d.status === 'SUCCESS' ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-900">{d.event}</p>
+                                            <p className="text-[10px] text-slate-400 font-medium tracking-tight">{new Date(d.timestamp).toLocaleString()} • {formatRelativeTime(d.timestamp)}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className={`text-xs font-mono font-bold ${d.statusCode >= 200 && d.statusCode < 300 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            {d.statusCode}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400">{d.responseTime}ms</div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {selectedDelivery && (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                            <div>
+                                <p className="text-xs uppercase tracking-wide text-slate-400">Selected Delivery</p>
+                                <p className="font-semibold text-slate-900">{selectedDelivery.deliveryId}</p>
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-2 text-sm">
+                                <div>
+                                    <p className="text-slate-400">Status</p>
+                                    <p className="text-slate-900">{selectedDelivery.status} ({selectedDelivery.statusCode})</p>
+                                </div>
+                                <div>
+                                    <p className="text-slate-400">Delivered</p>
+                                    <p className="text-slate-900">{selectedDelivery.deliveredAt ? new Date(selectedDelivery.deliveredAt).toLocaleString() : "—"}</p>
+                                </div>
+                            </div>
+                            {selectedDelivery.responseBody && (
+                                <div>
+                                    <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">Response Body</p>
+                                    <pre className="max-h-40 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100 whitespace-pre-wrap">{selectedDelivery.responseBody}</pre>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+                <div className="flex justify-end pt-4 border-t mt-4">
+                    <Button variant="outline" onClick={() => setIsDeliveriesModalOpen(false)}>Close</Button>
+                </div>
             </Modal>
         </div>
     );

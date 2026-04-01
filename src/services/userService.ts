@@ -69,6 +69,24 @@ export const userService = {
         return response.data;
     },
 
+    // ── Self-service (no admin role required) ──────────────────────────────────
+
+    /** GET /users/me — returns the currently logged-in user's own profile. */
+    getMe: async (): Promise<User> => {
+        const response = await api.get<User>("/users/me");
+        return response.data;
+    },
+
+    /**
+     * PATCH /users/me — self-service profile update.
+     * Only firstName, lastName, phone, and jobTitle are applied by the backend.
+     * Use this instead of update() when a regular (non-admin) user saves their profile.
+     */
+    patchMe: async (data: Pick<UserDto, "firstName" | "lastName" | "phone" | "jobTitle">): Promise<User> => {
+        const response = await api.patch<User>("/users/me", data);
+        return response.data;
+    },
+
     /** PUT /users/{id}/deactivate — sets status → INACTIVE */
     deactivate: async (id: string): Promise<void> => {
         await api.put(`/users/${id}/deactivate`);

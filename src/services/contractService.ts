@@ -45,4 +45,20 @@ export const contractService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/contracts/${id}`, { params: withOrgParams() });
     },
+
+    /** GET /contracts/{id} */
+    get: async (id: string): Promise<Contract> => {
+        const response = await api.get<Contract>(`/contracts/${id}`, {
+            params: withOrgParams(),
+        });
+        return response.data;
+    },
+
+    /** PUT /contracts/{id} */
+    replace: async (id: string, data: ContractDto): Promise<Contract> => {
+        const response = await api.put<Contract>(`/contracts/${id}`, data, {
+            params: withOrgParams(),
+        });
+        return response.data;
+    },
 };

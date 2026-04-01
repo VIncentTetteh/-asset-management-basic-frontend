@@ -29,6 +29,14 @@ export const supplierService = {
         return response.data;
     },
 
+    /** GET /suppliers/by-email */
+    getByEmail: async (email: string): Promise<Supplier> => {
+        const response = await api.get<Supplier>("/suppliers/by-email", {
+            params: withOrgParams({ email }),
+        });
+        return response.data;
+    },
+
     /** POST /suppliers */
     create: async (data: SupplierDto): Promise<Supplier> => {
         const payload: SupplierDto = {
@@ -58,5 +66,17 @@ export const supplierService = {
         await api.delete(`/suppliers/${id}`, {
             params: withOrgParams(),
         });
+    },
+
+    /** PUT /suppliers/{id} */
+    replace: async (id: string, data: SupplierDto): Promise<Supplier> => {
+        const payload: SupplierDto = {
+            ...data,
+            organisationId: data.organisationId || getOrgId(),
+        };
+        const response = await api.put<Supplier>(`/suppliers/${id}`, payload, {
+            params: withOrgParams(),
+        });
+        return response.data;
     },
 };

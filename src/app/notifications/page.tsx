@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { notificationService, resolveNotifId } from "@/services/notificationService";
 import { Notification, NotificationPreferences, NotificationSummary, NOTIFICATION_TYPES } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -272,7 +273,7 @@ export default function NotificationsPage() {
                                             )}
                                             {n.actionUrl && (
                                                 <Button variant="outline" size="sm" asChild>
-                                                    <a href={n.actionUrl}>View Item</a>
+                                                    <Link href={n.actionUrl}>View Item</Link>
                                                 </Button>
                                             )}
                                         </div>

@@ -29,5 +29,13 @@ export const bulkOperationService = {
     exportAssets: async (request: ExportJobRequest): Promise<ExportJobResponse> => {
         const response = await api.post<ExportJobResponse>("/bulk/assets/export", request);
         return response.data;
+    },
+    exportPurchaseOrders: async (request: ExportJobRequest): Promise<ExportJobResponse> => {
+        const response = await api.post<ExportJobResponse>("/bulk/purchase-orders/export", request);
+        return response.data;
+    },
+    exportSuppliers: async (request: ExportJobRequest): Promise<ExportJobResponse> => {
+        const response = await api.post<ExportJobResponse>("/bulk/suppliers/export", request);
+        return response.data;
     }
 };

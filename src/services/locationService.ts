@@ -37,4 +37,10 @@ export const locationService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/locations/${id}`);
     },
+
+    /** PUT /locations/{id} */
+    replace: async (id: string, data: LocationDto): Promise<Location> => {
+        const response = await api.put<Location>(`/locations/${id}`, data);
+        return response.data;
+    },
 };

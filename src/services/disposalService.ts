@@ -38,4 +38,10 @@ export const disposalService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/disposals/${id}`);
     },
+
+    /** PUT /disposals/{id} */
+    replace: async (id: string, data: DisposalsDto): Promise<DisposalRecord> => {
+        const response = await api.put<DisposalRecord>(`/disposals/${id}`, data);
+        return response.data;
+    },
 };

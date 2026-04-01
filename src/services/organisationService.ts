@@ -23,4 +23,21 @@ export const organisationService = {
         const response = await api.patch<Organisation>(`/organisations/${id}`, data);
         return response.data;
     },
+
+    /** POST /organisations */
+    create: async (data: OrganisationDto): Promise<Organisation> => {
+        const response = await api.post<Organisation>("/organisations", data);
+        return response.data;
+    },
+
+    /** PUT /organisations/{id} */
+    replace: async (id: string, data: OrganisationDto): Promise<Organisation> => {
+        const response = await api.put<Organisation>(`/organisations/${id}`, data);
+        return response.data;
+    },
+
+    /** DELETE /organisations/{id} */
+    delete: async (id: string): Promise<void> => {
+        await api.delete(`/organisations/${id}`);
+    },
 };

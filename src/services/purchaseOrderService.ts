@@ -106,4 +106,19 @@ export const purchaseOrderService = {
             params: withOrgParams(),
         });
     },
+
+    /** PUT /purchase-orders/{id} */
+    replace: async (id: string, data: PurchaseOrderDto): Promise<PurchaseOrder> => {
+        const organisationId = data.organisationId || requireOrgId();
+        const payload: PurchaseOrderDto = {
+            ...data,
+            organisationId,
+            status: normalizePoStatus(data.status) as PurchaseOrderDto["status"],
+        };
+        delete payload.id;
+        const response = await api.put<PurchaseOrder>(`/purchase-orders/${id}`, payload, {
+            params: withOrgParams(),
+        });
+        return response.data;
+    },
 };

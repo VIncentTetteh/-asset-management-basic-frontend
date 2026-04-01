@@ -38,8 +38,10 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                 if (user.organisationId) {
                     try {
                         const { organisationService } = await import("@/services/organisationService");
-                        const org = await organisationService.get(user.organisationId);
-                        setOrgName(org.name);
+                        const orgs = await organisationService.getAll();
+                        if (orgs.length > 0) {
+                            setOrgName(orgs[0].name);
+                        }
                     } catch (e) {
                         console.error("Failed to fetch org name for layout:", e);
                     }

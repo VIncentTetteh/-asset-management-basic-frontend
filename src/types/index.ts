@@ -223,6 +223,53 @@ export interface AssetDto {
     currentBookValue?: number;
 }
 
+// ─── Asset History ────────────────────────────────────────────────────────────
+export interface AssetHistory extends BaseEntity {
+    assetId: string;
+    action?: string;
+    fieldName?: string;
+    oldValue?: string;
+    newValue?: string;
+    notes?: string;
+    userId?: string;
+    /** Backend compatibility fields */
+    eventType?: string | null;
+    actor?: string | null;
+    summary?: string | null;
+    occurredAt?: string | null;
+    userName?: string | null;
+    path?: string | null;
+    httpMethod?: string | null;
+    description?: string | null;
+}
+
+// ─── Asset Custom Fields ──────────────────────────────────────────────────────
+export interface AssetCustomField extends BaseEntity {
+    assetId?: string;
+    fieldId?: string;
+    fieldName?: string;
+    fieldValue?: string;
+    name?: string;
+    key?: string;
+    label?: string;
+    value?: string | number | boolean | null;
+    dataType?: string;
+    required?: boolean;
+}
+
+export interface AssetCustomFieldDto {
+    id?: string;
+    assetId?: string;
+    fieldName?: string;
+    fieldValue?: string;
+    name?: string;
+    key?: string;
+    label?: string;
+    value?: string | number | boolean | null;
+    dataType?: string;
+    required?: boolean;
+}
+
 // ─── Asset Import ─────────────────────────────────────────────────────────────
 export interface AssetImportRowError {
     row: number;
@@ -239,7 +286,6 @@ export interface AssetImportResult {
 // ─── Category ─────────────────────────────────────────────────────────────────
 export interface Category extends BaseEntity {
     name: string;
-    description?: string;
     assetPrefixCode?: string;
     parentCategoryId?: string | null;
     depreciationPolicyId?: string;
@@ -250,7 +296,6 @@ export interface Category extends BaseEntity {
 export interface CategoryDto {
     id?: string;
     name: string;                         // required
-    description?: string;
     assetPrefixCode?: string;
     parentCategoryId?: string | null;
     depreciationPolicyId?: string;
@@ -297,6 +342,8 @@ export interface User extends BaseEntity {
     status?: UserStatus | string;
     organisationId?: string;
     departmentId?: string;
+    /** Whether TOTP-based MFA is currently active for this user */
+    mfaEnabled?: boolean;
 }
 
 export interface UserDto {
@@ -537,10 +584,28 @@ export interface DepreciationPolicyDto {
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-export interface LoginResponse {
+
+/** Returned when MFA is required — no token yet, just a short-lived challenge. */
+export interface MfaChallengeResponse {
+    mfaRequired: true;
+    mfaChallengeToken: string;
+}
+
+/** Returned when login succeeds without (or after) MFA verification. */
+export interface LoginSuccessResponse {
     token: string;
     expiresIn: number;
     tokenType: string;
+    user: User;
+}
+
+/** Union of all possible /auth/login responses. */
+export type LoginResponse = LoginSuccessResponse | MfaChallengeResponse;
+
+/** Response body from POST /mfa/challenge */
+export interface MfaChallengeVerifyResponse {
+    token: string;
+    expiresIn: number;
     user: User;
 }
 
@@ -556,18 +621,18 @@ export interface PaginatedResponse<T> {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export interface DashboardSummary {
     totalAssets: number;
-    assetsInUse: number;
-    assetsInStock: number;
-    assetsRetired: number;
-    pendingPurchaseOrders: number;
-    approvedPurchaseOrders: number;
-    totalAssetValue: number;
-    totalPendingValue: number;
-    assetsNeedingMaintenance: number;
-    deprecatedAssets: number;
-    lastUpdated: string;
-    totalDepreciation: number;
-    maintenanceAlerts: number;
+    activeAssets: number;
+    inMaintenanceAssets: number;
+    disposedAssets: number;
+    totalOrganisations: number;
+    totalUsers: number;
+    pendingPOs: number;
+    approvedPOs: number;
+    scheduledMaintenance: number;
+    inProgressMaintenance: number;
+    totalWebhooks: number;
+    activeWebhooks: number;
+    generatedAt: string;
 }
 
 export interface AssetsByStatus {
@@ -613,14 +678,17 @@ export interface FinancialAnalytics {
     totalAssetValue: number;
     totalDepreciation: number;
     netBookValue: number;
-    totalAcquisition: number;
-    totalDisposal: number;
-    totalMaintenance: number;
-    assetTurnover: number;
-    averageAssetAge: number;
-    depreciationMethod: string;
-    assetsFullyDepreciated: number;
-    monthlyDepreciation: number;
+    totalAcquisition?: number;
+    totalDisposal?: number;
+    totalMaintenance?: number;
+    totalBudget?: number;
+    totalActualSpend?: number;
+    budgetUtilization?: number;
+    assetTurnover?: number;
+    averageAssetAge?: number;
+    depreciationMethod?: string;
+    assetsFullyDepreciated?: number;
+    monthlyDepreciation?: number;
     breakdown: {
         byCategory: Record<string, {
             count: number;
@@ -638,10 +706,10 @@ export interface PurchaseOrderAnalytics {
     rejectedPOs: number;
     totalPOValue: number;
     averagePOValue: number;
-    largestPO: number;
-    smallestPO: number;
-    averageApprovalTime: number;
-    averageDeliveryTime: number;
+    largestPO?: number;
+    smallestPO?: number;
+    averageApprovalTime?: number;
+    averageDeliveryTime?: number;
     topSuppliers: {
         supplier: string;
         poCount: number;
@@ -726,6 +794,10 @@ export interface WebhookDelivery {
     statusCode: number;
     responseTime: number;
     attempts: number;
+    requestBody?: string | null;
+    responseBody?: string | null;
+    nextRetryAt?: string | null;
+    deliveredAt?: string | null;
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -789,6 +861,33 @@ export interface DetailedHealth extends SystemHealth {
     version: string;
 }
 
+export interface HealthJvmMetrics {
+    heapUsedBytes?: number;
+    heapMaxBytes?: number;
+    heapCommittedBytes?: number;
+    nonHeapUsedBytes?: number;
+    nonHeapCommittedBytes?: number;
+    threadCount?: number;
+    daemonThreadCount?: number;
+    processCpuLoad?: number;
+    systemCpuLoad?: number;
+    availableProcessors?: number;
+}
+
+export interface DatabaseMetrics {
+    status?: string;
+    poolName?: string;
+    activeConnections?: number;
+    idleConnections?: number;
+    totalConnections?: number;
+    maxConnections?: number;
+    minConnections?: number;
+    pendingThreads?: number;
+    usagePercent?: number;
+    responseTimeMs?: number;
+    details?: Record<string, unknown>;
+}
+
 export interface ApiMetrics {
     period: string;
     timestamp: string;
@@ -797,13 +896,18 @@ export interface ApiMetrics {
     failedRequests: number;
     successRate: string;
     averageLatency: number;
-    p50Latency: number;
-    p95Latency: number;
-    p99Latency: number;
-    maxLatency: number;
-    errorRate: string;
-    topErrors: { error: string; count: number; percentage: string; }[];
-    slowestEndpoints: { endpoint: string; avgLatency: number; callCount: number; }[];
+    jvm?: HealthJvmMetrics | null;
+    database?: DatabaseMetrics | null;
+    uptime?: string;
+    uptimeMs?: number;
+    p50Latency?: number;
+    p95Latency?: number;
+    p99Latency?: number;
+    maxLatency?: number;
+    errorRate?: string;
+    topErrors?: { error: string; count: number; percentage: string; }[];
+    slowestEndpoints?: { endpoint: string; avgLatency: number; callCount: number; }[];
+    raw?: Record<string, unknown>;
 }
 
 export interface EndpointMetric {
@@ -851,6 +955,7 @@ export interface Subscription {
     plan: BillingPlan;
     status: string;
     autoRenew: boolean;
+    autoRenewEnabled?: boolean;
     currentPeriodStart: string;
     currentPeriodEnd: string;
     nextBillingAt?: string | null;
@@ -894,6 +999,7 @@ export interface AuditEventFilterParams {
     end?: string;
     success?: boolean;
     method?: string;
+    path?: string;
 }
 
 // ─── Compliance ────────────────────────────────────────────────────────────────
@@ -1519,9 +1625,10 @@ export interface DepreciationSummary {
 
 export interface MaintenanceAnalytics {
     period?: string;
+    totalRecords?: number;
     totalMaintenanceCost: number;
     averageCost: number;
-    completionRate: number;
+    completionRate?: number;
     overdueCount: number;
     byType: Record<string, { count: number; cost: number }>;
 }

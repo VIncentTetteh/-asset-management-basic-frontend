@@ -31,4 +31,16 @@ export const budgetService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/budgets/${id}`);
     },
+
+    /** GET /budgets/{id} */
+    get: async (id: string): Promise<Budget> => {
+        const response = await api.get<Budget>(`/budgets/${id}`);
+        return response.data;
+    },
+
+    /** PUT /budgets/{id} */
+    replace: async (id: string, data: BudgetDto): Promise<Budget> => {
+        const response = await api.put<Budget>(`/budgets/${id}`, data);
+        return response.data;
+    },
 };

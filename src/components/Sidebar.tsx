@@ -58,8 +58,10 @@ export function Sidebar() {
                 if (storedUserStr) {
                     const user = JSON.parse(storedUserStr) as User;
                     if (user.organisationId) {
-                        const org = await organisationService.get(user.organisationId);
-                        setOrgName(org.name);
+                        const orgs = await organisationService.getAll();
+                        if (orgs.length > 0) {
+                            setOrgName(orgs[0].name);
+                        }
                     }
                 }
             } catch (error) {

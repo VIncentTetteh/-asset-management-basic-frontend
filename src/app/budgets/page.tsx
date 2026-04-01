@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { Budget, BudgetDto, Department } from "@/types";
 import { budgetService } from "@/services/budgetService";
 import { departmentService } from "@/services/departmentService";
+import { auditEventService } from "@/services/auditEventService";
+import { AuditEvent } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
@@ -11,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, Wallet, TrendingUp, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, TrendingUp, AlertTriangle, History } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
 
@@ -25,6 +27,12 @@ export default function BudgetsPage() {
     const [spendingBudgetId, setSpendingBudgetId] = useState<string>("");
     const [spendAmount, setSpendAmount] = useState<string>("");
     const [isSpendSubmitting, setIsSpendSubmitting] = useState(false);
+    
+    // History states
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [history, setHistory] = useState<AuditEvent[]>([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [activeBudgetName, setActiveBudgetName] = useState("");
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<BudgetDto>();
 
@@ -75,6 +83,24 @@ export default function BudgetsPage() {
         setSpendingBudgetId(id);
         setSpendAmount("");
         setIsSpendModalOpen(true);
+    };
+
+    const handleOpenHistory = async (budget: Budget) => {
+        setIsHistoryModalOpen(true);
+        setIsLoadingHistory(true);
+        setActiveBudgetName(budget.name);
+        try {
+            // Path filter for exactly this budget's spend endpoint
+            const data = await auditEventService.getAll({ 
+                path: `/budgets/${budget.id}/spend`,
+                success: true 
+            });
+            setHistory(data);
+        } catch {
+            toast.error("Failed to load expenditure history");
+        } finally {
+            setIsLoadingHistory(false);
+        }
     };
 
     const handleRecordSpend = async () => {
@@ -262,6 +288,9 @@ export default function BudgetsPage() {
                                                         <Button variant="outline" size="sm" onClick={() => handleOpenSpend(b.id)} className="h-7 px-2 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50">
                                                             Spend
                                                         </Button>
+                                                        <Button variant="outline" size="sm" title="History" onClick={() => handleOpenHistory(b)} className="h-7 px-2 text-slate-600 hover:bg-slate-50">
+                                                            <History className="h-3.5 w-3.5" />
+                                                        </Button>
                                                         <Button variant="outline" size="sm" onClick={() => handleOpenEdit(b)} className="h-7 px-2">
                                                             <Pencil className="h-3 w-3" />
                                                         </Button>
@@ -380,6 +409,41 @@ export default function BudgetsPage() {
                         </Button>
                     </div>
                 </form>
+            </Modal>
+
+            {/* Expenditure History Modal */}
+            <Modal
+                isOpen={isHistoryModalOpen}
+                onClose={() => setIsHistoryModalOpen(false)}
+                title="Expenditure History"
+                description={`Audit logs of spend activity for "${activeBudgetName}"`}
+            >
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                    {isLoadingHistory ? (
+                        <div className="py-12 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" /></div>
+                    ) : history.length === 0 ? (
+                        <div className="py-12 text-center text-slate-500 italic">No recorded expenditures found in audit logs.</div>
+                    ) : (
+                        <div className="space-y-3">
+                            {history.map((h) => (
+                                <div key={h.id} className="flex items-start gap-3 p-3 rounded-lg border border-slate-100 bg-slate-50/50">
+                                    <div className="mt-1 p-1 bg-emerald-100 rounded text-emerald-600"><TrendingUp className="h-3.5 w-3.5" /></div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <p className="text-sm font-medium text-slate-900 leading-tight">Expenditure Recorded</p>
+                                            <span className="text-[10px] whitespace-nowrap text-slate-400 font-mono">{new Date(h.createdAt).toLocaleString()}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-1">Recorded by: <span className="text-slate-700 font-medium">{h.actorEmail || 'System'}</span></p>
+                                        {h.message && <p className="text-xs text-slate-600 mt-2 p-1.5 bg-white border border-slate-100 rounded italic">{h.message}</p>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <div className="flex justify-end pt-4 border-t sticky bottom-0 bg-white">
+                        <Button variant="outline" onClick={() => setIsHistoryModalOpen(false)}>Close Activity Log</Button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

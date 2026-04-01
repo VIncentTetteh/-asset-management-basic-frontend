@@ -83,4 +83,16 @@ export const licenseService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/licenses/${id}`, { params: withOrgParams() });
     },
+
+    /** GET /licenses/{id} */
+    get: async (id: string): Promise<SoftwareLicense> => {
+        const response = await api.get<SoftwareLicense>(`/licenses/${id}`, { params: withOrgParams() });
+        return normalizeLicense(response.data);
+    },
+
+    /** PUT /licenses/{id} */
+    replace: async (id: string, data: SoftwareLicenseDto): Promise<SoftwareLicense> => {
+        const response = await api.put<SoftwareLicense>(`/licenses/${id}`, normalizePayload(data), { params: withOrgParams() });
+        return normalizeLicense(response.data);
+    },
 };

@@ -37,4 +37,10 @@ export const categoryService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/categories/${id}`);
     },
+
+    /** PUT /categories/{id} */
+    replace: async (id: string, data: CategoryDto): Promise<Category> => {
+        const response = await api.put<Category>(`/categories/${id}`, data);
+        return response.data;
+    },
 };

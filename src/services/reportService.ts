@@ -142,5 +142,33 @@ export const reportService = {
     getReportHistory: async (params?: { type?: string; limit?: number; offset?: number }): Promise<ReportHistory> => {
         const response = await api.get("/reports/history", { params });
         return normalizeHistory(response.data);
+    },
+
+    deleteReport: async (reportId: string): Promise<void> => {
+        await api.delete(`/reports/${reportId}`);
+    },
+
+    downloadAssetReport: async (reportId: string, expectedFormat?: string): Promise<{ blob: Blob; fileName?: string }> => {
+        const response = await api.get<Blob>(`/reports/assets/${reportId}/download`, { responseType: "blob" });
+        const normalizedBlob = await normalizeDownloadBlob(response.data, expectedFormat);
+        const disposition = response.headers["content-disposition"] as string | undefined;
+        const fileNameMatch = disposition?.match(/filename\*?=(?:UTF-8'')?\"?([^\";]+)/i);
+        return { blob: normalizedBlob, fileName: fileNameMatch?.[1] ? decodeURIComponent(fileNameMatch[1]) : undefined };
+    },
+
+    downloadFinancialReport: async (reportId: string, expectedFormat?: string): Promise<{ blob: Blob; fileName?: string }> => {
+        const response = await api.get<Blob>(`/reports/financial/${reportId}/download`, { responseType: "blob" });
+        const normalizedBlob = await normalizeDownloadBlob(response.data, expectedFormat);
+        const disposition = response.headers["content-disposition"] as string | undefined;
+        const fileNameMatch = disposition?.match(/filename\*?=(?:UTF-8'')?\"?([^\";]+)/i);
+        return { blob: normalizedBlob, fileName: fileNameMatch?.[1] ? decodeURIComponent(fileNameMatch[1]) : undefined };
+    },
+
+    downloadMaintenanceReport: async (reportId: string, expectedFormat?: string): Promise<{ blob: Blob; fileName?: string }> => {
+        const response = await api.get<Blob>(`/reports/maintenance/${reportId}/download`, { responseType: "blob" });
+        const normalizedBlob = await normalizeDownloadBlob(response.data, expectedFormat);
+        const disposition = response.headers["content-disposition"] as string | undefined;
+        const fileNameMatch = disposition?.match(/filename\*?=(?:UTF-8'')?\"?([^\";]+)/i);
+        return { blob: normalizedBlob, fileName: fileNameMatch?.[1] ? decodeURIComponent(fileNameMatch[1]) : undefined };
     }
 };

@@ -61,8 +61,14 @@ export default function CloudAssetsPage() {
                 cloudAssetService.getCostSummary(),
             ]);
             if (assetsResult.status === "fulfilled") {
-                setAssets(assetsResult.value.content ?? []);
-                setTotalPages(assetsResult.value.totalPages ?? 0);
+                const data = assetsResult.value as any;
+                // Backend returns 'items', frontend PaginatedResponse type says 'content'
+                setAssets(data.items || data.content || []);
+                
+                // Map backend total/limit/offset to totalPages
+                const total = Number(data.total) || 0;
+                const limit = Number(data.limit) || 20;
+                setTotalPages(Math.ceil(total / limit));
             }
             if (summaryResult.status === "fulfilled") setCostSummary(summaryResult.value);
         } catch {

@@ -123,7 +123,7 @@ export default function RisksPage() {
                 ...data,
                 likelihood: Number(data.likelihood),
                 impact: Number(data.impact),
-                residualRisk: data.residualRisk !== undefined && data.residualRisk !== null && data.residualRisk !== ""
+                residualRisk: data.residualRisk !== undefined && data.residualRisk !== null && String(data.residualRisk) !== ""
                     ? Number(data.residualRisk)
                     : undefined,
                 reviewDate: data.reviewDate

@@ -42,6 +42,12 @@ export const roleService = {
         return normalizeRole(response.data);
     },
 
+    /** GET /roles/by-name */
+    getByName: async (name: string): Promise<Role> => {
+        const response = await api.get<Role>("/roles/by-name", { params: { name, ...withOrgParams() } });
+        return normalizeRole(response.data);
+    },
+
     /** POST /roles */
     create: async (data: RoleDto): Promise<Role> => {
         const payload: Record<string, unknown> = { ...data };
@@ -69,5 +75,17 @@ export const roleService = {
     /** DELETE /roles/{id} */
     delete: async (id: string): Promise<void> => {
         await api.delete(`/roles/${id}`);
+    },
+
+    /** PUT /roles/{id} */
+    replace: async (id: string, data: RoleDto): Promise<Role> => {
+        const payload: Record<string, unknown> = { ...data };
+        if (Array.isArray(data.permissions)) {
+            payload.permissions = JSON.stringify(
+                Object.fromEntries(data.permissions.map((permission) => [permission, true]))
+            );
+        }
+        const response = await api.put<Role>(`/roles/${id}`, payload);
+        return normalizeRole(response.data);
     },
 };

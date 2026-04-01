@@ -102,7 +102,7 @@ export default function RegulatoryFilingsPage() {
 
     const onSubmit = async (data: RegulatoryFilingDto) => {
         try {
-            const normalized: RegulatoryFilingDto = {
+            const normalized: Record<string, any> = {
                 ...data,
                 dueDate: data.dueDate ? new Date(`${data.dueDate}T00:00:00Z`).toISOString() : undefined,
                 submittedAt: data.submittedAt ? new Date(`${data.submittedAt}T00:00:00Z`).toISOString() : undefined,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { DiscoveredDevice, DiscoveryScanDto, DiscoverySummary } from "@/types";
 import { discoveryService } from "@/services/discoveryService";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { ScanLine, Trash2, ArrowUpRight, Wifi, WifiOff, CheckCircle2 } from "luc
 import { useForm } from "react-hook-form";
 
 export default function DiscoveryPage() {
+    const router = useRouter();
     const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
     const [summary, setSummary] = useState<DiscoverySummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -77,6 +79,9 @@ export default function DiscoveryPage() {
             const res = await discoveryService.promote(id);
             toast.success(`Promoted as asset: ${res.assetName}`);
             fetchDevices(page);
+            if (res.assetId && confirm(`Open ${res.assetName} now?`)) {
+                router.push(`/assets?id=${res.assetId}`);
+            }
         } catch {
             toast.error("Failed to promote device");
         } finally {

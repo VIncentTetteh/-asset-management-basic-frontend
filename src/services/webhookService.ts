@@ -41,5 +41,9 @@ export const webhookService = {
     testWebhook: async (webhookId: string): Promise<WebhookTestResponse> => {
         const response = await api.post<WebhookTestResponse>(`/webhooks/${webhookId}/test`);
         return response.data;
+    },
+    getDelivery: async (webhookId: string, deliveryId: string): Promise<WebhookDelivery> => {
+        const response = await api.get<WebhookDelivery>(`/webhooks/${webhookId}/deliveries/${deliveryId}`);
+        return response.data;
     }
 };

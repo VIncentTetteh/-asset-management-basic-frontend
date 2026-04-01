@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import {
     Plus, Pencil, Trash2, Hexagon, Building2, Layers, Search,
     MapPin, UserRound, UserPlus, UserMinus, Loader2, Upload, FileSpreadsheet,
-    CheckCircle2, AlertTriangle, XCircle
+    CheckCircle2, AlertTriangle, XCircle, FileText
 } from "lucide-react";
 
 import {
@@ -15,7 +16,8 @@ import {
     DepreciationMethod, PurchaseOrder
 } from "@/types";
 
-import { assetService } from "@/services/assetService";
+import { assetService, AssetFilterParams } from "@/services/assetService";
+import { importJobService, ImportJobResponse } from "@/services/importJobService";
 import { departmentService } from "@/services/departmentService";
 import { organisationService } from "@/services/organisationService";
 import { categoryService } from "@/services/categoryService";
@@ -23,7 +25,7 @@ import { locationService } from "@/services/locationService";
 import { supplierService } from "@/services/supplierService";
 import { purchaseOrderService } from "@/services/purchaseOrderService";
 import { userService } from "@/services/userService";
-
+import { AssetDetailModal } from "@/components/assets/AssetDetailModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
@@ -56,14 +58,19 @@ export default function AssetsPage() {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [importFile, setImportFile] = useState<File | null>(null);
     const [importResult, setImportResult] = useState<AssetImportResult | null>(null);
+    const [importJobId, setImportJobId] = useState<string | null>(null);
+    const [importStatus, setImportStatus] = useState<string | null>(null);
     const [isImporting, setIsImporting] = useState(false);
     const [selectedAssetForAssignment, setSelectedAssetForAssignment] = useState<Asset | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
     const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+    const [selectedAssetForDetails, setSelectedAssetForDetails] = useState<Asset | null>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
     const { format } = useCurrency();
     const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<AssetDto>();
+    const searchParams = useSearchParams();
 
     const fetchData = async () => {
         try {
@@ -113,6 +120,17 @@ export default function AssetsPage() {
     useEffect(() => {
         fetchData();
     }, []);
+
+    useEffect(() => {
+        const id = searchParams.get("id");
+        if (id && assets.length > 0) {
+            const asset = assets.find(a => a.id === id);
+            if (asset) {
+                setSelectedAssetForDetails(asset);
+                setIsDetailModalOpen(true);
+            }
+        }
+    }, [searchParams, assets]);
 
     // Lookup Maps for Display
     const orgMap = useMemo(() => new Map(organisations.map(o => [o.id, o.name])), [organisations]);
@@ -284,17 +302,74 @@ export default function AssetsPage() {
         }
     };
 
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+
+        if (importJobId && (importStatus === "PENDING" || importStatus === "PROCESSING" || importStatus === "uploading")) {
+            interval = setInterval(async () => {
+                try {
+                    const details = await importJobService.getJobDetails(importJobId);
+                    setImportStatus(details.status || "COMPLETED");
+                    
+                    if (details.status === "COMPLETED" || details.status === "FAILED") {
+                        if (details.result) {
+                            // Map ImportJobResult to AssetImportResult if needed
+                            const result = details.result;
+                            setImportResult({
+                                totalRows: result.totalRows || 0,
+                                imported: result.imported || 0,
+                                skipped: result.skipped || 0,
+                                errors: (result.errors || []).map(e => ({ row: e.row || 0, message: e.message || "" }))
+                            });
+                        }
+                        if (details.status === "COMPLETED") {
+                            toast.success("Bulk import completed successfully");
+                            fetchData();
+                        }
+                        setImportJobId(null);
+                    }
+                } catch (err) {
+                    console.error("Import polling failed", err);
+                    clearInterval(interval);
+                    setImportJobId(null);
+                }
+            }, 2000);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [importJobId, importStatus]);
+
     const handleImport = async () => {
-        if (!importFile) { toast.error("Select an .xlsx file first"); return; }
+        if (!importFile) return;
+        setIsImporting(true);
+        setImportResult(null);
+        setImportJobId(null);
+        setImportStatus("uploading");
+
         try {
-            setIsImporting(true);
-            setImportResult(null);
-            const result = await assetService.importFromExcel(importFile);
-            setImportResult(result);
-            if (result.imported > 0) fetchData();
-            toast.success(`Imported ${result.imported} of ${result.totalRows} rows`);
-        } catch {
-            toast.error("Import failed");
+            const response = await importJobService.importAssets(importFile);
+            
+            if (response.jobId) {
+                setImportJobId(response.jobId);
+                setImportStatus(response.status || "PENDING");
+                toast.success("File uploaded. Processing in background...");
+            } else if (response.result) {
+                // Fallback for immediate processing
+                const result = response.result;
+                setImportResult({
+                    totalRows: result.totalRows || 0,
+                    imported: result.imported || 0,
+                    skipped: result.skipped || 0,
+                    errors: (result.errors || []).map(e => ({ row: e.row || 0, message: e.message || "" }))
+                });
+                toast.success("Assets imported successfully");
+                fetchData();
+            }
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || "Failed to start import");
+            setImportStatus("FAILED");
         } finally {
             setIsImporting(false);
         }
@@ -409,10 +484,13 @@ export default function AssetsPage() {
                                     </div>
                                 </div>
                                 <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button variant="outline" size="sm" onClick={() => { setSelectedAssetForDetails(asset); setIsDetailModalOpen(true); }} className="h-8">
+                                        <FileText className="h-3.5 w-3.5 mr-1" /> View
+                                    </Button>
                                     <Button variant="outline" size="sm" onClick={() => handleOpenAssignModal(asset)} className="h-8">
                                         <UserPlus className="h-3.5 w-3.5 mr-1" /> Assign
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenEdit(asset)} className="h-8">
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenEdit(asset)} className="h-8 text-indigo-600 border-indigo-100 hover:bg-indigo-50">
                                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                     </Button>
                                     <Button variant="ghost" size="sm" onClick={() => handleDelete(asset.id!)} isLoading={deletingId === asset.id} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
@@ -695,8 +773,17 @@ export default function AssetsPage() {
                         />
                     </div>
 
+                    {/* Polling State */}
+                    {importJobId && (
+                        <div className="flex flex-col items-center justify-center p-8 bg-indigo-50/50 rounded-xl border border-indigo-100 animate-pulse">
+                            <Loader2 className="h-10 w-10 text-indigo-500 animate-spin mb-3" />
+                            <p className="text-sm font-bold text-indigo-900 tracking-tight">Status: {importStatus?.replace(/_/g, ' ')}</p>
+                            <p className="text-xs text-indigo-600 mt-1">Processing your file on the server. This may take a moment...</p>
+                        </div>
+                    )}
+
                     {/* Results */}
-                    {importResult && (
+                    {importResult && !importJobId && (
                         <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3 text-sm">
                             <div className="grid grid-cols-3 gap-3 text-center">
                                 <div className="rounded-lg bg-slate-50 border border-slate-100 py-2">
@@ -735,6 +822,16 @@ export default function AssetsPage() {
                     </div>
                 </div>
             </Modal>
+
+            <AssetDetailModal 
+                isOpen={isDetailModalOpen}
+                onClose={() => setIsDetailModalOpen(false)}
+                asset={selectedAssetForDetails}
+                departments={departments}
+                locations={locations}
+                categories={categories}
+                users={users}
+            />
         </div>
     );
 }

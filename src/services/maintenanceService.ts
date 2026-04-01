@@ -47,4 +47,10 @@ export const maintenanceService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/maintenance/${id}`);
     },
+
+    /** PUT /maintenance/{id} */
+    replace: async (id: string, data: MaintenanceDto): Promise<MaintenanceRecord> => {
+        const response = await api.put<MaintenanceRecord>(`/maintenance/${id}`, data);
+        return response.data;
+    },
 };

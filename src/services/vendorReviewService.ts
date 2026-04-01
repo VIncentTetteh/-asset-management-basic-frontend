@@ -48,4 +48,10 @@ export const vendorReviewService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/vendor-reviews/${id}`, { params: withOrgParams() });
     },
+
+    /** GET /vendor-reviews/{id} */
+    get: async (id: string): Promise<VendorReview> => {
+        const response = await api.get<VendorReview>(`/vendor-reviews/${id}`, { params: withOrgParams() });
+        return response.data;
+    },
 };

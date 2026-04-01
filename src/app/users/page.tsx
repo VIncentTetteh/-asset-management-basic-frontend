@@ -12,10 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, UserX, UsersIcon, Shield, Layers, Briefcase, Mail, Lock } from "lucide-react";
+import { Plus, Pencil, UserX, UsersIcon, Shield, Layers, Briefcase, Mail, Lock, ShieldOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
 import { buildPatchPayload } from "@/lib/patch";
+import { mfaService } from "@/services/mfaService";
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -24,6 +25,7 @@ export default function UsersPage() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+    const [resettingMfaId, setResettingMfaId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
 
@@ -96,6 +98,21 @@ export default function UsersPage() {
             console.error(error);
         } finally {
             setDeactivatingId(null);
+        }
+    };
+
+    const handleResetMfa = async (user: User) => {
+        if (!confirm(`Reset MFA for ${user.firstName} ${user.lastName}? They will be able to re-enrol next time they log in.`)) return;
+        setResettingMfaId(user.id!);
+        try {
+            const result = await mfaService.adminReset(user.id!);
+            toast.success(result.message || "MFA reset successfully");
+            fetchData();
+        } catch (error) {
+            toast.error("Failed to reset MFA");
+            console.error(error);
+        } finally {
+            setResettingMfaId(null);
         }
     };
 
@@ -226,6 +243,18 @@ export default function UsersPage() {
                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(user)} className="h-8">
                                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                     </Button>
+                                    {user.mfaEnabled && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleResetMfa(user)}
+                                            isLoading={resettingMfaId === user.id}
+                                            className="h-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                            title="Reset MFA (admin recovery)"
+                                        >
+                                            <ShieldOff className="h-3.5 w-3.5" />
+                                        </Button>
+                                    )}
                                     <Button
                                         variant="ghost"
                                         size="sm"

@@ -79,43 +79,36 @@ export default function ProfilePage() {
     };
 
     useEffect(() => {
-        // Fetch current user from local storage
         const loadUserAndOrg = async () => {
             try {
-                const storedUserStr = localStorage.getItem("user");
-                if (storedUserStr) {
-                    const storedUser = JSON.parse(storedUserStr) as User;
-                    setUser(storedUser);
-                    if ((storedUser as User & { mfaEnabled?: boolean }).mfaEnabled) {
-                        setMfaEnabled(true);
-                    }
+                // Always fetch fresh profile from the API — localStorage never contains mfaEnabled
+                const freshUser = await userService.getMe();
+                setUser(freshUser);
+                setMfaEnabled(Boolean(freshUser.mfaEnabled));
 
-                    // Initialize form with user data
-                    reset({
-                        firstName: storedUser.firstName,
-                        lastName: storedUser.lastName,
-                        email: storedUser.email,
-                        phone: storedUser.phone || "",
-                        jobTitle: storedUser.jobTitle || "",
-                    });
+                // Initialize form with live data
+                reset({
+                    firstName: freshUser.firstName,
+                    lastName: freshUser.lastName,
+                    email: freshUser.email,
+                    phone: freshUser.phone || "",
+                    jobTitle: freshUser.jobTitle || "",
+                });
 
-                    // Fetch Organisation name
-                    if (storedUser.organisationId) {
-                        try {
-                            const org = await organisationService.get(storedUser.organisationId);
-                            setOrganisationName(org.name);
-                        } catch (e) {
-                            console.error("Failed to fetch organisation name:", e);
-                            setOrganisationName("Unknown Organisation");
-                        }
-                    } else {
-                        setOrganisationName("No Organisation Assigned");
+                // Fetch Organisation name
+                if (freshUser.organisationId) {
+                    try {
+                        const org = await organisationService.get(freshUser.organisationId);
+                        setOrganisationName(org.name);
+                    } catch (e) {
+                        console.error("Failed to fetch organisation name:", e);
+                        setOrganisationName("Unknown Organisation");
                     }
                 } else {
-                    toast.error("User session not found. Please log in again.");
+                    setOrganisationName("No Organisation Assigned");
                 }
             } catch (error) {
-                console.error("Error parsing user data:", error);
+                console.error("Error loading profile:", error);
                 toast.error("Failed to load user profile");
             } finally {
                 setIsLoading(false);
@@ -126,36 +119,32 @@ export default function ProfilePage() {
     }, [reset]);
 
     const onSubmit = async (data: UserDto) => {
-        if (!user || (!user.id && !('id' in user))) {
-            toast.error("Cannot update profile: User ID missing");
-            return;
-        }
-
         try {
-            // Clean up empty optional fields
-            if (!data.phone) delete data.phone;
-            if (!data.jobTitle) delete data.jobTitle;
-
-            // Preserve existing relationships that shouldn't be changed via this restricted form
-            const updatePayload: UserDto = {
-                ...data,
-                organisationId: user.organisationId,
-                departmentId: user.departmentId,
-                roleId: user.roleId,
-                status: user.status
+            // Build a patch payload containing only the fields this form can change
+            const patchPayload = {
+                firstName: data.firstName,
+                lastName: data.lastName,
+                phone: data.phone || undefined,
+                jobTitle: data.jobTitle || undefined,
             };
 
-            const patch = buildPatchPayload<UserDto>(user as unknown as Partial<UserDto>, updatePayload);
+            // Only send if something actually changed
+            const patch = buildPatchPayload<typeof patchPayload>(
+                { firstName: user?.firstName, lastName: user?.lastName, phone: user?.phone, jobTitle: user?.jobTitle },
+                patchPayload
+            );
             if (Object.keys(patch).length === 0) {
                 toast("No changes to update");
                 return;
             }
 
-            const updatedUser = await userService.update(user.id!, patch);
+            // Use the self-service endpoint — no ROLE_ADMIN needed
+            const updatedUser = await userService.patchMe(patchPayload);
 
-            // Update local storage so changes persist across refresh
-            localStorage.setItem("user", JSON.stringify(updatedUser));
-            setUser(updatedUser);
+            // Merge the updated fields into the locally cached user object
+            const merged = { ...user, ...updatedUser } as User;
+            localStorage.setItem("user", JSON.stringify(merged));
+            setUser(merged);
 
             toast.success("Profile updated successfully");
         } catch (error: any) {
@@ -364,7 +353,7 @@ export default function ProfilePage() {
                             {mfaSetupData && (
                                 <div className="flex flex-col items-center gap-4">
                                     <img
-                                        src={`data:image/png;base64,${mfaSetupData.qrCodeImage}`}
+                                        src={mfaSetupData.qrCodeImage}
                                         alt="MFA QR Code"
                                         className="w-48 h-48 border border-slate-200 rounded-lg"
                                     />

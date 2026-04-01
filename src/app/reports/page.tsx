@@ -9,8 +9,9 @@ import { toast } from "react-hot-toast";
 import {
     Loader2, Download, FileText, FileSpreadsheet, Wrench,
     BarChart3, Clock, CheckCircle2, AlertCircle, RefreshCw,
-    FileDown
+    FileDown, Trash2
 } from "lucide-react";
+import { formatRelativeTime } from "@/lib/time";
 
 type Format = "PDF" | "EXCEL" | "CSV";
 type ReportType = "assets" | "financial" | "maintenance";
@@ -89,6 +90,7 @@ export default function ReportsPage() {
     const [historyLoading, setHistoryLoading] = useState(true);
     const [generating, setGenerating] = useState<ReportType | "">("");
     const [downloadingId, setDownloadingId] = useState("");
+    const [deletingId, setDeletingId] = useState("");
     const [formats, setFormats] = useState<Record<ReportType, Format>>({
         assets: "PDF", financial: "PDF", maintenance: "PDF",
     });
@@ -124,8 +126,14 @@ export default function ReportsPage() {
         try {
             setDownloadingId(id);
             let result: { blob: Blob; fileName?: string };
-            // Prefer downloadUrl since it encodes the correct report-type path
-            if (report.downloadUrl) {
+            const reportType = String(report.type || report.reportType || "").toLowerCase();
+            if (report.reportId && reportType === "assets") {
+                result = await reportService.downloadAssetReport(report.reportId, report.format);
+            } else if (report.reportId && reportType === "financial") {
+                result = await reportService.downloadFinancialReport(report.reportId, report.format);
+            } else if (report.reportId && reportType === "maintenance") {
+                result = await reportService.downloadMaintenanceReport(report.reportId, report.format);
+            } else if (report.downloadUrl) {
                 result = await reportService.downloadFromUrl(report.downloadUrl, report.format);
             } else if (report.reportId) {
                 result = await reportService.downloadReport(report.reportId, report.format);
@@ -141,6 +149,20 @@ export default function ReportsPage() {
             toast.error(e instanceof Error ? e.message : "Download failed");
         } finally {
             setDownloadingId("");
+        }
+    };
+
+    const handleDeleteReport = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this report?")) return;
+        try {
+            setDeletingId(id);
+            await reportService.deleteReport(id);
+            toast.success("Report deleted");
+            fetchHistory(true);
+        } catch {
+            toast.error("Failed to delete report");
+        } finally {
+            setDeletingId("");
         }
     };
 
@@ -279,7 +301,10 @@ export default function ReportsPage() {
                                                     <div className="text-xs font-mono text-slate-400 truncate max-w-[200px]">{r.reportId || r.downloadUrl || "—"}</div>
                                                 </td>
                                                 <td className="px-5 py-3"><FormatBadge format={r.format} /></td>
-                                                <td className="px-5 py-3 text-slate-600 text-xs whitespace-nowrap">{new Date(r.generatedAt).toLocaleString()}</td>
+                                                <td className="px-5 py-3 text-slate-600 text-xs whitespace-nowrap">
+                                                    <div>{new Date(r.generatedAt).toLocaleString()}</div>
+                                                    <div className="text-slate-400">{formatRelativeTime(r.generatedAt)}</div>
+                                                </td>
                                                 <td className="px-5 py-3 text-slate-600">{r.rowCount ?? "—"}</td>
                                                 <td className="px-5 py-3"><StatusBadge status={r.status || "COMPLETED"} /></td>
                                                 <td className="px-5 py-3 text-right">
@@ -294,6 +319,16 @@ export default function ReportsPage() {
                                                             ? <><Loader2 className="h-3 w-3 animate-spin" /> Downloading</>
                                                             : <><Download className="h-3 w-3" /> Download</>
                                                         }
+                                                    </Button>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        disabled={!r.reportId}
+                                                        onClick={() => handleDeleteReport(r.reportId!)}
+                                                        isLoading={deletingId === r.reportId}
+                                                        className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 ml-1"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
                                                 </td>
                                             </tr>

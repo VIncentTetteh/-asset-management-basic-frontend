@@ -37,4 +37,10 @@ export const departmentService = {
     delete: async (id: string): Promise<void> => {
         await api.delete(`/departments/${id}`);
     },
+
+    /** PUT /departments/{id} */
+    replace: async (id: string, data: DepartmentDto): Promise<Department> => {
+        const response = await api.put<Department>(`/departments/${id}`, data);
+        return response.data;
+    },
 };
