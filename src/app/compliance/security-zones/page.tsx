@@ -14,6 +14,8 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Network, Search } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const PURDUE_LEVELS = [
     { value: 0, label: "0 — Field Devices (Sensors/Actuators)" },
@@ -58,6 +60,7 @@ export default function SecurityZonesPage() {
 
     useEffect(() => { fetchData(); }, []);
 
+    const { confirm, ConfirmDialog } = useConfirm();
     const filtered = useMemo(() => {
         if (!search.trim()) return items;
         const q = search.toLowerCase();
@@ -88,7 +91,7 @@ export default function SecurityZonesPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this security zone?")) return;
+        if (!await confirm({ message: "Delete this security zone?", variant: "danger" })) return;
         try {
             await securityZoneService.delete(id);
             toast.success("Deleted");
@@ -217,6 +220,7 @@ export default function SecurityZonesPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

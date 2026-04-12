@@ -15,6 +15,8 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, ShieldCheck, Search, ExternalLink, User as UserIcon, Calendar } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const FRAMEWORKS: ComplianceFramework[] = ["ISO_27001", "SOC2", "PCI_DSS", "ICS", "BOG"];
 const STATUSES: ControlStatus[] = ["NOT_IMPLEMENTED", "PARTIAL", "IMPLEMENTED", "NOT_APPLICABLE"];
@@ -80,6 +82,7 @@ export default function ComplianceControlsPage() {
         );
     }, [items, search]);
 
+    const { confirm, ConfirmDialog } = useConfirm();
     const stats = useMemo(() => ({
         implemented: items.filter(i => i.status === "IMPLEMENTED").length,
         partial: items.filter(i => i.status === "PARTIAL").length,
@@ -111,7 +114,7 @@ export default function ComplianceControlsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this control?")) return;
+        if (!await confirm({ message: "Delete this control?", variant: "danger" })) return;
         try {
             await complianceControlService.delete(id);
             toast.success("Control deleted");
@@ -330,6 +333,7 @@ export default function ComplianceControlsPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

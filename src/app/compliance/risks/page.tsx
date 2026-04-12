@@ -15,6 +15,8 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, AlertTriangle, Search, User as UserIcon, Calendar } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const STATUSES: RiskStatus[] = ["OPEN", "IN_TREATMENT", "CLOSED", "ACCEPTED"];
 const TREATMENTS: RiskTreatment[] = ["ACCEPT", "MITIGATE", "TRANSFER", "AVOID"];
@@ -74,6 +76,7 @@ export default function RisksPage() {
         );
     }, [items, search]);
 
+    const { confirm, ConfirmDialog } = useConfirm();
     const stats = useMemo(() => ({
         open: items.filter(i => i.status === "OPEN").length,
         inTreatment: items.filter(i => i.status === "IN_TREATMENT").length,
@@ -107,7 +110,7 @@ export default function RisksPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this risk?")) return;
+        if (!await confirm({ message: "Delete this risk?", variant: "danger" })) return;
         try {
             await riskService.delete(id);
             toast.success("Risk deleted");
@@ -339,6 +342,7 @@ export default function RisksPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

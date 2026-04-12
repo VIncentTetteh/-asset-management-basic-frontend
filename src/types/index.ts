@@ -96,6 +96,9 @@ export interface Location extends BaseEntity {
     room?: string;
     city?: string;
     country?: string;
+    address?: string;
+    latitude?: number | null;
+    longitude?: number | null;
     geoCoordinates?: string;
     parentLocationId?: string | null;
     organisationId?: string;
@@ -109,6 +112,9 @@ export interface LocationDto {
     room?: string;
     city?: string;
     country?: string;
+    address?: string;
+    latitude?: number | null;
+    longitude?: number | null;
     geoCoordinates?: string;
     parentLocationId?: string | null;    // optional — nested locations
 }

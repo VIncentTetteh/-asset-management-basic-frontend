@@ -3,15 +3,54 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
-import { Bell, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { Modal } from "@/components/ui/modal";
 import { billingService } from "@/services/billingService";
 import { Subscription } from "@/types";
 import { CurrencyProvider, useCurrency } from "@/contexts/CurrencyContext";
+import { PermissionProvider, usePermissions } from "@/contexts/PermissionContext";
+import { LicenseProvider } from "@/contexts/LicenseContext";
+import { ConfirmDialogHost } from "@/hooks/useConfirm";
+import { AiAssistant } from "@/components/AiAssistant";
 
-// Inner layout — can safely use useCurrency since it's inside <CurrencyProvider>
+// Routes that require a specific permission — mirrors Sidebar route map.
+// Any path that starts with a pattern AND the user lacks the permission triggers
+// a redirect to /dashboard.
+const ROUTE_PERMISSIONS: { pattern: string; permission: string }[] = [
+    { pattern: "/analytics",          permission: "VIEW_REPORTS" },
+    { pattern: "/reports",            permission: "VIEW_REPORTS" },
+    { pattern: "/organisations",      permission: "MANAGE_ORGANIZATION_SETTINGS" },
+    { pattern: "/departments",        permission: "MANAGE_ORGANIZATION_SETTINGS" },
+    { pattern: "/locations",          permission: "VIEW_LOCATIONS" },
+    { pattern: "/users",              permission: "VIEW_USERS" },
+    { pattern: "/roles",              permission: "VIEW_ROLES" },
+    { pattern: "/assets",             permission: "VIEW_ASSETS" },
+    { pattern: "/categories",         permission: "VIEW_CATEGORIES" },
+    { pattern: "/maintenance",        permission: "VIEW_MAINTENANCE" },
+    { pattern: "/transfers",          permission: "VIEW_TRANSFERS" },
+    { pattern: "/disposals",          permission: "VIEW_DISPOSALS" },
+    { pattern: "/audits",             permission: "VIEW_AUDITS" },
+    { pattern: "/suppliers",          permission: "VIEW_SUPPLIERS" },
+    { pattern: "/purchase-orders",    permission: "VIEW_PROCUREMENT" },
+    { pattern: "/contracts",          permission: "VIEW_CONTRACTS" },
+    { pattern: "/budgets",            permission: "VIEW_BUDGETS" },
+    { pattern: "/vendor-reviews",     permission: "VIEW_VENDOR_REVIEWS" },
+    { pattern: "/licenses",           permission: "VIEW_SOFTWARE_LICENSES" },
+    { pattern: "/compliance",         permission: "VIEW_COMPLIANCE" },
+    { pattern: "/discovery",          permission: "VIEW_NETWORK_DISCOVERY" },
+    { pattern: "/cloud-assets",       permission: "VIEW_CLOUD_ASSETS" },
+    { pattern: "/ai-insights",        permission: "VIEW_ASSETS" },
+    { pattern: "/sso-configuration",  permission: "MANAGE_ORGANIZATION_SETTINGS" },
+    { pattern: "/webhooks",           permission: "MANAGE_ORGANIZATION_SETTINGS" },
+    { pattern: "/billing",            permission: "MANAGE_ORGANIZATION_SETTINGS" },
+    { pattern: "/audit-events",       permission: "REVIEW_ACCESS" },
+    { pattern: "/health",             permission: "MANAGE_ORGANIZATION_SETTINGS" },
+    { pattern: "/depreciation-policies", permission: "VIEW_DEPRECIATION" },
+];
+
+// Inner layout — can safely use useCurrency + usePermissions since it's inside both providers
 function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
@@ -24,6 +63,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const [planLimitMessage, setPlanLimitMessage] = useState("");
 
     const { currency, setCurrency } = useCurrency();
+    const { loading: permLoading, hasPermission } = usePermissions();
 
     const publicPaths = ["/", "/login", "/register", "/register-tenant", "/forgot-password", "/reset-password"];
     const isPublicPage = publicPaths.includes(pathname);
@@ -90,9 +130,33 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         return () => window.removeEventListener("plan-limit-error", onPlanLimit as EventListener);
     }, []);
 
+    // After permissions load, redirect away from any page this user isn't allowed to see.
+    // This covers direct URL entry, page refresh, and Ctrl+K quick navigation.
+    useEffect(() => {
+        if (permLoading || isPublicPage || !isAuthorized) return;
+        const match = ROUTE_PERMISSIONS.find(r => pathname.startsWith(r.pattern));
+        if (match && !hasPermission(match.permission)) {
+            router.replace("/dashboard");
+        }
+    }, [permLoading, pathname, isPublicPage, isAuthorized, hasPermission, router]);
+
     if (!isMounted) return null;
     if (!isAuthorized && !isPublicPage) return null;
     if (isPublicPage) return <>{children}</>;
+
+    // Block the entire authenticated shell while permissions are being fetched.
+    // This closes the race-condition window where users could click restricted
+    // sidebar items or search results before permission data arrives.
+    if (permLoading) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center gap-3 text-slate-500">
+                    <div className="h-7 w-7 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+                    <span className="text-xs font-medium tracking-wide">Loading workspace…</span>
+                </div>
+            </div>
+        );
+    }
 
     const assetUsagePercent = subscription?.plan?.maxAssets
         ? Math.round((subscription.currentAssetCount / subscription.plan.maxAssets) * 100)
@@ -118,14 +182,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                         </div>
                     </div>
                     <div className="flex items-center gap-2 md:gap-3">
-                        <div className="hidden lg:flex relative w-72">
-                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                            <Input
-                                className="pl-9"
-                                placeholder="Search assets, users, suppliers..."
-                                aria-label="Global search"
-                            />
-                        </div>
+                        <GlobalSearch />
 
                         {/* Currency switcher */}
                         <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
@@ -190,11 +247,20 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     );
 }
 
-// Outer wrapper — provides currency context to the entire app shell
+// Outer wrapper — provides currency context and permissions to the entire app shell
 export function AppLayoutClient({ children }: { children: React.ReactNode }) {
     return (
-        <CurrencyProvider>
-            <AppLayoutInner>{children}</AppLayoutInner>
-        </CurrencyProvider>
+        // LicenseProvider wraps everything but is a no-op in cloud mode —
+        // it makes zero API calls and adds zero overhead when
+        // NEXT_PUBLIC_APP_MODE=cloud (the default).
+        <LicenseProvider>
+            <CurrencyProvider>
+                <PermissionProvider>
+                    <AppLayoutInner>{children}</AppLayoutInner>
+                    <ConfirmDialogHost />
+                    <AiAssistant />
+                </PermissionProvider>
+            </CurrencyProvider>
+        </LicenseProvider>
     );
 }

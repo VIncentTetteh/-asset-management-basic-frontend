@@ -12,6 +12,8 @@ import {
     FileDown, Trash2
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/time";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 type Format = "PDF" | "EXCEL" | "CSV";
 type ReportType = "assets" | "financial" | "maintenance";
@@ -94,6 +96,7 @@ export default function ReportsPage() {
     const [formats, setFormats] = useState<Record<ReportType, Format>>({
         assets: "PDF", financial: "PDF", maintenance: "PDF",
     });
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const fetchHistory = async (quiet = false) => {
         try {
@@ -153,7 +156,7 @@ export default function ReportsPage() {
     };
 
     const handleDeleteReport = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this report?")) return;
+        if (!await confirm({ message: "Are you sure you want to delete this report?", variant: "danger" })) return;
         try {
             setDeletingId(id);
             await reportService.deleteReport(id);
@@ -340,6 +343,7 @@ export default function ReportsPage() {
                     )}
                 </CardContent>
             </Card>
+        {ConfirmDialog}
         </div>
     );
 }

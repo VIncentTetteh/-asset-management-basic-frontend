@@ -15,6 +15,8 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Cpu, Search, ShieldAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const VENDOR_STATUSES: VendorSupportStatus[] = ["SUPPORTED", "END_OF_LIFE", "END_OF_SUPPORT", "UNKNOWN"];
 
@@ -73,6 +75,7 @@ export default function ICSAssetsPage() {
 
     const eolCount = useMemo(() => items.filter(i => i.vendorSupportStatus === "END_OF_LIFE" || i.vendorSupportStatus === "END_OF_SUPPORT").length, [items]);
     const vulnCount = useMemo(() => items.filter(i => i.knownVulnerabilities).length, [items]);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const handleOpenCreate = () => {
         setEditing(null);
@@ -97,7 +100,7 @@ export default function ICSAssetsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this ICS asset record?")) return;
+        if (!await confirm({ message: "Delete this ICS asset record?", variant: "danger" })) return;
         try {
             await icsAssetService.delete(id);
             toast.success("Deleted");
@@ -296,6 +299,7 @@ export default function ICSAssetsPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

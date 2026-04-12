@@ -15,6 +15,8 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Building2, Search, ExternalLink, User as UserIcon, Calendar } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const STATUSES: ControlStatus[] = ["NOT_IMPLEMENTED", "PARTIAL", "IMPLEMENTED", "NOT_APPLICABLE"];
 
@@ -66,6 +68,7 @@ export default function BOGControlsPage() {
         );
     }, [items, search]);
 
+    const { confirm, ConfirmDialog } = useConfirm();
     const stats = useMemo(() => ({
         implemented: items.filter(i => i.status === "IMPLEMENTED").length,
         partial: items.filter(i => i.status === "PARTIAL").length,
@@ -94,7 +97,7 @@ export default function BOGControlsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this BOG control?")) return;
+        if (!await confirm({ message: "Delete this BOG control?", variant: "danger" })) return;
         try {
             await bogControlService.delete(id);
             toast.success("Deleted");
@@ -288,6 +291,7 @@ export default function BOGControlsPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

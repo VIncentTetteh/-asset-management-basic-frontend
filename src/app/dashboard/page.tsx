@@ -3,36 +3,38 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-    Activity,
     AlertTriangle,
     ArrowRight,
     BarChart3,
     Building2,
+    CheckCircle2,
     Clock,
-    Cpu,
+    DollarSign,
     FileText,
     Hash,
     Hexagon,
     Mail,
     MapPin,
-    PackageCheck,
     Receipt,
-    ScanLine,
+    RefreshCw,
     ShieldCheck,
     ShoppingCart,
     TrendingUp,
-    Webhook,
+    Users,
     Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { authService } from "@/services/authService";
+import { assetTransferService } from "@/services/assetTransferService";
+import { budgetService } from "@/services/budgetService";
 import { dashboardService } from "@/services/dashboardService";
 import { organisationService } from "@/services/organisationService";
 import { userService } from "@/services/userService";
-import { webhookService } from "@/services/webhookService";
-import { AssetsByDepartment, DepreciationSummary, Organisation } from "@/types";
+import { AssetsByDepartment, Budget, DepreciationSummary, Organisation } from "@/types";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface DashboardStats {
     totalAssets: number;
@@ -44,8 +46,15 @@ interface DashboardStats {
     openPurchaseOrders: number;
     expiredLicenses: number;
     totalUsers: number;
-    totalWebhooks: number;
-    activeWebhooks: number;
+    pendingTransfers: number;
+}
+
+interface BudgetStats {
+    totalBudgetAmount: number;
+    totalSpentAmount: number;
+    activeBudgets: number;
+    exceededBudgets: number;
+    utilizationPct: number;
 }
 
 interface AssetStatusBreakdownItem {
@@ -69,16 +78,18 @@ interface DashboardMaintenanceAlerts {
     }[];
 }
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
 const QUICK_LINKS = [
     { href: "/assets", label: "All Assets", icon: Hexagon, color: "text-indigo-600 bg-indigo-50" },
-    { href: "/compliance/controls", label: "Controls", icon: ShieldCheck, color: "text-teal-600 bg-teal-50" },
-    { href: "/compliance/risks", label: "Risk Register", icon: AlertTriangle, color: "text-amber-600 bg-amber-50" },
-    { href: "/compliance/incidents", label: "Incidents", icon: Activity, color: "text-red-600 bg-red-50" },
-    { href: "/compliance/patch-records", label: "Patch Records", icon: PackageCheck, color: "text-blue-600 bg-blue-50" },
-    { href: "/compliance/vulnerability-scans", label: "Vuln Scans", icon: ScanLine, color: "text-purple-600 bg-purple-50" },
-    { href: "/compliance/ics-assets", label: "ICS Assets", icon: Cpu, color: "text-orange-600 bg-orange-50" },
-    { href: "/analytics", label: "Analytics", icon: BarChart3, color: "text-emerald-600 bg-emerald-50" },
+    { href: "/maintenance", label: "Maintenance", icon: Wrench, color: "text-amber-600 bg-amber-50" },
+    { href: "/purchase-orders", label: "Purchase Orders", icon: ShoppingCart, color: "text-sky-600 bg-sky-50" },
+    { href: "/budgets", label: "Budgets", icon: DollarSign, color: "text-emerald-600 bg-emerald-50" },
+    { href: "/licenses", label: "Licenses", icon: ShieldCheck, color: "text-violet-600 bg-violet-50" },
+    { href: "/departments", label: "Departments", icon: Building2, color: "text-teal-600 bg-teal-50" },
+    { href: "/transfers", label: "Transfers", icon: RefreshCw, color: "text-rose-600 bg-rose-50" },
     { href: "/reports", label: "Reports", icon: FileText, color: "text-slate-600 bg-slate-50" },
+    { href: "/users", label: "Users", icon: Users, color: "text-blue-600 bg-blue-50" },
 ];
 
 const EMPTY_STATS: DashboardStats = {
@@ -91,8 +102,15 @@ const EMPTY_STATS: DashboardStats = {
     openPurchaseOrders: 0,
     expiredLicenses: 0,
     totalUsers: 0,
-    totalWebhooks: 0,
-    activeWebhooks: 0,
+    pendingTransfers: 0,
+};
+
+const EMPTY_BUDGET_STATS: BudgetStats = {
+    totalBudgetAmount: 0,
+    totalSpentAmount: 0,
+    activeBudgets: 0,
+    exceededBudgets: 0,
+    utilizationPct: 0,
 };
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
@@ -105,6 +123,8 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
     RESERVED: { label: "Reserved", color: "bg-violet-500" },
     PENDING_PROCUREMENT: { label: "Pending Procurement", color: "bg-cyan-500" },
 };
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
     typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
@@ -125,23 +145,23 @@ const formatLabel = (value: string) =>
         .map(part => part.charAt(0).toUpperCase() + part.slice(1))
         .join(" ");
 
+// ── Normalization ─────────────────────────────────────────────────────────────
+
 const normalizeDashboardSummary = (payload: unknown): DashboardStats => {
     const raw = asRecord(payload) ?? {};
-
     return {
         ...EMPTY_STATS,
         totalAssets: toNumber(raw.totalAssets),
         activeAssets: toNumber(raw.activeAssets ?? raw.assetsInUse),
         totalAssetValue: toNumber(raw.totalAssetValue),
-        pendingApprovals: toNumber(raw.pendingApprovals ?? raw.pendingPurchaseOrders ?? raw.pendingPOs),
+        // pendingApprovals is distinct from openPurchaseOrders
+        pendingApprovals: toNumber(raw.pendingApprovals),
+        openPurchaseOrders: toNumber(raw.openPurchaseOrders ?? raw.pendingPurchaseOrders ?? raw.pendingPOs),
         overdueMaintenanceCount: toNumber(raw.overdueMaintenanceCount ?? raw.maintenanceAlerts),
         upcomingMaintenanceCount: toNumber(raw.upcomingMaintenanceCount ?? raw.scheduledMaintenance ?? raw.assetsNeedingMaintenance),
-        openPurchaseOrders: toNumber(raw.openPurchaseOrders ?? raw.pendingPurchaseOrders ?? raw.pendingPOs),
-        expiredLicenses: toNumber(raw.expiredLicenses ?? raw.deprecatedAssets),
-        // Use summary totals as baseline; separate API calls will override these if successful
+        expiredLicenses: toNumber(raw.expiredLicenses),
         totalUsers: toNumber(raw.totalUsers),
-        totalWebhooks: toNumber(raw.totalWebhooks),
-        activeWebhooks: toNumber(raw.activeWebhooks),
+        pendingTransfers: 0, // populated separately
     };
 };
 
@@ -158,7 +178,6 @@ const normalizeAssetsByStatus = (payload: unknown): AssetStatusBreakdownItem[] =
             const entry = asRecord(item) ?? {};
             const key = String(entry.status ?? entry.name ?? "UNKNOWN").toUpperCase();
             const meta = STATUS_META[key];
-
             return {
                 key,
                 label: meta?.label ?? formatLabel(key),
@@ -171,7 +190,6 @@ const normalizeAssetsByStatus = (payload: unknown): AssetStatusBreakdownItem[] =
         .filter(item => item.count > 0 || item.value > 0);
 
     const total = normalized.reduce((sum, item) => sum + item.count, 0);
-
     return normalized.map(item => ({
         ...item,
         percentage: item.percentage > 0 ? item.percentage : total ? (item.count / total) * 100 : 0,
@@ -189,11 +207,9 @@ const normalizeAssetsByDepartment = (payload: unknown): AssetsByDepartment | nul
     const grouped = items
         .map(item => {
             const entry = asRecord(item) ?? {};
-            const departmentName = String(entry.departmentName ?? "").trim() || "Unassigned";
-
             return {
                 departmentId: String(entry.departmentId ?? ""),
-                departmentName,
+                departmentName: String(entry.departmentName ?? "").trim() || "Unassigned",
                 count: toNumber(entry.count),
                 value: toNumber(entry.value),
                 percentage: toNumber(entry.percentage),
@@ -203,33 +219,29 @@ const normalizeAssetsByDepartment = (payload: unknown): AssetsByDepartment | nul
         .reduce<Map<string, AssetsByDepartment["data"][number]>>((acc, item) => {
             const key = item.departmentId || item.departmentName.toLowerCase();
             const existing = acc.get(key);
-
             if (existing) {
                 existing.count += item.count;
                 existing.value += item.value;
                 existing.percentage = (existing.percentage ?? 0) + (item.percentage ?? 0);
                 return acc;
             }
-
             acc.set(key, { ...item });
             return acc;
         }, new Map());
 
-    const data = Array.from(grouped.values()).sort((left, right) => right.count - left.count);
-
+    const data = Array.from(grouped.values()).sort((l, r) => r.count - l.count);
     if (data.length === 0) return null;
 
     return {
         data,
-        total: toNumber(raw?.total) || data.reduce((sum, item) => sum + item.count, 0),
-        totalValue: toNumber(raw?.totalValue) || data.reduce((sum, item) => sum + item.value, 0),
+        total: toNumber(raw?.total) || data.reduce((s, i) => s + i.count, 0),
+        totalValue: toNumber(raw?.totalValue) || data.reduce((s, i) => s + i.value, 0),
     };
 };
 
 const normalizeDepreciationSummary = (payload: unknown): DepreciationSummary | null => {
     const raw = asRecord(payload);
     if (!raw) return null;
-
     return {
         totalDepreciation: toNumber(raw.totalDepreciation ?? raw.accumulatedDepreciation),
         netBookValue: toNumber(raw.netBookValue),
@@ -242,7 +254,6 @@ const normalizeDepreciationSummary = (payload: unknown): DepreciationSummary | n
 const normalizeMaintenanceAlerts = (payload: unknown): DashboardMaintenanceAlerts | null => {
     const raw = asRecord(payload);
     if (!raw) return null;
-
     const alerts = Array.isArray(raw.alerts)
         ? raw.alerts.map(item => {
             const entry = asRecord(item) ?? {};
@@ -254,7 +265,6 @@ const normalizeMaintenanceAlerts = (payload: unknown): DashboardMaintenanceAlert
             };
         })
         : [];
-
     return {
         critical: toNumber(raw.critical ?? raw.criticalCount),
         warning: toNumber(raw.warning ?? raw.warningCount),
@@ -262,6 +272,22 @@ const normalizeMaintenanceAlerts = (payload: unknown): DashboardMaintenanceAlert
         alerts,
     };
 };
+
+const computeBudgetStats = (budgets: Budget[]): BudgetStats => {
+    if (!budgets.length) return EMPTY_BUDGET_STATS;
+    const activeBudgets = budgets.filter(b => b.status === "ACTIVE");
+    const totalAmount = activeBudgets.reduce((s, b) => s + (b.totalAmount ?? 0), 0);
+    const totalSpent = activeBudgets.reduce((s, b) => s + (b.spentAmount ?? 0), 0);
+    return {
+        totalBudgetAmount: totalAmount,
+        totalSpentAmount: totalSpent,
+        activeBudgets: activeBudgets.length,
+        exceededBudgets: budgets.filter(b => b.status === "EXCEEDED").length,
+        utilizationPct: totalAmount > 0 ? Math.round((totalSpent / totalAmount) * 100) : 0,
+    };
+};
+
+// ── Formatters ────────────────────────────────────────────────────────────────
 
 const formatDate = (value?: string) => {
     if (!value) return null;
@@ -280,9 +306,13 @@ const formatCompactCurrency = (amount: number, currencyCode: string) =>
         maximumFractionDigits: 1,
     }).format(amount);
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
     const { currency, format } = useCurrency();
+
     const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
+    const [budgetStats, setBudgetStats] = useState<BudgetStats>(EMPTY_BUDGET_STATS);
     const [myOrg, setMyOrg] = useState<Organisation | null>(null);
     const [assetStatusBreakdown, setAssetStatusBreakdown] = useState<AssetStatusBreakdownItem[]>([]);
     const [assetsByDepartment, setAssetsByDepartment] = useState<AssetsByDepartment | null>(null);
@@ -300,11 +330,12 @@ export default function DashboardPage() {
 
                 const [summary, profileOrg] = await Promise.all([
                     dashboardService.getSummary(),
-                    typeof orgId === "string" && orgId ? organisationService.get(orgId) : Promise.resolve(null),
+                    typeof orgId === "string" && orgId
+                        ? organisationService.get(orgId)
+                        : Promise.resolve(null),
                 ]);
 
                 if (!isActive) return;
-
                 if (profileOrg) setMyOrg(profileOrg);
 
                 const baseStats = normalizeDashboardSummary(summary);
@@ -315,14 +346,16 @@ export default function DashboardPage() {
                     depreciationResult,
                     alertsResult,
                     usersResult,
-                    webhooksResult,
+                    budgetsResult,
+                    transfersResult,
                 ] = await Promise.allSettled([
                     dashboardService.getAssetsByStatus(),
                     dashboardService.getAssetsByDepartment(),
                     dashboardService.getDepreciationSummary(),
                     dashboardService.getMaintenanceAlerts(),
                     userService.getAll(),
-                    webhookService.list(),
+                    budgetService.getAll(),
+                    assetTransferService.getAll(),
                 ]);
 
                 if (!isActive) return;
@@ -332,44 +365,41 @@ export default function DashboardPage() {
                 if (statusResult.status === "fulfilled") {
                     setAssetStatusBreakdown(normalizeAssetsByStatus(statusResult.value));
                 }
-
                 if (deptResult.status === "fulfilled") {
                     setAssetsByDepartment(normalizeAssetsByDepartment(deptResult.value));
                 }
-
                 if (depreciationResult.status === "fulfilled") {
                     setDepreciationSummary(normalizeDepreciationSummary(depreciationResult.value));
                 }
-
                 if (alertsResult.status === "fulfilled") {
                     setMaintenanceAlerts(normalizeMaintenanceAlerts(alertsResult.value));
                 }
-
                 if (usersResult.status === "fulfilled") {
                     nextStats.totalUsers = usersResult.value.length;
                 }
-
-                if (webhooksResult.status === "fulfilled") {
-                    nextStats.totalWebhooks = toNumber(webhooksResult.value.totalWebhooks);
-                    nextStats.activeWebhooks = toNumber(webhooksResult.value.activeWebhooks);
+                if (budgetsResult.status === "fulfilled") {
+                    setBudgetStats(computeBudgetStats(budgetsResult.value));
+                }
+                if (transfersResult.status === "fulfilled") {
+                    const pending = transfersResult.value.filter(
+                        t => String(t.status ?? "").toUpperCase() === "PENDING"
+                    ).length;
+                    nextStats.pendingTransfers = pending;
                 }
 
                 setStats(nextStats);
             } catch (err) {
                 console.error("Dashboard load failed:", err);
             } finally {
-                if (isActive) {
-                    setIsLoading(false);
-                }
+                if (isActive) setIsLoading(false);
             }
         };
 
         load();
-
-        return () => {
-            isActive = false;
-        };
+        return () => { isActive = false; };
     }, []);
+
+    // ── Derived values ────────────────────────────────────────────────────────
 
     if (isLoading) {
         return (
@@ -380,24 +410,32 @@ export default function DashboardPage() {
                     <div className="h-80 rounded-2xl bg-slate-100 animate-pulse" />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    {Array.from({ length: 4 }).map((_, index) => (
-                        <div key={index} className="h-32 rounded-xl bg-slate-100 animate-pulse" />
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="h-32 rounded-xl bg-slate-100 animate-pulse" />
                     ))}
                 </div>
             </div>
         );
     }
 
-    const totalBreakdown = assetStatusBreakdown.reduce((sum, item) => sum + item.count, 0);
+    const totalBreakdown = assetStatusBreakdown.reduce((s, i) => s + i.count, 0);
     const assetUtilization = stats.totalAssets ? Math.round((stats.activeAssets / stats.totalAssets) * 100) : 0;
     const maintenanceLoad = stats.overdueMaintenanceCount + stats.upcomingMaintenanceCount;
     const inactiveAssets = Math.max(stats.totalAssets - stats.activeAssets, 0);
     const topDepartments = assetsByDepartment?.data?.slice(0, 4) ?? [];
-    const activeAlertPreview = maintenanceAlerts?.alerts?.slice(0, 3) ?? [];
-    const heroPortfolioValue = formatCompactCurrency(stats.totalAssetValue, currency);
+    const alertPreview = maintenanceAlerts?.alerts?.slice(0, 3) ?? [];
+    const openActions = (stats.openPurchaseOrders ?? 0) + (stats.pendingTransfers ?? 0);
+
+    const budgetBarColor =
+        budgetStats.utilizationPct >= 100
+            ? "bg-rose-500"
+            : budgetStats.utilizationPct >= 80
+                ? "bg-amber-500"
+                : "bg-emerald-500";
 
     return (
         <div className="space-y-6">
+            {/* ── Page Header ──────────────────────────────────────────────── */}
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">
@@ -405,7 +443,7 @@ export default function DashboardPage() {
                         {myOrg && <span className="font-normal text-slate-400"> | {myOrg.name}</span>}
                     </h1>
                     <p className="text-slate-500">
-                        Company overview with portfolio value, maintenance pressure, approvals, and asset distribution.
+                        Live overview of your asset portfolio, maintenance status, and financial health.
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -422,10 +460,14 @@ export default function DashboardPage() {
                 </div>
             </div>
 
+            {/* ── Hero + Sidebar ───────────────────────────────────────────── */}
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
+
+                {/* Hero — dark gradient card */}
                 <Card className="overflow-hidden border-0 shadow-sm">
                     <CardContent className="bg-gradient-to-br from-slate-950 via-slate-900 to-teal-900 p-6 text-white">
                         <div className="flex flex-col gap-6">
+                            {/* Org name + meta + 3 mini-stats */}
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                 <div className="space-y-3">
                                     <div className="flex flex-wrap items-center gap-3">
@@ -434,7 +476,7 @@ export default function DashboardPage() {
                                         </div>
                                         <div>
                                             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-200">
-                                                Company Snapshot
+                                                Organisation Snapshot
                                             </p>
                                             <h2 className="text-2xl font-semibold text-white">
                                                 {myOrg?.name || "Your Organisation"}
@@ -452,81 +494,86 @@ export default function DashboardPage() {
                                                 <span>{myOrg.country}</span>
                                             </>
                                         )}
-                                        {myOrg?.timezone && (
-                                            <>
-                                                <span className="text-slate-500">•</span>
-                                                <span>{myOrg.timezone}</span>
-                                            </>
-                                        )}
                                     </div>
-                                    <p className="max-w-2xl text-sm leading-6 text-slate-300">
-                                        The dashboard now highlights the shape of your company at a glance: how much value
-                                        is under management, where maintenance is stacking up, and what needs attention
-                                        next.
-                                    </p>
                                 </div>
 
+                                {/* 3 mini-stat chips */}
                                 <div className="grid min-w-[220px] gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                                    <Link href="/users" className="rounded-2xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition-colors">
                                         <p className="text-xs uppercase tracking-wide text-slate-400">People</p>
-                                        <p className="mt-1 text-2xl font-bold text-white">{stats.totalUsers?.toLocaleString() ?? "0"}</p>
-                                    </div>
-                                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                                        <p className="text-xs uppercase tracking-wide text-slate-400">Webhooks</p>
-                                        <p className="mt-1 text-2xl font-bold text-white">{stats.activeWebhooks?.toLocaleString() ?? "0"}</p>
-                                        <p className="text-xs text-slate-400">{stats.totalWebhooks?.toLocaleString() ?? "0"} configured</p>
-                                    </div>
-                                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                                        <p className="text-xs uppercase tracking-wide text-slate-400">Alerts</p>
-                                        <p className="mt-1 text-2xl font-bold text-white">{maintenanceLoad?.toLocaleString() ?? "0"}</p>
-                                        <p className="text-xs text-slate-400">{stats.expiredLicenses?.toLocaleString() ?? "0"} expired licenses</p>
-                                    </div>
+                                        <p className="mt-1 text-2xl font-bold text-white">
+                                            {stats.totalUsers.toLocaleString()}
+                                        </p>
+                                        <p className="text-xs text-slate-400">registered users</p>
+                                    </Link>
+                                    <Link href="/budgets" className="rounded-2xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition-colors">
+                                        <p className="text-xs uppercase tracking-wide text-slate-400">Budgets</p>
+                                        <p className="mt-1 text-2xl font-bold text-white">
+                                            {budgetStats.activeBudgets}
+                                        </p>
+                                        <p className="text-xs text-slate-400">
+                                            {budgetStats.utilizationPct}% utilised
+                                        </p>
+                                    </Link>
+                                    <Link href="/purchase-orders" className="rounded-2xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition-colors">
+                                        <p className="text-xs uppercase tracking-wide text-slate-400">Open Actions</p>
+                                        <p className="mt-1 text-2xl font-bold text-white">
+                                            {openActions.toLocaleString()}
+                                        </p>
+                                        <p className="text-xs text-slate-400">
+                                            {stats.openPurchaseOrders} POs · {stats.pendingTransfers} transfers
+                                        </p>
+                                    </Link>
                                 </div>
                             </div>
 
+                            {/* 4 hero metric tiles */}
                             <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
-                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                <Link href="/assets" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Portfolio Value</p>
                                     <p className="mt-2 text-[2rem] font-black leading-none text-white lg:text-[2.25rem]">
-                                        {heroPortfolioValue}
+                                        {formatCompactCurrency(stats.totalAssetValue, currency)}
                                     </p>
                                     <p className="mt-2 text-xs text-slate-300">
-                                        Full value: {format(stats.totalAssetValue)} · {stats.totalAssets?.toLocaleString() ?? "0"} tracked assets
+                                        {stats.totalAssets.toLocaleString()} assets tracked
                                     </p>
-                                </div>
-                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Assets In Service</p>
-                                    <p className="mt-2 text-[2rem] font-black leading-none text-white lg:text-[2.25rem]">{assetUtilization}%</p>
-                                    <p className="mt-1 text-xs text-slate-300">
-                                        {stats.activeAssets?.toLocaleString() ?? "0"} active · {inactiveAssets?.toLocaleString() ?? "0"} not active
-                                    </p>
-                                </div>
-                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Approval Queue</p>
+                                </Link>
+                                <Link href="/assets" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">In Service</p>
                                     <p className="mt-2 text-[2rem] font-black leading-none text-white lg:text-[2.25rem]">
-                                        {stats.pendingApprovals?.toLocaleString() ?? "0"}
+                                        {assetUtilization}%
                                     </p>
-                                    <p className="mt-1 text-xs text-slate-300">
-                                        {stats.openPurchaseOrders?.toLocaleString() ?? "0"} open purchase orders
+                                    <p className="mt-2 text-xs text-slate-300">
+                                        {stats.activeAssets.toLocaleString()} active · {inactiveAssets.toLocaleString()} idle
                                     </p>
-                                </div>
-                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Maintenance Pressure</p>
+                                </Link>
+                                <Link href="/maintenance" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Maintenance Due</p>
+                                    <p className={`mt-2 text-[2rem] font-black leading-none lg:text-[2.25rem] ${stats.overdueMaintenanceCount > 0 ? "text-rose-400" : "text-white"}`}>
+                                        {maintenanceLoad.toLocaleString()}
+                                    </p>
+                                    <p className="mt-2 text-xs text-slate-300">
+                                        {stats.overdueMaintenanceCount} overdue · {stats.upcomingMaintenanceCount} upcoming
+                                    </p>
+                                </Link>
+                                <Link href="/purchase-orders" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">PO Approvals</p>
                                     <p className="mt-2 text-[2rem] font-black leading-none text-white lg:text-[2.25rem]">
-                                        {maintenanceLoad?.toLocaleString() ?? "0"}
+                                        {stats.openPurchaseOrders.toLocaleString()}
                                     </p>
-                                    <p className="mt-1 text-xs text-slate-300">
-                                        {stats.overdueMaintenanceCount?.toLocaleString() ?? "0"} overdue · {stats.upcomingMaintenanceCount?.toLocaleString() ?? "0"} upcoming
+                                    <p className="mt-2 text-xs text-slate-300">
+                                        {stats.pendingApprovals} pending approval
                                     </p>
-                                </div>
+                                </Link>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
+                {/* Sidebar — org details + top departments */}
                 <Card className="border-slate-200 shadow-sm">
                     <CardHeader className="border-b border-slate-100 bg-slate-50/60 pb-3">
-                        <CardTitle className="text-base font-semibold text-slate-800">Company Snapshot</CardTitle>
+                        <CardTitle className="text-base font-semibold text-slate-800">Organisation Details</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-5 p-5">
                         <div className="grid gap-4">
@@ -538,7 +585,6 @@ export default function DashboardPage() {
                                     <p className="mt-0.5 text-xs text-slate-500">{myOrg?.contactPhone || "Phone not set"}</p>
                                 </div>
                             </div>
-
                             <div className="flex items-start gap-3">
                                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                                 <div>
@@ -549,7 +595,6 @@ export default function DashboardPage() {
                                     </p>
                                 </div>
                             </div>
-
                             <div className="flex items-start gap-3">
                                 <Hash className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                                 <div>
@@ -563,37 +608,40 @@ export default function DashboardPage() {
                             </div>
                         </div>
 
+                        {/* Top departments */}
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-sm font-semibold text-slate-800">Top departments</p>
+                                <p className="text-sm font-semibold text-slate-800">Top Departments</p>
                                 <Link href="/departments">
                                     <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-slate-500">
-                                        View <ArrowRight className="h-3 w-3" />
+                                        View All <ArrowRight className="h-3 w-3" />
                                     </Button>
                                 </Link>
                             </div>
                             <div className="mt-3 space-y-3">
                                 {topDepartments.length === 0 ? (
-                                    <p className="text-sm text-slate-500">Department-level asset distribution will appear here once data is available.</p>
-                                ) : topDepartments.map((department, index) => {
+                                    <p className="text-sm text-slate-500">No department data yet. Assign assets to departments to see distribution.</p>
+                                ) : topDepartments.map((dept, i) => {
                                     const pct = assetsByDepartment?.total
-                                        ? Math.round((department.count / assetsByDepartment.total) * 100)
+                                        ? Math.round((dept.count / assetsByDepartment.total) * 100)
                                         : 0;
-
+                                    const deptLink = dept.departmentId
+                                        ? `/assets?departmentId=${dept.departmentId}`
+                                        : "/assets";
                                     return (
-                                        <div key={department.departmentId || `${department.departmentName}-${index}`}>
+                                        <Link key={dept.departmentId || `${dept.departmentName}-${i}`} href={deptLink} className="block group">
                                             <div className="mb-1 flex items-center justify-between gap-3">
-                                                <span className="truncate text-sm font-medium text-slate-700">
-                                                    {department.departmentName}
+                                                <span className="truncate text-sm font-medium text-slate-700 group-hover:text-teal-700">
+                                                    {dept.departmentName}
                                                 </span>
                                                 <span className="text-xs font-semibold text-slate-500">
-                                                    {department.count?.toLocaleString() ?? "0"} assets
+                                                    {dept.count.toLocaleString()} assets
                                                 </span>
                                             </div>
                                             <div className="h-2 rounded-full bg-slate-200">
-                                                <div className="h-2 rounded-full bg-teal-500" style={{ width: `${pct}%` }} />
+                                                <div className="h-2 rounded-full bg-teal-500 transition-all" style={{ width: `${pct}%` }} />
                                             </div>
-                                        </div>
+                                        </Link>
                                     );
                                 })}
                             </div>
@@ -602,74 +650,104 @@ export default function DashboardPage() {
                 </Card>
             </div>
 
+            {/* ── 4 KPI Cards ─────────────────────────────────────────────── */}
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <Card className="border-slate-200 shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Asset Estate</p>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                            <Hexagon className="h-4 w-4" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-black text-slate-900">{stats.totalAssets?.toLocaleString() ?? "0"}</div>
-                        <p className="mt-1 text-xs text-slate-500">
-                            {stats.activeAssets?.toLocaleString() ?? "0"} active · {inactiveAssets?.toLocaleString() ?? "0"} inactive
-                        </p>
-                    </CardContent>
-                </Card>
 
-                <Card className="border-slate-200 shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Portfolio Value</p>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                            <TrendingUp className="h-4 w-4" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-black text-slate-900">{format(stats.totalAssetValue || 0)}</div>
-                        <p className="mt-1 text-xs text-slate-500">
-                            Net book value: {format(depreciationSummary?.netBookValue ?? 0)}
-                        </p>
-                    </CardContent>
-                </Card>
+                {/* Asset Estate */}
+                <Link href="/assets">
+                    <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Asset Estate</p>
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                                <Hexagon className="h-4 w-4" />
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-3xl font-black text-slate-900">{stats.totalAssets.toLocaleString()}</div>
+                            <p className="mt-1 text-xs text-slate-500">
+                                {stats.activeAssets.toLocaleString()} active · {inactiveAssets.toLocaleString()} idle
+                            </p>
+                        </CardContent>
+                    </Card>
+                </Link>
 
-                <Card className="border-slate-200 shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Maintenance Load</p>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-                            <Wrench className="h-4 w-4" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-black text-slate-900">{maintenanceLoad?.toLocaleString() ?? "0"}</div>
-                        <p className="mt-1 text-xs text-slate-500">
-                            {stats.overdueMaintenanceCount?.toLocaleString() ?? "0"} overdue · {stats.upcomingMaintenanceCount?.toLocaleString() ?? "0"} upcoming
-                        </p>
-                    </CardContent>
-                </Card>
+                {/* Portfolio Value */}
+                <Link href="/assets">
+                    <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Portfolio Value</p>
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                                <TrendingUp className="h-4 w-4" />
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-3xl font-black text-slate-900">{format(stats.totalAssetValue)}</div>
+                            <p className="mt-1 text-xs text-slate-500">
+                                Net book value: {format(depreciationSummary?.netBookValue ?? 0)}
+                            </p>
+                        </CardContent>
+                    </Card>
+                </Link>
 
-                <Card className="border-slate-200 shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Governance Watch</p>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
-                            <ShieldCheck className="h-4 w-4" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-black text-slate-900">{stats.expiredLicenses?.toLocaleString() ?? "0"}</div>
-                        <p className="mt-1 text-xs text-slate-500">
-                            {stats.activeWebhooks?.toLocaleString() ?? "0"} active webhooks · {stats.totalUsers?.toLocaleString() ?? "0"} users
-                        </p>
-                    </CardContent>
-                </Card>
+                {/* Maintenance Load */}
+                <Link href="/maintenance">
+                    <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Maintenance Load</p>
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                                <Wrench className="h-4 w-4" />
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className={`text-3xl font-black ${stats.overdueMaintenanceCount > 0 ? "text-rose-600" : "text-slate-900"}`}>
+                                {maintenanceLoad.toLocaleString()}
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">
+                                {stats.overdueMaintenanceCount} overdue · {stats.upcomingMaintenanceCount} upcoming
+                            </p>
+                        </CardContent>
+                    </Card>
+                </Link>
+
+                {/* Budget Health */}
+                <Link href="/budgets">
+                    <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Budget Health</p>
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                                <DollarSign className="h-4 w-4" />
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className={`text-3xl font-black ${budgetStats.exceededBudgets > 0 ? "text-rose-600" : "text-slate-900"}`}>
+                                {budgetStats.utilizationPct}%
+                            </div>
+                            <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
+                                <div
+                                    className={`h-1.5 rounded-full transition-all ${budgetBarColor}`}
+                                    style={{ width: `${Math.min(budgetStats.utilizationPct, 100)}%` }}
+                                />
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">
+                                {budgetStats.activeBudgets} active budgets
+                                {budgetStats.exceededBudgets > 0 && (
+                                    <span className="ml-1 font-semibold text-rose-600">· {budgetStats.exceededBudgets} exceeded</span>
+                                )}
+                            </p>
+                        </CardContent>
+                    </Card>
+                </Link>
             </div>
 
+            {/* ── Asset Health + Action Required ───────────────────────────── */}
             <div className="grid gap-6 md:grid-cols-2">
+
+                {/* Asset Health Breakdown */}
                 <Card className="border-slate-200">
                     <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
-                                <TrendingUp className="h-4 w-4 text-indigo-500" /> Asset Health Breakdown
+                                <TrendingUp className="h-4 w-4 text-indigo-500" /> Asset Status Breakdown
                             </CardTitle>
                             <Link href="/assets">
                                 <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-slate-500">
@@ -680,27 +758,34 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent className="space-y-3 p-5">
                         {assetStatusBreakdown.length === 0 ? (
-                            <p className="py-8 text-center text-sm text-slate-400">No asset data available</p>
+                            <div className="py-8 text-center">
+                                <CheckCircle2 className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                                <p className="text-sm text-slate-400">No asset data available yet.</p>
+                                <Link href="/assets">
+                                    <Button variant="outline" size="sm" className="mt-3 text-xs">Add your first asset</Button>
+                                </Link>
+                            </div>
                         ) : assetStatusBreakdown.map(item => {
                             const pct = totalBreakdown ? Math.round((item.count / totalBreakdown) * 100) : Math.round(item.percentage);
                             return (
-                                <div key={item.key}>
+                                <Link key={item.key} href={`/assets?status=${item.key}`} className="block group">
                                     <div className="mb-1 flex items-center justify-between">
-                                        <span className="text-sm font-medium text-slate-600">{item.label}</span>
+                                        <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">{item.label}</span>
                                         <span className="text-sm font-bold text-slate-800">
-                                            {item.count?.toLocaleString() ?? "0"}{" "}
+                                            {item.count.toLocaleString()}{" "}
                                             <span className="text-xs font-normal text-slate-400">({pct}%)</span>
                                         </span>
                                     </div>
                                     <div className="h-2 w-full rounded-full bg-slate-100">
                                         <div className={`${item.color} h-2 rounded-full transition-all`} style={{ width: `${pct}%` }} />
                                     </div>
-                                </div>
+                                </Link>
                             );
                         })}
                     </CardContent>
                 </Card>
 
+                {/* Action Required */}
                 <Card className="border-slate-200">
                     <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
                         <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
@@ -709,6 +794,8 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent className="p-0">
                         <div className="divide-y divide-slate-100">
+
+                            {/* Purchase Orders */}
                             <Link href="/purchase-orders" className="group flex items-center justify-between p-4 transition-colors hover:bg-slate-50">
                                 <div className="flex items-center gap-3">
                                     <div className="rounded-lg bg-sky-100 p-2 text-sky-600">
@@ -717,74 +804,89 @@ export default function DashboardPage() {
                                     <div>
                                         <p className="text-sm font-semibold text-slate-900">Purchase Orders</p>
                                         <p className="text-xs text-slate-500">
-                                            {stats.pendingApprovals?.toLocaleString() ?? "0"} pending approvals · {stats.openPurchaseOrders?.toLocaleString() ?? "0"} open
+                                            {stats.openPurchaseOrders} open · {stats.pendingApprovals} awaiting approval
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xl font-bold text-sky-600">{stats.openPurchaseOrders?.toLocaleString() ?? "0"}</span>
+                                    <span className={`text-xl font-bold ${stats.openPurchaseOrders > 0 ? "text-sky-600" : "text-slate-300"}`}>
+                                        {stats.openPurchaseOrders}
+                                    </span>
                                     <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500" />
                                 </div>
                             </Link>
 
+                            {/* Maintenance */}
                             <Link href="/maintenance" className="group flex items-center justify-between p-4 transition-colors hover:bg-slate-50">
                                 <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-teal-100 p-2 text-teal-600">
+                                    <div className="rounded-lg bg-amber-100 p-2 text-amber-600">
                                         <Wrench className="h-4 w-4" />
                                     </div>
                                     <div>
                                         <p className="text-sm font-semibold text-slate-900">Maintenance Alerts</p>
                                         <p className="text-xs text-slate-500">
-                                            {(maintenanceAlerts?.critical ?? stats.overdueMaintenanceCount)?.toLocaleString() ?? "0"} critical ·{" "}
-                                            {(maintenanceAlerts?.scheduled ?? stats.upcomingMaintenanceCount)?.toLocaleString() ?? "0"} scheduled
+                                            {maintenanceAlerts?.critical ?? stats.overdueMaintenanceCount} critical · {maintenanceAlerts?.scheduled ?? stats.upcomingMaintenanceCount} scheduled
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xl font-bold text-teal-600">{maintenanceLoad?.toLocaleString() ?? "0"}</span>
+                                    <span className={`text-xl font-bold ${maintenanceLoad > 0 ? "text-amber-600" : "text-slate-300"}`}>
+                                        {maintenanceLoad}
+                                    </span>
                                     <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500" />
                                 </div>
                             </Link>
 
+                            {/* License Renewals */}
                             <Link href="/licenses" className="group flex items-center justify-between p-4 transition-colors hover:bg-slate-50">
                                 <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-amber-100 p-2 text-amber-600">
+                                    <div className="rounded-lg bg-violet-100 p-2 text-violet-600">
                                         <Clock className="h-4 w-4" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-semibold text-slate-900">License Renewals</p>
+                                        <p className="text-sm font-semibold text-slate-900">Expired Licenses</p>
                                         <p className="text-xs text-slate-500">
-                                            {stats.expiredLicenses?.toLocaleString() ?? "0"} expired licenses need review
+                                            {stats.expiredLicenses > 0 ? `${stats.expiredLicenses} licenses require renewal` : "All licenses are current"}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xl font-bold text-amber-600">{stats.expiredLicenses?.toLocaleString() ?? "0"}</span>
+                                    <span className={`text-xl font-bold ${stats.expiredLicenses > 0 ? "text-violet-600" : "text-slate-300"}`}>
+                                        {stats.expiredLicenses}
+                                    </span>
                                     <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500" />
                                 </div>
                             </Link>
 
-                            <Link href="/webhooks" className="group flex items-center justify-between p-4 transition-colors hover:bg-slate-50">
+                            {/* Pending Transfers */}
+                            <Link href="/transfers" className="group flex items-center justify-between p-4 transition-colors hover:bg-slate-50">
                                 <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-slate-100 p-2 text-slate-700">
-                                        <Webhook className="h-4 w-4" />
+                                    <div className="rounded-lg bg-rose-100 p-2 text-rose-600">
+                                        <RefreshCw className="h-4 w-4" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-semibold text-slate-900">Automation & Integrations</p>
+                                        <p className="text-sm font-semibold text-slate-900">Asset Transfers</p>
                                         <p className="text-xs text-slate-500">
-                                            {stats.activeWebhooks?.toLocaleString() ?? "0"} active · {stats.totalWebhooks?.toLocaleString() ?? "0"} configured
+                                            {stats.pendingTransfers > 0 ? `${stats.pendingTransfers} transfers awaiting approval` : "No pending transfers"}
                                         </p>
                                     </div>
                                 </div>
-                                <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500" />
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-xl font-bold ${stats.pendingTransfers > 0 ? "text-rose-600" : "text-slate-300"}`}>
+                                        {stats.pendingTransfers}
+                                    </span>
+                                    <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500" />
+                                </div>
                             </Link>
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
+            {/* ── Dept Chart + Depreciation ────────────────────────────────── */}
             {(assetsByDepartment || depreciationSummary) && (
                 <div className="grid gap-6 md:grid-cols-2">
+
                     {assetsByDepartment && assetsByDepartment.data.length > 0 && (
                         <Card className="border-slate-200">
                             <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
@@ -792,34 +894,36 @@ export default function DashboardPage() {
                                     <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
                                         <Building2 className="h-4 w-4 text-blue-500" /> Assets by Department
                                     </CardTitle>
-                                    <Link href="/assets">
+                                    <Link href="/departments">
                                         <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-slate-500">
-                                            View All <ArrowRight className="h-3 w-3" />
+                                            Manage <ArrowRight className="h-3 w-3" />
                                         </Button>
                                     </Link>
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-3 p-5">
-                                {assetsByDepartment.data.slice(0, 6).map((department, index) => {
+                                {assetsByDepartment.data.slice(0, 7).map((dept, i) => {
                                     const pct = assetsByDepartment.total
-                                        ? Math.round((department.count / assetsByDepartment.total) * 100)
+                                        ? Math.round((dept.count / assetsByDepartment.total) * 100)
                                         : 0;
-
+                                    const link = dept.departmentId
+                                        ? `/assets?departmentId=${dept.departmentId}`
+                                        : "/assets";
                                     return (
-                                        <div key={department.departmentId || `${department.departmentName}-${index}`}>
+                                        <Link key={dept.departmentId || `${dept.departmentName}-${i}`} href={link} className="block group">
                                             <div className="mb-1 flex items-center justify-between">
-                                                <span className="max-w-[60%] truncate text-sm font-medium text-slate-600">
-                                                    {department.departmentName}
+                                                <span className="max-w-[60%] truncate text-sm font-medium text-slate-600 group-hover:text-blue-700">
+                                                    {dept.departmentName}
                                                 </span>
                                                 <span className="text-sm font-bold text-slate-800">
-                                                    {department.count?.toLocaleString() ?? "0"}{" "}
+                                                    {dept.count.toLocaleString()}{" "}
                                                     <span className="text-xs font-normal text-slate-400">({pct}%)</span>
                                                 </span>
                                             </div>
                                             <div className="h-2 w-full rounded-full bg-slate-100">
                                                 <div className="h-2 rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
                                             </div>
-                                        </div>
+                                        </Link>
                                     );
                                 })}
                             </CardContent>
@@ -829,23 +933,28 @@ export default function DashboardPage() {
                     {depreciationSummary && (
                         <Card className="border-slate-200">
                             <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
-                                <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
-                                    <TrendingUp className="h-4 w-4 text-purple-500" /> Depreciation Summary
-                                </CardTitle>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
+                                        <TrendingUp className="h-4 w-4 text-purple-500" /> Depreciation Summary
+                                    </CardTitle>
+                                    <Link href="/depreciation-policies">
+                                        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-slate-500">
+                                            Policies <ArrowRight className="h-3 w-3" />
+                                        </Button>
+                                    </Link>
+                                </div>
                             </CardHeader>
                             <CardContent className="p-5">
                                 <div className="grid grid-cols-2 gap-4">
                                     {[
-                                        { label: "Total Depreciation", value: depreciationSummary.totalDepreciation },
-                                        { label: "Net Book Value", value: depreciationSummary.netBookValue },
-                                        { label: "Current Depreciation", value: depreciationSummary.monthlyDepreciation },
-                                        { label: "Fully Depreciated", value: depreciationSummary.assetsFullyDepreciated, isNumeric: true },
+                                        { label: "Accumulated Depreciation", value: format(depreciationSummary.totalDepreciation) },
+                                        { label: "Net Book Value", value: format(depreciationSummary.netBookValue) },
+                                        { label: "Monthly Charge", value: format(depreciationSummary.monthlyDepreciation) },
+                                        { label: "Fully Depreciated", value: (depreciationSummary.assetsFullyDepreciated ?? 0).toLocaleString() + " assets" },
                                     ].map(item => (
                                         <div key={item.label} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
                                             <p className="mb-1 text-xs text-slate-500">{item.label}</p>
-                                            <p className="text-lg font-bold text-slate-800">
-                                                {item.isNumeric ? item.value?.toLocaleString() ?? "0" : format(item.value || 0)}
-                                            </p>
+                                            <p className="text-lg font-bold text-slate-800">{item.value}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -855,23 +964,82 @@ export default function DashboardPage() {
                 </div>
             )}
 
-            {activeAlertPreview.length > 0 && (
+            {/* ── Budget Breakdown (if budgets exist) ─────────────────────── */}
+            {budgetStats.activeBudgets > 0 && (
                 <Card className="border-slate-200">
                     <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
-                        <CardTitle className="text-base font-semibold text-slate-800">Maintenance Alert Preview</CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
+                                <DollarSign className="h-4 w-4 text-emerald-500" /> Budget Overview
+                            </CardTitle>
+                            <Link href="/budgets">
+                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-slate-500">
+                                    Manage <ArrowRight className="h-3 w-3" />
+                                </Button>
+                            </Link>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-5">
+                        <div className="grid gap-4 sm:grid-cols-4">
+                            {[
+                                { label: "Total Budget", value: format(budgetStats.totalBudgetAmount), sub: `${budgetStats.activeBudgets} active budgets` },
+                                { label: "Spent", value: format(budgetStats.totalSpentAmount), sub: `${budgetStats.utilizationPct}% of total` },
+                                { label: "Remaining", value: format(Math.max(budgetStats.totalBudgetAmount - budgetStats.totalSpentAmount, 0)), sub: "available to allocate" },
+                                {
+                                    label: "Exceeded Budgets",
+                                    value: budgetStats.exceededBudgets.toLocaleString(),
+                                    sub: budgetStats.exceededBudgets > 0 ? "need review" : "all within limit",
+                                    highlight: budgetStats.exceededBudgets > 0,
+                                },
+                            ].map(item => (
+                                <div key={item.label} className={`rounded-lg border p-4 ${(item as any).highlight ? "border-rose-200 bg-rose-50" : "border-slate-100 bg-slate-50"}`}>
+                                    <p className="text-xs text-slate-500 mb-1">{item.label}</p>
+                                    <p className={`text-xl font-bold ${(item as any).highlight ? "text-rose-700" : "text-slate-800"}`}>{item.value}</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">{item.sub}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-4">
+                            <div className="flex items-center justify-between mb-1">
+                                <p className="text-xs text-slate-500">Overall utilisation</p>
+                                <p className="text-xs font-semibold text-slate-700">{budgetStats.utilizationPct}%</p>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-slate-100">
+                                <div
+                                    className={`h-2 rounded-full transition-all ${budgetBarColor}`}
+                                    style={{ width: `${Math.min(budgetStats.utilizationPct, 100)}%` }}
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* ── Maintenance Alert Preview ────────────────────────────────── */}
+            {alertPreview.length > 0 && (
+                <Card className="border-slate-200">
+                    <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-base font-semibold text-slate-800">
+                                Maintenance Alerts
+                            </CardTitle>
+                            <Link href="/maintenance">
+                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-slate-500">
+                                    View All <ArrowRight className="h-3 w-3" />
+                                </Button>
+                            </Link>
+                        </div>
                     </CardHeader>
                     <CardContent className="grid gap-3 p-4 md:grid-cols-3">
-                        {activeAlertPreview.map((alert, index) => (
-                            <div key={`${alert.assetName}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4">
+                        {alertPreview.map((alert, i) => (
+                            <Link key={`${alert.assetName}-${i}`} href="/maintenance" className="block rounded-xl border border-slate-200 bg-white p-4 hover:shadow-sm transition-shadow">
                                 <div className="flex items-center justify-between gap-3">
-                                    <p className="text-sm font-semibold text-slate-900">{alert.assetName}</p>
-                                    <span
-                                        className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
-                                            alert.severity.toLowerCase() === "critical"
-                                                ? "bg-rose-100 text-rose-700"
-                                                : "bg-amber-100 text-amber-700"
-                                        }`}
-                                    >
+                                    <p className="text-sm font-semibold text-slate-900 truncate">{alert.assetName}</p>
+                                    <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                                        alert.severity.toLowerCase() === "critical"
+                                            ? "bg-rose-100 text-rose-700"
+                                            : "bg-amber-100 text-amber-700"
+                                    }`}>
                                         {alert.severity}
                                     </span>
                                 </div>
@@ -880,15 +1048,16 @@ export default function DashboardPage() {
                                         ? `${alert.daysOverdue} day${alert.daysOverdue === 1 ? "" : "s"} overdue`
                                         : "Upcoming maintenance"}
                                 </p>
-                                <p className="mt-1 text-xs text-slate-500">
-                                    {formatDate(alert.nextDueDate) || "Due date not available"}
-                                </p>
-                            </div>
+                                {alert.nextDueDate && (
+                                    <p className="mt-1 text-xs text-slate-400">Due: {formatDate(alert.nextDueDate)}</p>
+                                )}
+                            </Link>
                         ))}
                     </CardContent>
                 </Card>
             )}
 
+            {/* ── Quick Navigation ─────────────────────────────────────────── */}
             <Card className="border-slate-200">
                 <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
                     <CardTitle className="text-base font-semibold text-slate-800">Quick Navigation</CardTitle>

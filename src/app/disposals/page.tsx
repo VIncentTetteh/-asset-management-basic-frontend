@@ -11,11 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { Plus, Pencil, Trash2, Trash, Hexagon, Calendar, FileSignature } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 export default function DisposalsPage() {
     const { format, symbol } = useCurrency();
@@ -50,6 +53,7 @@ export default function DisposalsPage() {
 
     const assetMap = useMemo(() => new Map(assets.map(a => [a.id, a.name])), [assets]);
     const assetTagMap = useMemo(() => new Map(assets.map(a => [a.id, a.assetTag])), [assets]);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const handleOpenCreate = () => {
         setEditingDisposal(null);
@@ -80,7 +84,7 @@ export default function DisposalsPage() {
     };
 
     const handleDelete = async (id: string, assetId: string) => {
-        if (!confirm("Are you sure you want to delete this disposal record? The asset will need its state reverted manually.")) return;
+        if (!await confirm({ message: "Are you sure you want to delete this disposal record? The asset will need its state reverted manually.", variant: "danger" })) return;
         try {
             await disposalService.delete(id);
             toast.success("Disposal record deleted");
@@ -170,7 +174,7 @@ export default function DisposalsPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div>
+                        <PageSpinner />
                     </div>
                 ) : disposals.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
@@ -308,6 +312,7 @@ export default function DisposalsPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

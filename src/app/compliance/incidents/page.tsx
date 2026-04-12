@@ -15,6 +15,8 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Siren, Search, User as UserIcon, Clock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const STATUSES: IncidentStatus[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 const SEVERITIES: IncidentSeverity[] = ["P1_CRITICAL", "P2_HIGH", "P3_MEDIUM", "P4_LOW"];
@@ -75,6 +77,7 @@ export default function IncidentsPage() {
         );
     }, [items, search, statusFilter]);
 
+    const { confirm, ConfirmDialog } = useConfirm();
     const stats = useMemo(() => ({
         open: items.filter(i => i.status === "OPEN").length,
         inProgress: items.filter(i => i.status === "IN_PROGRESS").length,
@@ -106,7 +109,7 @@ export default function IncidentsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this incident?")) return;
+        if (!await confirm({ message: "Delete this incident?", variant: "danger" })) return;
         try {
             await incidentService.delete(id);
             toast.success("Deleted");
@@ -323,6 +326,7 @@ export default function IncidentsPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

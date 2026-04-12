@@ -13,9 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { Plus, Trash2, ArrowRightLeft, Hexagon, MapPin, Layers, CheckCircle2, XCircle, ThumbsUp } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 export default function TransfersPage() {
     const [transfers, setTransfers] = useState<AssetTransfer[]>([]);
@@ -57,6 +60,7 @@ export default function TransfersPage() {
     const assetTagMap = useMemo(() => new Map(assets.map(a => [a.id, a.assetTag])), [assets]);
     const locationMap = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations]);
     const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const handleOpenCreate = () => {
         const currentUser = typeof window !== "undefined"
@@ -75,7 +79,7 @@ export default function TransfersPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this transfer request?")) return;
+        if (!await confirm({ message: "Are you sure you want to delete this transfer request?", variant: "danger" })) return;
         try {
             await assetTransferService.delete(id);
             toast.success("Transfer deleted");
@@ -205,7 +209,7 @@ export default function TransfersPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        <PageSpinner />
                     </div>
                 ) : transfers.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
@@ -401,6 +405,7 @@ export default function TransfersPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

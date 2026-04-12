@@ -15,6 +15,8 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, PackageCheck, Search } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const STATUSES: PatchStatus[] = ["PLANNED", "APPLIED", "FAILED", "ROLLED_BACK"];
 
@@ -63,6 +65,7 @@ export default function PatchRecordsPage() {
         rolledBack: items.filter(i => i.status === "ROLLED_BACK").length,
     }), [items]);
 
+    const { confirm, ConfirmDialog } = useConfirm();
     const filtered = useMemo(() => {
         const base = statusFilter ? items.filter(i => i.status === statusFilter) : items;
         if (!search.trim()) return base;
@@ -98,7 +101,7 @@ export default function PatchRecordsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this patch record?")) return;
+        if (!await confirm({ message: "Delete this patch record?", variant: "danger" })) return;
         try {
             await patchRecordService.delete(id);
             toast.success("Deleted");
@@ -284,6 +287,7 @@ export default function PatchRecordsPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

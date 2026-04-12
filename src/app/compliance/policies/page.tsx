@@ -14,6 +14,8 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, FileText, Search, ExternalLink, User as UserIcon, Calendar } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const STATUSES: PolicyStatus[] = ["DRAFT", "UNDER_REVIEW", "APPROVED", "RETIRED"];
 
@@ -66,6 +68,7 @@ export default function PoliciesPage() {
         );
     }, [items, search, statusFilter]);
 
+    const { confirm, ConfirmDialog } = useConfirm();
     const stats = useMemo(() => ({
         approved: items.filter(i => i.status === "APPROVED").length,
         underReview: items.filter(i => i.status === "UNDER_REVIEW").length,
@@ -95,7 +98,7 @@ export default function PoliciesPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this policy?")) return;
+        if (!await confirm({ message: "Delete this policy?", variant: "danger" })) return;
         try {
             await policyService.delete(id);
             toast.success("Deleted");
@@ -301,6 +304,7 @@ export default function PoliciesPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

@@ -11,12 +11,15 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, UserX, UsersIcon, Shield, Layers, Briefcase, Mail, Lock, ShieldOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
 import { buildPatchPayload } from "@/lib/patch";
 import { mfaService } from "@/services/mfaService";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -56,6 +59,7 @@ export default function UsersPage() {
 
     const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
     const roleMap = useMemo(() => new Map(roles.map(r => [r.id, r.name])), [roles]);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const handleOpenCreate = () => {
         setEditingUser(null);
@@ -87,7 +91,7 @@ export default function UsersPage() {
     };
 
     const handleDeactivate = async (user: User) => {
-        if (!confirm(`Deactivate ${user.firstName} ${user.lastName}? They will lose access.`)) return;
+        if (!await confirm({ message: `Deactivate ${user.firstName} ${user.lastName}? They will lose access.`, variant: "warning" })) return;
         setDeactivatingId(user.id!);
         try {
             await userService.deactivate(user.id!);
@@ -102,7 +106,7 @@ export default function UsersPage() {
     };
 
     const handleResetMfa = async (user: User) => {
-        if (!confirm(`Reset MFA for ${user.firstName} ${user.lastName}? They will be able to re-enrol next time they log in.`)) return;
+        if (!await confirm({ message: `Reset MFA for ${user.firstName} ${user.lastName}? They will be able to re-enrol next time they log in.`, variant: "warning" })) return;
         setResettingMfaId(user.id!);
         try {
             const result = await mfaService.adminReset(user.id!);
@@ -190,7 +194,7 @@ export default function UsersPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-700"></div>
+                        <PageSpinner />
                     </div>
                 ) : users.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
@@ -357,6 +361,7 @@ export default function UsersPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

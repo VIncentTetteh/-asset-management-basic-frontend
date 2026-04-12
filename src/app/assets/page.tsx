@@ -7,8 +7,11 @@ import toast from "react-hot-toast";
 import {
     Plus, Pencil, Trash2, Hexagon, Building2, Layers, Search,
     MapPin, UserRound, UserPlus, UserMinus, Loader2, Upload, FileSpreadsheet,
-    CheckCircle2, AlertTriangle, XCircle, FileText
+    CheckCircle2, AlertTriangle, XCircle, FileText, TrendingDown,
+    Package, PackageCheck, Wrench, Filter
 } from "lucide-react";
+import { CardSkeleton } from "@/components/ui/skeleton";
+import { PageSpinner } from "@/components/ui/spinner";
 
 import {
     Asset, AssetDto, AssetImportResult, Department, Organisation, Category,
@@ -35,6 +38,8 @@ import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { buildPatchPayload } from "@/lib/patch";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 
 export default function AssetsPage() {
@@ -63,6 +68,7 @@ export default function AssetsPage() {
     const [isImporting, setIsImporting] = useState(false);
     const [selectedAssetForAssignment, setSelectedAssetForAssignment] = useState<Asset | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [statusFilter, setStatusFilter] = useState<string>("ALL");
     const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
     const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
     const [selectedAssetForDetails, setSelectedAssetForDetails] = useState<Asset | null>(null);
@@ -139,13 +145,18 @@ export default function AssetsPage() {
     const locMap = useMemo(() => new Map(locations.map(l => [l.id, l.name])), [locations]);
     const userMap = useMemo(() => new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`])), [users]);
 
+    const { confirm, ConfirmDialog } = useConfirm();
     const filteredAssets = useMemo(() => {
         const term = searchTerm.trim().toLowerCase();
-        if (!term) return assets;
         return assets.filter((asset) => {
+            if (statusFilter !== "ALL" && asset.status !== statusFilter) return false;
+            if (!term) return true;
             const fields = [
                 asset.name,
                 asset.assetTag,
+                asset.serialNumber,
+                asset.manufacturer,
+                asset.model,
                 String(asset.status || ""),
                 catMap.get(asset.categoryId || ""),
                 deptMap.get(asset.departmentId || ""),
@@ -154,7 +165,16 @@ export default function AssetsPage() {
             ];
             return fields.some((value) => String(value || "").toLowerCase().includes(term));
         });
-    }, [assets, searchTerm, catMap, deptMap, locMap, userMap]);
+    }, [assets, searchTerm, statusFilter, catMap, deptMap, locMap, userMap]);
+
+    const assetStats = useMemo(() => ({
+        total: assets.length,
+        inUse: assets.filter(a => a.status === "IN_USE").length,
+        inStock: assets.filter(a => a.status === "IN_STOCK").length,
+        maintenance: assets.filter(a => a.status === "MAINTENANCE").length,
+        retired: assets.filter(a => a.status === "RETIRED" || a.status === "DISPOSED").length,
+        totalValue: assets.reduce((s, a) => s + (a.purchaseCost || 0), 0),
+    }), [assets]);
 
     const handleOpenCreate = () => {
         setEditingAsset(null);
@@ -215,7 +235,7 @@ export default function AssetsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this asset?")) return;
+        if (!await confirm({ message: "Are you sure you want to delete this asset?", variant: "danger" })) return;
         setDeletingId(id);
         try {
             await assetService.delete(id);
@@ -387,6 +407,14 @@ export default function AssetsPage() {
         }
     };
 
+    const STATUS_TABS = [
+        { key: "ALL", label: "All Assets", count: assetStats.total },
+        { key: "IN_USE", label: "In Use", count: assetStats.inUse },
+        { key: "IN_STOCK", label: "In Stock", count: assetStats.inStock },
+        { key: "MAINTENANCE", label: "Maintenance", count: assetStats.maintenance },
+        { key: "RETIRED", label: "Retired", count: assetStats.retired },
+    ];
+
     return (
         <div className="space-y-6">
             <PageHeader
@@ -394,13 +422,13 @@ export default function AssetsPage() {
                 subtitle="Comprehensive view of all organizational assets."
                 actions={<>
                     <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                         <Input
                             type="search"
-                            placeholder="Search assets..."
+                            placeholder="Search by name, tag, model, dept…"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-8 w-[250px]"
+                            className="pl-8 w-[280px]"
                         />
                     </div>
                     <Button variant="outline" onClick={() => { setImportFile(null); setImportResult(null); setIsImportModalOpen(true); }}>
@@ -412,94 +440,162 @@ export default function AssetsPage() {
                 </>}
             />
 
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {/* Summary Stats */}
+            {!isLoading && assets.length > 0 && (
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
+                    {[
+                        { label: "Total Assets", value: assetStats.total, icon: <Package className="h-5 w-5" />, color: "bg-slate-100 text-slate-600" },
+                        { label: "In Use", value: assetStats.inUse, icon: <PackageCheck className="h-5 w-5" />, color: "bg-blue-100 text-blue-600" },
+                        { label: "In Stock", value: assetStats.inStock, icon: <CheckCircle2 className="h-5 w-5" />, color: "bg-emerald-100 text-emerald-600" },
+                        { label: "Maintenance", value: assetStats.maintenance, icon: <Wrench className="h-5 w-5" />, color: "bg-amber-100 text-amber-600" },
+                        { label: "Total Value", value: format(assetStats.totalValue, "USD"), icon: <TrendingDown className="h-5 w-5" />, color: "bg-teal-100 text-teal-700" },
+                    ].map((s) => (
+                        <div key={s.label} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow">
+                            <div className={`p-2 rounded-lg shrink-0 ${s.color}`}>{s.icon}</div>
+                            <div className="min-w-0">
+                                <p className="text-xs text-slate-500 truncate">{s.label}</p>
+                                <p className="text-lg font-bold text-slate-900 tabular-nums">{s.value}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Status Filter Tabs */}
+            {!isLoading && assets.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap">
+                    <Filter className="h-4 w-4 text-slate-400 mr-1" />
+                    {STATUS_TABS.map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setStatusFilter(tab.key)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${statusFilter === tab.key
+                                ? "bg-emerald-600 text-white shadow-sm"
+                                : "bg-white border border-slate-200 text-slate-600 hover:border-emerald-300 hover:text-emerald-700"
+                            }`}
+                        >
+                            {tab.label}
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${statusFilter === tab.key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
+                                {tab.count}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {isLoading ? (
-                    <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-                    </div>
+                    Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)
                 ) : filteredAssets.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
                         <Hexagon className="h-12 w-12 text-slate-300 mb-4" />
                         <h3 className="text-lg font-medium text-slate-900">No assets found</h3>
-                        <p className="text-slate-500 mt-1 max-w-sm">Get started by creating your first asset or importing from a CSV file.</p>
-                        <Button onClick={handleOpenCreate} className="mt-6 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300">
-                            Create Asset
-                        </Button>
+                        <p className="text-slate-500 mt-1 max-w-sm">
+                            {searchTerm || statusFilter !== "ALL" ? "Try adjusting your search or filters." : "Get started by creating your first asset or importing from Excel."}
+                        </p>
+                        {!searchTerm && statusFilter === "ALL" && (
+                            <Button onClick={handleOpenCreate} className="mt-6 bg-emerald-600 hover:bg-emerald-700">
+                                <Plus className="mr-2 h-4 w-4" /> Create Asset
+                            </Button>
+                        )}
                     </div>
                 ) : (
-                    filteredAssets.map((asset) => (
-                        <Card key={asset.id} className="overflow-hidden hover:shadow-md transition-all group">
-                            <CardHeader className="pb-3 border-b bg-slate-50/50">
-                                <div className="flex justify-between items-start gap-4">
-                                    <div className="truncate">
-                                        <CardTitle className="text-lg font-semibold text-slate-900 truncate" title={asset.name}>
+                    filteredAssets.map((asset) => {
+                        const age = asset.purchaseDate
+                            ? Math.floor((Date.now() - new Date(asset.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 30))
+                            : null;
+                        const hasWarranty = asset.warrantyExpiryDate && new Date(asset.warrantyExpiryDate) > new Date();
+                        return (
+                        <Card key={asset.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 border-slate-200 flex flex-col">
+                            <CardHeader className="pb-3 border-b bg-gradient-to-r from-slate-50 to-white">
+                                <div className="flex justify-between items-start gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <CardTitle className="text-base font-semibold text-slate-900 truncate leading-snug" title={asset.name}>
                                             {asset.name}
                                         </CardTitle>
-                                        <CardDescription className="flex items-center gap-2 mt-1">
-                                            <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200">
-                                                {asset.assetTag || asset.barcodeQrCode || 'NO-TAG'}
+                                        <CardDescription className="flex items-center gap-2 mt-1.5">
+                                            <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-slate-600 shrink-0">
+                                                {asset.assetTag || 'NO-TAG'}
                                             </span>
-                                            <span className="truncate">{catMap.get(asset.categoryId || "") || "Uncategorized"}</span>
+                                            <span className="truncate text-slate-500 text-xs">{catMap.get(asset.categoryId || "") || "Uncategorized"}</span>
                                         </CardDescription>
                                     </div>
-                                    <div className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusStyles(asset.status || "")}`}>
+                                    <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusStyles(asset.status || "")}`}>
                                         {(asset.status || "UNKNOWN").replace('_', ' ')}
-                                    </div>
+                                    </span>
                                 </div>
                             </CardHeader>
-                            <CardContent className="p-4">
-                                <div className="space-y-3 text-sm">
-                                    <div className="grid grid-cols-2 gap-2 pb-2">
-                                        <div>
-                                            <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Value</p>
-                                            <p className="font-medium text-slate-900">
-                                                {format(asset.purchaseCost, asset.currency || 'USD')}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Condition</p>
-                                            <p className="font-medium text-slate-900">{asset.condition || 'N/A'}</p>
-                                        </div>
+                            <CardContent className="p-4 flex-1 flex flex-col">
+                                {/* Cost & Condition row */}
+                                <div className="grid grid-cols-2 gap-3 pb-3 mb-3 border-b border-slate-100">
+                                    <div className="bg-emerald-50 rounded-lg p-2.5">
+                                        <p className="text-[10px] text-emerald-700 font-semibold uppercase tracking-wider mb-0.5">Purchase Value</p>
+                                        <p className="text-sm font-bold text-emerald-900 tabular-nums">
+                                            {format(asset.purchaseCost, asset.currency || 'USD')}
+                                        </p>
                                     </div>
-
-                                    <div className="pt-3 border-t border-slate-100 grid gap-2">
-                                        <div className="flex items-center text-slate-600">
-                                            <MapPin className="h-4 w-4 mr-2 text-slate-400 shrink-0" />
-                                            <span className="truncate">{locMap.get(asset.locationId || "") || "No Location assigned"}</span>
-                                        </div>
-                                        <div className="flex items-center text-slate-600">
-                                            <Layers className="h-4 w-4 mr-2 text-slate-400 shrink-0" />
-                                            <span className="truncate">{deptMap.get(asset.departmentId || "") || "No Department assigned"}</span>
-                                        </div>
-                                        <div className="flex items-center text-slate-600">
-                                            <UserRound className="h-4 w-4 mr-2 text-slate-400 shrink-0" />
-                                            <span className="truncate">{userMap.get(asset.assignedUserId || "") || "No Employee assigned"}</span>
-                                        </div>
-                                        {asset.organisationId && (
-                                            <div className="flex items-center text-slate-600">
-                                                <Building2 className="h-4 w-4 mr-2 text-slate-400 shrink-0" />
-                                                <span className="truncate">{orgMap.get(asset.organisationId) || "Unknown Org"}</span>
-                                            </div>
-                                        )}
+                                    <div className="bg-slate-50 rounded-lg p-2.5">
+                                        <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Condition</p>
+                                        <p className="text-sm font-semibold text-slate-800">{asset.condition || 'N/A'}</p>
                                     </div>
                                 </div>
-                                <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="outline" size="sm" onClick={() => { setSelectedAssetForDetails(asset); setIsDetailModalOpen(true); }} className="h-8">
+
+                                {/* Meta info */}
+                                <div className="space-y-1.5 text-sm flex-1">
+                                    <div className="flex items-center text-slate-600">
+                                        <MapPin className="h-3.5 w-3.5 mr-2 text-slate-400 shrink-0" />
+                                        <span className="truncate text-xs">{locMap.get(asset.locationId || "") || "No Location"}</span>
+                                    </div>
+                                    <div className="flex items-center text-slate-600">
+                                        <Layers className="h-3.5 w-3.5 mr-2 text-slate-400 shrink-0" />
+                                        <span className="truncate text-xs">{deptMap.get(asset.departmentId || "") || "No Department"}</span>
+                                    </div>
+                                    <div className="flex items-center text-slate-600">
+                                        <UserRound className="h-3.5 w-3.5 mr-2 text-slate-400 shrink-0" />
+                                        <span className="truncate text-xs">{userMap.get(asset.assignedUserId || "") || "Unassigned"}</span>
+                                    </div>
+                                </div>
+
+                                {/* Footer badges */}
+                                {(age !== null || hasWarranty) && (
+                                    <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100 flex-wrap">
+                                        {age !== null && (
+                                            <span className="text-[10px] font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                                                {age} mo old
+                                            </span>
+                                        )}
+                                        {hasWarranty && (
+                                            <span className="text-[10px] font-medium bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100">
+                                                ✓ Warranty Active
+                                            </span>
+                                        )}
+                                        {asset.manufacturer && (
+                                            <span className="text-[10px] font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                                                {asset.manufacturer}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Action buttons — always visible */}
+                                <div className="flex gap-1.5 mt-3 pt-3 border-t border-slate-100">
+                                    <Button variant="outline" size="sm" onClick={() => { setSelectedAssetForDetails(asset); setIsDetailModalOpen(true); }} className="h-8 flex-1 text-xs">
                                         <FileText className="h-3.5 w-3.5 mr-1" /> View
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenAssignModal(asset)} className="h-8">
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenAssignModal(asset)} className="h-8 flex-1 text-xs">
                                         <UserPlus className="h-3.5 w-3.5 mr-1" /> Assign
                                     </Button>
                                     <Button variant="outline" size="sm" onClick={() => handleOpenEdit(asset)} className="h-8 text-indigo-600 border-indigo-100 hover:bg-indigo-50">
-                                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                                        <Pencil className="h-3.5 w-3.5" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(asset.id!)} isLoading={deletingId === asset.id} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(asset.id!)} isLoading={deletingId === asset.id} className="h-8 text-red-500 hover:bg-red-50">
                                         <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                 </div>
                             </CardContent>
                         </Card>
-                    ))
+                        );
+                    })
                 )}
             </div>
 
@@ -678,8 +774,7 @@ export default function AssetsPage() {
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700">
-                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <Button type="submit" isLoading={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700">
                             {editingAsset ? "Save Changes" : "Create Asset"}
                         </Button>
                     </div>
@@ -823,7 +918,7 @@ export default function AssetsPage() {
                 </div>
             </Modal>
 
-            <AssetDetailModal 
+            <AssetDetailModal
                 isOpen={isDetailModalOpen}
                 onClose={() => setIsDetailModalOpen(false)}
                 asset={selectedAssetForDetails}
@@ -831,7 +926,9 @@ export default function AssetsPage() {
                 locations={locations}
                 categories={categories}
                 users={users}
+                organisations={organisations}
             />
+        {ConfirmDialog}
         </div>
     );
 }

@@ -9,13 +9,40 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Shield, Lock, ShieldAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
+
+// Permission groups matching the backend Permission enum categories
+const PERMISSION_GROUPS: { label: string; permissions: string[] }[] = [
+    { label: "Assets", permissions: ["VIEW_ASSETS", "CREATE_ASSET", "EDIT_ASSET", "DELETE_ASSET", "DISPOSE_ASSET", "TRANSFER_ASSET", "CHECKOUT_ASSET", "REGENERATE_QR"] },
+    { label: "Approvals", permissions: ["APPROVE_REQUESTS", "REJECT_REQUESTS", "ESCALATE_REQUESTS"] },
+    { label: "Budgets", permissions: ["VIEW_BUDGETS", "MANAGE_BUDGETS", "APPROVE_BUDGET"] },
+    { label: "Users", permissions: ["VIEW_USERS", "MANAGE_USERS", "EDIT_USER", "DELETE_USER"] },
+    { label: "Departments", permissions: ["VIEW_DEPARTMENTS", "MANAGE_DEPARTMENTS"] },
+    { label: "Locations", permissions: ["VIEW_LOCATIONS", "MANAGE_LOCATIONS"] },
+    { label: "Categories", permissions: ["VIEW_CATEGORIES", "MANAGE_CATEGORIES"] },
+    { label: "Maintenance", permissions: ["VIEW_MAINTENANCE", "SCHEDULE_MAINTENANCE", "MARK_MAINTENANCE_COMPLETE"] },
+    { label: "Audit", permissions: ["VIEW_AUDIT_LOGS", "CONDUCT_AUDIT", "EXPORT_AUDIT_LOGS"] },
+    { label: "Reports", permissions: ["VIEW_REPORTS", "GENERATE_REPORTS", "EXPORT_REPORTS"] },
+    { label: "Finance", permissions: ["MANAGE_EXPENSES", "VIEW_TCO", "MANAGE_EXCHANGE_RATES", "MANAGE_LEASES", "VIEW_DEPRECIATION", "MANAGE_DEPRECIATION"] },
+    { label: "Procurement", permissions: ["VIEW_PROCUREMENT", "MANAGE_PROCUREMENT", "APPROVE_PROCUREMENT"] },
+    { label: "Suppliers & Vendors", permissions: ["VIEW_SUPPLIERS", "MANAGE_SUPPLIERS", "VIEW_VENDOR_REVIEWS", "MANAGE_VENDOR_REVIEWS"] },
+    { label: "Software & Licenses", permissions: ["VIEW_SOFTWARE_LICENSES", "MANAGE_SOFTWARE_LICENSES"] },
+    { label: "Contracts", permissions: ["VIEW_CONTRACTS", "MANAGE_CONTRACTS"] },
+    { label: "Compliance", permissions: ["VIEW_COMPLIANCE", "MANAGE_COMPLIANCE"] },
+    { label: "Infrastructure", permissions: ["VIEW_NETWORK_DISCOVERY", "MANAGE_NETWORK_DISCOVERY", "VIEW_CLOUD_ASSETS", "MANAGE_CLOUD_ASSETS"] },
+    { label: "Roles", permissions: ["VIEW_ROLES", "MANAGE_ROLES"] },
+    { label: "Settings & Admin", permissions: ["MANAGE_ORGANIZATION_SETTINGS", "MANAGE_SECURITY_SETTINGS", "REVIEW_ACCESS", "SYSTEM_ADMIN"] },
+];
 
 export default function RolesPage() {
     const [roles, setRoles] = useState<Role[]>([]);
+    const [allPermissions, setAllPermissions] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRole, setEditingRole] = useState<Role | null>(null);
@@ -25,8 +52,12 @@ export default function RolesPage() {
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const rolesData = await roleService.getAll();
+            const [rolesData, permsData] = await Promise.all([
+                roleService.getAll(),
+                roleService.getPermissions(),
+            ]);
             setRoles(rolesData);
+            setAllPermissions(permsData);
         } catch (error) {
             toast.error("Failed to load roles");
             console.error(error);
@@ -39,16 +70,20 @@ export default function RolesPage() {
         fetchData();
     }, []);
 
-    // Hardcode a list of common permissions for the multi-select payload
-    const ALL_PERMISSIONS = [
-        "ASSET_READ", "ASSET_WRITE", "ASSET_DELETE",
-        "USER_READ", "USER_WRITE", "USER_DELETE",
-        "ORG_READ", "ORG_WRITE", "ORG_DELETE",
-        "PO_READ", "PO_WRITE", "PO_APPROVE",
-        "FINANCE_READ", "AUDIT_READ", "AUDIT_WRITE",
-        "MAINTENANCE_WRITE"
-    ];
+    // Build the grouped permission list: known groups first, then any extra from the server
+    const permissionGroups = (() => {
+        const grouped = PERMISSION_GROUPS.map(g => ({
+            ...g,
+            permissions: g.permissions.filter(p => allPermissions.includes(p)),
+        })).filter(g => g.permissions.length > 0);
 
+        const knownPerms = new Set(PERMISSION_GROUPS.flatMap(g => g.permissions));
+        const extra = allPermissions.filter(p => !knownPerms.has(p));
+        if (extra.length > 0) grouped.push({ label: "Other", permissions: extra });
+        return grouped;
+    })();
+
+    const { confirm, ConfirmDialog } = useConfirm();
     const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
     const parsePermissions = (value: Role["permissions"]): string[] => {
         if (Array.isArray(value)) return value;
@@ -101,7 +136,7 @@ export default function RolesPage() {
             toast.error("System roles cannot be deleted.");
             return;
         }
-        if (!confirm("Are you sure you want to delete this role? Users with this role might lose access.")) return;
+        if (!await confirm({ message: "Are you sure you want to delete this role? Users with this role might lose access.", variant: "danger" })) return;
         try {
             await roleService.delete(role.id!);
             toast.success("Role deleted");
@@ -172,7 +207,7 @@ export default function RolesPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-zinc-800"></div>
+                        <PageSpinner />
                     </div>
                 ) : roles.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
@@ -281,21 +316,36 @@ export default function RolesPage() {
                     </div>
 
                     <div className="space-y-3 border-t pt-4 border-b pb-4">
-                        <Label>Granular Permissions</Label>
-                        <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto p-2 bg-slate-50 rounded border border-slate-200">
-                            {ALL_PERMISSIONS.map(perm => (
-                                <div key={perm} className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        id={`perm-${perm}`}
-                                        className="rounded border-gray-300 text-zinc-600 shadow-sm focus:border-zinc-300 focus:ring focus:ring-zinc-200 focus:ring-opacity-50"
-                                        checked={selectedPermissions.includes(perm)}
-                                        onChange={() => !editingRole?.isSystemRole && togglePermission(perm)}
-                                        disabled={!!(editingRole?.isSystemRole)}
-                                    />
-                                    <Label htmlFor={`perm-${perm}`} className="text-xs font-mono cursor-pointer">{perm}</Label>
+                        <div className="flex items-center justify-between">
+                            <Label>Granular Permissions</Label>
+                            <span className="text-xs text-slate-400">{selectedPermissions.length} selected</span>
+                        </div>
+                        <div className="max-h-[280px] overflow-y-auto space-y-4 pr-1">
+                            {permissionGroups.map(group => (
+                                <div key={group.label}>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 px-1">{group.label}</p>
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                        {group.permissions.map(perm => (
+                                            <div key={perm} className="flex items-center space-x-2 px-2 py-1.5 rounded-md hover:bg-slate-100 transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    id={`perm-${perm}`}
+                                                    className="rounded border-gray-300 text-zinc-600 shadow-sm focus:border-zinc-300 focus:ring focus:ring-zinc-200 focus:ring-opacity-50"
+                                                    checked={selectedPermissions.includes(perm)}
+                                                    onChange={() => !editingRole?.isSystemRole && togglePermission(perm)}
+                                                    disabled={!!(editingRole?.isSystemRole)}
+                                                />
+                                                <Label htmlFor={`perm-${perm}`} className="text-xs font-mono cursor-pointer leading-tight">
+                                                    {perm.replace(/_/g, ' ')}
+                                                </Label>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             ))}
+                            {permissionGroups.length === 0 && (
+                                <p className="text-xs text-slate-400 italic text-center py-4">Loading permissions…</p>
+                            )}
                         </div>
                     </div>
 
@@ -310,6 +360,7 @@ export default function RolesPage() {
                         )}
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

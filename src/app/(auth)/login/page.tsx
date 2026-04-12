@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -14,78 +14,21 @@ import {
 } from "@/components/ui/card";
 import { authService } from "@/services/authService";
 import { mfaService } from "@/services/mfaService";
-import { ssoAuthService } from "@/services/ssoAuthService";
 import api from "@/lib/axios";
-import { Building2, Chrome, ShieldCheck, Smartphone } from "lucide-react";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface ActiveSsoConfig {
-    enabled: boolean;
-    provider?: string; // e.g. "GOOGLE", "AZURE_AD", "OKTA", "SAML"
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-const SSO_PROVIDER_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
-    GOOGLE: { label: "Google", icon: <Chrome className="mr-2 h-4 w-4" /> },
-    AZURE_AD: { label: "Microsoft", icon: <Building2 className="mr-2 h-4 w-4" /> },
-    OKTA: { label: "Okta", icon: <ShieldCheck className="mr-2 h-4 w-4" /> },
-    SAML: { label: "Enterprise SAML", icon: <ShieldCheck className="mr-2 h-4 w-4 text-slate-500" /> },
-    GITHUB: { label: "GitHub", icon: <ShieldCheck className="mr-2 h-4 w-4" /> },
-    CUSTOM_OAUTH2: { label: "SSO", icon: <ShieldCheck className="mr-2 h-4 w-4" /> },
-};
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { Smartphone } from "lucide-react";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
-    const [ssoProvider, setSsoProvider] = useState("");
-
-    // Dynamic SSO discovery
-    const [activeSso, setActiveSso] = useState<ActiveSsoConfig | null>(null);
-    const [ssoLoading, setSsoLoading] = useState(false);
-    const orgIdDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // MFA challenge state
     const [mfaChallengeToken, setMfaChallengeToken] = useState<string | null>(null);
     const [mfaCode, setMfaCode] = useState("");
     const [isMfaSubmitting, setIsMfaSubmitting] = useState(false);
 
-    const { register, handleSubmit, watch, formState: { errors } } = useForm();
-    const orgIdValue = watch("organisationId");
-
-    // ── SSO Discovery ─────────────────────────────────────────────────────────
-    useEffect(() => {
-        if (orgIdDebounceRef.current) clearTimeout(orgIdDebounceRef.current);
-        const trimmed = String(orgIdValue ?? "").trim();
-
-        if (!UUID_RE.test(trimmed)) {
-            setActiveSso(null);
-            return;
-        }
-
-        orgIdDebounceRef.current = setTimeout(async () => {
-            setSsoLoading(true);
-            try {
-                const res = await api.get<ActiveSsoConfig>("/auth/sso/public", {
-                    params: { orgId: trimmed },
-                });
-                setActiveSso(res.data);
-            } catch {
-                setActiveSso(null);
-            } finally {
-                setSsoLoading(false);
-            }
-        }, 500);
-
-        return () => {
-            if (orgIdDebounceRef.current) clearTimeout(orgIdDebounceRef.current);
-        };
-    }, [orgIdValue]);
+    const { register, handleSubmit, formState: { errors } } = useForm();
 
     // ── Password Login ─────────────────────────────────────────────────────────
     const onSubmit = async (data: any) => {
@@ -142,27 +85,6 @@ export default function LoginPage() {
         }
     };
 
-    // ── SSO Login ──────────────────────────────────────────────────────────────
-    const handleSsoLogin = async (provider: string) => {
-        const orgId = String(orgIdValue ?? "").trim();
-        if (!orgId) {
-            toast.error("Please enter your Organization ID to continue with SSO");
-            return;
-        }
-        try {
-            setSsoProvider(provider);
-            const redirectUri = `${window.location.origin}/login/sso-callback`;
-            const url = provider === "SAML"
-                ? await ssoAuthService.getSamlRedirectUrl({ organisationId: orgId, provider })
-                : await ssoAuthService.getOAuth2AuthorizeUrl({ organisationId: orgId, provider, redirectUri });
-            window.location.href = url;
-        } catch (error: any) {
-            toast.error(error.response?.data?.message || `Failed to initiate ${provider} SSO`);
-        } finally {
-            setSsoProvider("");
-        }
-    };
-
     // ── MFA Step ───────────────────────────────────────────────────────────────
     if (mfaChallengeToken) {
         return (
@@ -213,10 +135,6 @@ export default function LoginPage() {
         );
     }
 
-    // ── SSO button visibility ──────────────────────────────────────────────────
-    const showSsoSection = activeSso?.enabled === true && activeSso.provider;
-    const ssoProvider_ = activeSso?.provider ?? "";
-
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50/50 p-4">
             <Card className="w-full max-w-lg shadow-xl border-t-4 border-t-emerald-600">
@@ -263,19 +181,6 @@ export default function LoginPage() {
                                 <p className="text-sm text-red-500">{errors.password.message as string}</p>
                             )}
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="organisationId" className="text-slate-600">
-                                Organization ID{" "}
-                                <span className="text-slate-400 font-normal">
-                                    (optional — only if your email exists in multiple orgs)
-                                </span>
-                            </Label>
-                            <Input
-                                id="organisationId"
-                                placeholder="e.g. 18571af6-3a7e-4a9e-a85f-754fccb96715"
-                                {...register("organisationId")}
-                            />
-                        </div>
                     </CardContent>
                     <CardFooter className="flex flex-col space-y-4">
                         <Button
@@ -285,39 +190,6 @@ export default function LoginPage() {
                         >
                             {isLoading ? "Signing in..." : "Sign in"}
                         </Button>
-
-                        {/* SSO section — only visible when org has an active SSO provider */}
-                        {ssoLoading && (
-                            <p className="text-xs text-center text-slate-400 animate-pulse">
-                                Checking SSO configuration…
-                            </p>
-                        )}
-
-                        {showSsoSection && (
-                            <>
-                                <div className="relative w-full py-2">
-                                    <div className="absolute inset-0 flex items-center">
-                                        <span className="w-full border-t border-slate-200" />
-                                    </div>
-                                    <div className="relative flex justify-center text-xs uppercase">
-                                        <span className="bg-white px-2 text-slate-500">Or continue with SSO</span>
-                                    </div>
-                                </div>
-
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="w-full border-slate-200 hover:bg-slate-50"
-                                    disabled={Boolean(ssoProvider)}
-                                    onClick={() => handleSsoLogin(ssoProvider_)}
-                                >
-                                    {SSO_PROVIDER_LABELS[ssoProvider_]?.icon}
-                                    {ssoProvider === ssoProvider_
-                                        ? "Starting SSO…"
-                                        : `Continue with ${SSO_PROVIDER_LABELS[ssoProvider_]?.label ?? ssoProvider_}`}
-                                </Button>
-                            </>
-                        )}
 
                         <div className="text-sm text-center text-gray-500 pt-4 border-t space-y-2">
                             <div>
@@ -330,12 +202,6 @@ export default function LoginPage() {
                                 Need to create a new workspace?{" "}
                                 <Link href="/register-tenant" className="font-semibold text-emerald-600 hover:underline">
                                     Register Organization
-                                </Link>
-                            </div>
-                            <div>
-                                Joining an existing workspace?{" "}
-                                <Link href="/register" className="font-semibold text-emerald-600 hover:underline">
-                                    Create User Account
                                 </Link>
                             </div>
                         </div>

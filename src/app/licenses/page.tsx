@@ -10,10 +10,13 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Key, AlertTriangle, BarChart2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 type TabType = "all" | "expiring" | "over-allocated";
 
@@ -27,6 +30,7 @@ export default function LicensesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingLicense, setEditingLicense] = useState<SoftwareLicense | null>(null);
     const [utilization, setUtilization] = useState<{ totalSeats: number; totalAllocated: number; utilizationPct: number } | null>(null);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<SoftwareLicenseDto>();
 
@@ -99,7 +103,7 @@ export default function LicensesPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this license?")) return;
+        if (!await confirm({ message: "Delete this license?", variant: "danger" })) return;
         setDeletingId(id);
         try {
             await licenseService.delete(id);
@@ -230,7 +234,7 @@ export default function LicensesPage() {
                 <CardContent className="p-0">
                     {isLoading ? (
                         <div className="h-40 flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+                            <PageSpinner />
                         </div>
                     ) : displayedLicenses.length === 0 ? (
                         <div className="flex flex-col items-center justify-center p-12 text-center">
@@ -403,6 +407,7 @@ export default function LicensesPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

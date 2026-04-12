@@ -4,12 +4,15 @@ import { useState, useEffect } from "react";
 import { User, UserDto, MfaSetupResponse } from "@/types";
 import { userService } from "@/services/userService";
 import { organisationService } from "@/services/organisationService";
+import { departmentService } from "@/services/departmentService";
+import { roleService } from "@/services/roleService";
 import { mfaService } from "@/services/mfaService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { useForm } from "react-hook-form";
 import { UserCircle, Mail, Phone, Building, Briefcase, Shield, Save, ShieldCheck, ShieldOff } from "lucide-react";
@@ -19,6 +22,8 @@ export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [organisatonName, setOrganisationName] = useState<string>("Loading...");
+    const [departmentName, setDepartmentName] = useState<string>("");
+    const [roleName, setRoleName] = useState<string>("");
 
     // MFA state
     const [mfaEnabled, setMfaEnabled] = useState(false);
@@ -95,17 +100,23 @@ export default function ProfilePage() {
                     jobTitle: freshUser.jobTitle || "",
                 });
 
-                // Fetch Organisation name
-                if (freshUser.organisationId) {
-                    try {
-                        const org = await organisationService.get(freshUser.organisationId);
-                        setOrganisationName(org.name);
-                    } catch (e) {
-                        console.error("Failed to fetch organisation name:", e);
-                        setOrganisationName("Unknown Organisation");
-                    }
+                // Fetch Organisation, Department, and Role names in parallel
+                const [orgResult, deptResult, roleResult] = await Promise.allSettled([
+                    freshUser.organisationId ? organisationService.get(freshUser.organisationId) : Promise.resolve(null),
+                    freshUser.departmentId ? departmentService.get(freshUser.departmentId) : Promise.resolve(null),
+                    freshUser.roleId ? roleService.get(freshUser.roleId) : Promise.resolve(null),
+                ]);
+
+                if (orgResult.status === "fulfilled") {
+                    setOrganisationName(orgResult.value?.name ?? "No Organisation Assigned");
                 } else {
-                    setOrganisationName("No Organisation Assigned");
+                    setOrganisationName("Unknown Organisation");
+                }
+                if (deptResult.status === "fulfilled" && deptResult.value) {
+                    setDepartmentName(deptResult.value.name);
+                }
+                if (roleResult.status === "fulfilled" && roleResult.value) {
+                    setRoleName(roleResult.value.name);
                 }
             } catch (error) {
                 console.error("Error loading profile:", error);
@@ -156,7 +167,7 @@ export default function ProfilePage() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <PageSpinner />
             </div>
         );
     }
@@ -205,13 +216,15 @@ export default function ProfilePage() {
                             <Building className="h-4 w-4 text-slate-400 shrink-0" />
                             <span>{organisatonName}</span>
                         </div>
-                        <div className="flex items-center gap-3 text-sm text-slate-600">
-                            <Briefcase className="h-4 w-4 text-slate-400 shrink-0" />
-                            <span>Department ID: {user.departmentId || 'N/A'}</span>
-                        </div>
+                        {(departmentName || user.departmentId) && (
+                            <div className="flex items-center gap-3 text-sm text-slate-600">
+                                <Briefcase className="h-4 w-4 text-slate-400 shrink-0" />
+                                <span>{departmentName || "Department not found"}</span>
+                            </div>
+                        )}
                         <div className="flex items-center gap-3 text-sm text-indigo-700 bg-indigo-50 p-2 rounded-md font-medium border border-indigo-100 mt-2">
                             <Shield className="h-4 w-4 text-indigo-500 shrink-0" />
-                            <span>Role ID: {user.roleId || 'N/A'}</span>
+                            <span>{roleName || "No role assigned"}</span>
                         </div>
                     </CardContent>
                 </Card>

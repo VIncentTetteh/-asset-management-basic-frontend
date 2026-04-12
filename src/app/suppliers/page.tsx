@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import {
     Plus, Pencil,
@@ -22,6 +23,8 @@ import {
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 export default function SuppliersPage() {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -29,6 +32,7 @@ export default function SuppliersPage() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<SupplierDto>();
 
@@ -82,7 +86,7 @@ export default function SuppliersPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this supplier?")) return;
+        if (!await confirm({ message: "Are you sure you want to delete this supplier?", variant: "danger" })) return;
         setDeletingId(id);
         try {
             await supplierService.delete(id);
@@ -163,7 +167,7 @@ export default function SuppliersPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                        <PageSpinner />
                     </div>
                 ) : suppliers.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
@@ -308,6 +312,7 @@ export default function SuppliersPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

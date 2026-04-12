@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
+import {
     Asset, AssetHistory, AssetCustomField, AssetCustomFieldDto,
-    Department, Organisation, Category, Location, User 
+    Department, Organisation, Category, Location, User
 } from "@/types";
 import { assetService } from "@/services/assetService";
 import { assetCustomFieldService } from "@/services/assetCustomFieldService";
@@ -27,11 +27,12 @@ interface Props {
     locations: Location[];
     categories: Category[];
     users: User[];
+    organisations?: Organisation[];
 }
 
 type Tab = "overview" | "history" | "custom_fields" | "qrcode";
 
-export function AssetDetailModal({ isOpen, onClose, asset, departments, locations, categories, users }: Props) {
+export function AssetDetailModal({ isOpen, onClose, asset, departments, locations, categories, users, organisations = [] }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>("overview");
     const [history, setHistory] = useState<AssetHistory[]>([]);
     const [customFields, setCustomFields] = useState<AssetCustomField[]>([]);
@@ -46,6 +47,7 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
     const locMap = new Map(locations.map(l => [l.id, l.name]));
     const catMap = new Map(categories.map(c => [c.id, c.name]));
     const userMap = new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`]));
+    const orgMap = new Map(organisations.map(o => [o.id, o.name]));
 
     const resolveQrPayload = (payload: Blob | Record<string, unknown> | string): string => {
         if (payload instanceof Blob) {
@@ -218,6 +220,7 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                                 <DetailItem label="Status" value={asset.status ? asset.status.replace(/_/g, ' ') : "—"} highlight />
                                 <DetailItem label="Condition" value={asset.condition} />
                                 <DetailItem label="Category" value={catMap.get(asset.categoryId || "") || "Uncategorized"} />
+                                <DetailItem label="Organisation" value={orgMap.get(asset.organisationId || "") || "—"} />
                                 <DetailItem label="Department" value={deptMap.get(asset.departmentId || "") || "Not Assigned"} />
                                 <DetailItem label="Location" value={locMap.get(asset.locationId || "") || "Not Assigned"} />
                                 <DetailItem label="Assigned To" value={userMap.get(asset.assignedUserId || "") || "Unassigned"} />

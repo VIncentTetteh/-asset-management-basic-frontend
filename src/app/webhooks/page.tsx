@@ -12,6 +12,8 @@ import { Loader2, Webhook as WebhookIcon, Plus, CheckCircle, XCircle, Trash2, Ac
 import { toast } from "react-hot-toast";
 import { useForm } from "react-hook-form";
 import { formatRelativeTime } from "@/lib/time";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const AVAILABLE_EVENTS = [
     "asset.created", "asset.updated", "asset.deleted",
@@ -43,6 +45,7 @@ export default function WebhooksPage() {
     const [deliveries, setDeliveries] = useState<WebhookDelivery[]>([]);
     const [loadingDeliveries, setLoadingDeliveries] = useState(false);
     const [selectedDelivery, setSelectedDelivery] = useState<WebhookDelivery | null>(null);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<WebhookFormData>();
 
@@ -112,7 +115,7 @@ export default function WebhooksPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this webhook?")) return;
+        if (!await confirm({ message: "Delete this webhook?", variant: "danger" })) return;
         setDeletingId(id);
         try {
             await webhookService.delete(id);
@@ -432,6 +435,7 @@ export default function WebhooksPage() {
                 <div className="flex justify-end pt-4 border-t mt-4">
                     <Button variant="outline" onClick={() => setIsDeliveriesModalOpen(false)}>Close</Button>
                 </div>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

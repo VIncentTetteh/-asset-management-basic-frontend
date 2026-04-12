@@ -12,15 +12,21 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { TableRowSkeleton, StatCardSkeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, Wallet, TrendingUp, AlertTriangle, History } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, TrendingUp, AlertTriangle, History, Search, DollarSign, PieChart, CheckCircle2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 export default function BudgetsPage() {
     const [budgets, setBudgets] = useState<Budget[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSpendModalOpen, setIsSpendModalOpen] = useState(false);
     const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
@@ -33,6 +39,7 @@ export default function BudgetsPage() {
     const [history, setHistory] = useState<AuditEvent[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [activeBudgetName, setActiveBudgetName] = useState("");
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<BudgetDto>();
 
@@ -120,15 +127,24 @@ export default function BudgetsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this budget?")) return;
+        if (!await confirm({ message: "Delete this budget?", variant: "danger" })) return;
+        setDeletingId(id);
         try {
             await budgetService.delete(id);
             toast.success("Budget deleted");
             fetchAll();
         } catch {
             toast.error("Failed to delete budget");
+        } finally {
+            setDeletingId(null);
         }
     };
+
+    const filteredBudgets = budgets.filter(b =>
+        !searchTerm.trim() ||
+        b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        deptName(b.departmentId).toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     const onSubmit = async (data: BudgetDto) => {
         const payload = { ...data };
@@ -171,67 +187,119 @@ export default function BudgetsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Budgets</h1>
-                    <p className="text-slate-500">Track department and project budgets.</p>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">Budget Management</h1>
+                    <p className="text-slate-500 text-sm mt-0.5">Track department and project budgets in real time.</p>
                 </div>
-                <Button onClick={handleOpenCreate} className="bg-purple-600 hover:bg-purple-700">
+                <Button onClick={handleOpenCreate} className="bg-purple-600 hover:bg-purple-700 shadow-sm">
                     <Plus className="mr-2 h-4 w-4" /> Add Budget
                 </Button>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-4">
-                <Card className="border-slate-200">
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 rounded-lg"><Wallet className="h-5 w-5 text-blue-600" /></div>
-                        <div>
-                            <p className="text-xs text-slate-500">Total Budgets</p>
-                            <p className="text-xl font-bold text-slate-900">{budgets.length}</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="border-slate-200">
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <div className="p-2 bg-purple-100 rounded-lg"><TrendingUp className="h-5 w-5 text-purple-600" /></div>
-                        <div>
-                            <p className="text-xs text-slate-500">Total Allocated</p>
-                            <p className="text-xl font-bold text-slate-900">{totalAllocated.toLocaleString()}</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="border-slate-200">
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <div className="p-2 bg-amber-100 rounded-lg"><TrendingUp className="h-5 w-5 text-amber-600" /></div>
-                        <div>
-                            <p className="text-xs text-slate-500">Total Spent</p>
-                            <p className="text-xl font-bold text-slate-900">{totalSpent.toLocaleString()}</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="border-slate-200">
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <div className="p-2 bg-emerald-100 rounded-lg"><Wallet className="h-5 w-5 text-emerald-600" /></div>
-                        <div>
-                            <p className="text-xs text-slate-500">Total Remaining</p>
-                            <p className="text-xl font-bold text-slate-900">{totalRemaining.toLocaleString()}</p>
-                        </div>
-                    </CardContent>
-                </Card>
+            {/* Stat Cards */}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {isLoading ? (
+                    Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
+                ) : ([
+                    {
+                        label: "Active Budgets",
+                        value: budgets.filter(b => b.status === "ACTIVE").length,
+                        icon: <Wallet className="h-5 w-5" />,
+                        iconBg: "bg-purple-100 text-purple-600",
+                        sub: `${budgets.length} total`,
+                    },
+                    {
+                        label: "Total Allocated",
+                        value: `${totalAllocated.toLocaleString()}`,
+                        icon: <DollarSign className="h-5 w-5" />,
+                        iconBg: "bg-blue-100 text-blue-600",
+                        sub: "across all budgets",
+                    },
+                    {
+                        label: "Total Spent",
+                        value: `${totalSpent.toLocaleString()}`,
+                        icon: <TrendingUp className="h-5 w-5" />,
+                        iconBg: "bg-amber-100 text-amber-600",
+                        sub: totalAllocated ? `${((totalSpent / totalAllocated) * 100).toFixed(0)}% utilized` : "—",
+                    },
+                    {
+                        label: "Remaining",
+                        value: `${totalRemaining.toLocaleString()}`,
+                        icon: <CheckCircle2 className="h-5 w-5" />,
+                        iconBg: "bg-emerald-100 text-emerald-600",
+                        sub: totalAllocated ? `${((totalRemaining / totalAllocated) * 100).toFixed(0)}% available` : "—",
+                    },
+                ] as const).map((s) => (
+                    <Card key={s.label} className="border-slate-200 hover:shadow-md transition-shadow">
+                        <CardContent className="p-5">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-slate-500 mb-1">{s.label}</p>
+                                    <p className="text-2xl font-bold text-slate-900 tabular-nums truncate">{s.value}</p>
+                                    <p className="text-[11px] text-slate-400 mt-1">{s.sub}</p>
+                                </div>
+                                <div className={`p-2.5 rounded-xl shrink-0 ${s.iconBg}`}>{s.icon}</div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
 
-            <Card className="border-slate-200">
-                <CardHeader className="pb-0">
+            {/* Overall utilization bar */}
+            {!isLoading && totalAllocated > 0 && (
+                <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                    <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2">
+                            <PieChart className="h-4 w-4 text-slate-500" />
+                            <span className="text-sm font-semibold text-slate-700">Overall Budget Utilization</span>
+                        </div>
+                        <span className="text-sm font-bold text-slate-900 tabular-nums">
+                            {((totalSpent / totalAllocated) * 100).toFixed(1)}%
+                        </span>
+                    </div>
+                    <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                            className={`h-full rounded-full transition-all duration-700 ${
+                                (totalSpent / totalAllocated) >= 1 ? "bg-red-500" :
+                                (totalSpent / totalAllocated) >= 0.8 ? "bg-amber-500" :
+                                "bg-gradient-to-r from-emerald-500 to-teal-500"
+                            }`}
+                            style={{ width: `${Math.min(100, (totalSpent / totalAllocated) * 100)}%` }}
+                        />
+                    </div>
+                    <div className="flex justify-between mt-1.5 text-xs text-slate-400">
+                        <span>Spent: {totalSpent.toLocaleString()}</span>
+                        <span>Allocated: {totalAllocated.toLocaleString()}</span>
+                    </div>
+                </div>
+            )}
+
+            <Card className="border-slate-200 shadow-sm">
+                <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3">
                     <CardTitle className="text-base font-semibold text-slate-700">
-                        {budgets.length} budget{budgets.length !== 1 ? "s" : ""}
+                        {filteredBudgets.length} budget{filteredBudgets.length !== 1 ? "s" : ""}
+                        {searchTerm && ` matching "${searchTerm}"`}
                     </CardTitle>
+                    <div className="relative w-56">
+                        <Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400" />
+                        <Input
+                            placeholder="Filter budgets…"
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="pl-8 h-8 text-sm"
+                        />
+                    </div>
                 </CardHeader>
                 <CardContent className="p-0">
                     {isLoading ? (
-                        <div className="h-40 flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
-                        </div>
-                    ) : budgets.length === 0 ? (
+                        <table className="w-full text-sm">
+                            <tbody>
+                                {Array.from({ length: 4 }).map((_, i) => <TableRowSkeleton key={i} cols={8} />)}
+                            </tbody>
+                        </table>
+                    ) : filteredBudgets.length === 0 ? (
                         <div className="flex flex-col items-center justify-center p-12 text-center">
                             <Wallet className="h-12 w-12 text-slate-300 mb-4" />
                             <h3 className="text-lg font-medium text-slate-900">No budgets found</h3>
@@ -241,60 +309,66 @@ export default function BudgetsPage() {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b border-slate-100 bg-slate-50/50">
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Name</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Department</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">FY</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Allocated</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600 min-w-[160px]">Spent</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Remaining</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Status</th>
-                                        <th className="text-right py-3 px-4 font-medium text-slate-600">Actions</th>
+                                    <tr className="border-b border-slate-100 bg-slate-50/60">
+                                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Department</th>
+                                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">FY</th>
+                                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Allocated</th>
+                                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider min-w-[180px]">Utilization</th>
+                                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Remaining</th>
+                                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                        <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {budgets.map((b) => {
+                                    {filteredBudgets.map((b) => {
                                         const pct = spendPct(b);
                                         const exceeded = pct >= 100;
+                                        const warning = pct >= 80 && pct < 100;
                                         return (
-                                            <tr key={b.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                                                <td className="py-3 px-4 font-medium text-slate-900">{b.name}</td>
-                                                <td className="py-3 px-4 text-slate-600">{deptName(b.departmentId)}</td>
-                                                <td className="py-3 px-4 text-slate-600">{b.fiscalYear || "—"}</td>
-                                                <td className="py-3 px-4 text-slate-700">{(b.currency || "USD")} {b.totalAmount.toLocaleString()}</td>
-                                                <td className="py-3 px-4">
-                                                    <div className="space-y-1">
-                                                        <div className={`flex items-center gap-1 ${exceeded ? "text-red-600" : "text-slate-700"}`}>
-                                                            {exceeded && <AlertTriangle className="h-3.5 w-3.5" />}
-                                                            {b.spentAmount.toLocaleString()}
+                                            <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50/70 transition-colors group">
+                                                <td className="py-3.5 px-4 font-semibold text-slate-900">{b.name}</td>
+                                                <td className="py-3.5 px-4 text-slate-600 text-sm">{deptName(b.departmentId)}</td>
+                                                <td className="py-3.5 px-4 text-slate-500 text-sm">{b.fiscalYear || "—"}</td>
+                                                <td className="py-3.5 px-4 text-slate-700 font-medium tabular-nums">
+                                                    <span className="text-xs text-slate-400 mr-1">{b.currency || "USD"}</span>
+                                                    {b.totalAmount.toLocaleString()}
+                                                </td>
+                                                <td className="py-3.5 px-4">
+                                                    <div className="space-y-1.5">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className={`text-sm font-semibold tabular-nums ${exceeded ? "text-red-600" : warning ? "text-amber-600" : "text-slate-700"}`}>
+                                                                {exceeded && <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />}
+                                                                {b.spentAmount.toLocaleString()}
+                                                            </span>
+                                                            <span className="text-xs font-bold text-slate-400">{pct.toFixed(0)}%</span>
                                                         </div>
-                                                        <div className="w-32 bg-slate-100 rounded-full h-1.5">
+                                                        <div className="w-36 bg-slate-100 rounded-full h-2 overflow-hidden">
                                                             <div
-                                                                className={`h-1.5 rounded-full ${exceeded ? "bg-red-500" : pct > 75 ? "bg-amber-500" : "bg-emerald-500"}`}
-                                                                style={{ width: `${pct}%` }}
+                                                                className={`h-full rounded-full transition-all ${exceeded ? "bg-red-500" : warning ? "bg-amber-400" : "bg-gradient-to-r from-emerald-500 to-teal-400"}`}
+                                                                style={{ width: `${Math.min(100, pct)}%` }}
                                                             />
                                                         </div>
-                                                        <p className="text-xs text-slate-400">{pct.toFixed(0)}%</p>
                                                     </div>
                                                 </td>
-                                                <td className="py-3 px-4 text-slate-700">{b.remainingAmount.toLocaleString()}</td>
-                                                <td className="py-3 px-4">
-                                                    <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${getStatusStyles(b.status)}`}>
+                                                <td className="py-3.5 px-4 text-slate-700 font-medium tabular-nums">{b.remainingAmount.toLocaleString()}</td>
+                                                <td className="py-3.5 px-4">
+                                                    <span className={`px-2.5 py-1 text-xs font-bold rounded-full border ${getStatusStyles(b.status)}`}>
                                                         {b.status}
                                                     </span>
                                                 </td>
-                                                <td className="py-3 px-4">
+                                                <td className="py-3.5 px-4">
                                                     <div className="flex justify-end gap-1">
-                                                        <Button variant="outline" size="sm" onClick={() => handleOpenSpend(b.id)} className="h-7 px-2 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50">
-                                                            Spend
+                                                        <Button variant="outline" size="sm" onClick={() => handleOpenSpend(b.id)} className="h-7 px-2.5 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50 font-semibold">
+                                                            + Spend
                                                         </Button>
-                                                        <Button variant="outline" size="sm" title="History" onClick={() => handleOpenHistory(b)} className="h-7 px-2 text-slate-600 hover:bg-slate-50">
+                                                        <Button variant="outline" size="sm" title="Expenditure History" onClick={() => handleOpenHistory(b)} className="h-7 px-2 text-slate-500 hover:bg-slate-50">
                                                             <History className="h-3.5 w-3.5" />
                                                         </Button>
                                                         <Button variant="outline" size="sm" onClick={() => handleOpenEdit(b)} className="h-7 px-2">
                                                             <Pencil className="h-3 w-3" />
                                                         </Button>
-                                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(b.id)} className="h-7 px-2 text-red-600 hover:bg-red-50">
+                                                        <Button variant="ghost" size="sm" isLoading={deletingId === b.id} onClick={() => handleDelete(b.id)} className="h-7 px-2 text-red-500 hover:bg-red-50">
                                                             <Trash2 className="h-3 w-3" />
                                                         </Button>
                                                     </div>
@@ -420,7 +494,7 @@ export default function BudgetsPage() {
             >
                 <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
                     {isLoadingHistory ? (
-                        <div className="py-12 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" /></div>
+                        <div className="py-12 flex justify-center"><Spinner size="lg" className="text-purple-600" /></div>
                     ) : history.length === 0 ? (
                         <div className="py-12 text-center text-slate-500 italic">No recorded expenditures found in audit logs.</div>
                     ) : (
@@ -444,6 +518,7 @@ export default function BudgetsPage() {
                         <Button variant="outline" onClick={() => setIsHistoryModalOpen(false)}>Close Activity Log</Button>
                     </div>
                 </div>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

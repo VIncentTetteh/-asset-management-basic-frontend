@@ -13,9 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, ClipboardCheck, Calendar, Layers, User as UserIcon, CheckSquare, XSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 export default function AuditsPage() {
     const [audits, setAudits] = useState<Audit[]>([]);
@@ -55,6 +58,7 @@ export default function AuditsPage() {
 
     const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
     const userMap = useMemo(() => new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`])), [users]);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const handleOpenCreate = () => {
         setEditingAudit(null);
@@ -83,7 +87,7 @@ export default function AuditsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this audit record?")) return;
+        if (!await confirm({ message: "Are you sure you want to delete this audit record?", variant: "danger" })) return;
         try {
             await auditService.delete(id);
             toast.success("Audit deleted");
@@ -149,7 +153,7 @@ export default function AuditsPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fuchsia-600"></div>
+                        <PageSpinner />
                     </div>
                 ) : audits.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
@@ -301,6 +305,7 @@ export default function AuditsPage() {
                         <Button type="submit" isLoading={isSubmitting} className="bg-fuchsia-600 hover:bg-fuchsia-700">
                             {editingAudit ? "Save Changes" : "Schedule Audit"}
                         </Button>
+                    {ConfirmDialog}
                     </div>
                 </form>
             </Modal>

@@ -13,12 +13,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { Plus, Pencil, Trash2, ShoppingCart, Building2, CheckCircle2, XCircle, MoreHorizontal, Layers } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 export default function PurchaseOrdersPage() {
     const { format } = useCurrency();
@@ -58,6 +61,7 @@ export default function PurchaseOrdersPage() {
 
     const supplierMap = useMemo(() => new Map(suppliers.map(s => [s.id, s.name])), [suppliers]);
     const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
+    const { confirm, ConfirmDialog } = useConfirm();
     const normalizePoStatus = (status?: string): string | undefined => {
         if (!status) return undefined;
         if (status === "PENDING") return POStatus.SUBMITTED;
@@ -94,7 +98,7 @@ export default function PurchaseOrdersPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this purchase order?")) return;
+        if (!await confirm({ message: "Are you sure you want to delete this purchase order?", variant: "danger" })) return;
         setDeletingId(id);
         try {
             await purchaseOrderService.delete(id);
@@ -255,7 +259,7 @@ export default function PurchaseOrdersPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-600"></div>
+                        <PageSpinner />
                     </div>
                 ) : orders.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
@@ -423,6 +427,7 @@ export default function PurchaseOrdersPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

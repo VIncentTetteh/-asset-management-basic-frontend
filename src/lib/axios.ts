@@ -52,16 +52,60 @@ api.interceptors.request.use((config) => {
     return Promise.reject(error);
 });
 
-// Response interceptor: Handle 401 Unauthorized globally
+// Track in-flight token refresh to avoid duplicate requests
+let _refreshingToken: Promise<string | null> | null = null;
+
+async function refreshToken(): Promise<string | null> {
+    if (_refreshingToken) return _refreshingToken;
+    _refreshingToken = (async () => {
+        try {
+            const current = localStorage.getItem("token");
+            if (!current) return null;
+            const res = await axios.post(
+                "/api/v1/auth/refresh",
+                {},
+                { headers: { Authorization: `Bearer ${current}` } }
+            );
+            const newToken: string = res.data?.token;
+            if (newToken) {
+                localStorage.setItem("token", newToken);
+                api.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
+                return newToken;
+            }
+            return null;
+        } catch {
+            return null;
+        } finally {
+            _refreshingToken = null;
+        }
+    })();
+    return _refreshingToken;
+}
+
+// Response interceptor: Handle 401 and 403 globally
 api.interceptors.response.use((response) => {
     return response;
-}, (error) => {
+}, async (error) => {
+    const originalRequest = error.config;
+
     if (typeof window !== "undefined" && error.response?.status === 403) {
         const message = String(error.response?.data?.message || "").toLowerCase();
         if (message.includes("plan") || message.includes("subscription") || message.includes("limit")) {
             window.dispatchEvent(new CustomEvent("plan-limit-error", {
                 detail: { message: error.response?.data?.message || "Plan limit reached" }
             }));
+            return Promise.reject(error);
+        }
+
+        // Auto-refresh token on 403 (permissions may have been updated server-side)
+        // Only retry once to avoid infinite loops
+        if (!originalRequest._permissionsRetried) {
+            originalRequest._permissionsRetried = true;
+            const newToken = await refreshToken();
+            if (newToken) {
+                originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
+                return api(originalRequest);
+            }
         }
     }
 

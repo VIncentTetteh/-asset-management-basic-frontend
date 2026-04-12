@@ -77,6 +77,12 @@ export const roleService = {
         await api.delete(`/roles/${id}`);
     },
 
+    /** GET /roles/permissions — all available permission enum values */
+    getPermissions: async (): Promise<string[]> => {
+        const response = await api.get<string[]>("/roles/permissions");
+        return Array.isArray(response.data) ? response.data : [];
+    },
+
     /** PUT /roles/{id} */
     replace: async (id: string, data: RoleDto): Promise<Role> => {
         const payload: Record<string, unknown> = { ...data };

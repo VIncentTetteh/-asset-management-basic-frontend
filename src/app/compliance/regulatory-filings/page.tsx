@@ -14,6 +14,8 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, FileClock, Search, AlertTriangle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const STATUSES: FilingStatus[] = ["PENDING", "SUBMITTED", "OVERDUE", "ACKNOWLEDGED", "REJECTED"];
 
@@ -58,6 +60,7 @@ export default function RegulatoryFilingsPage() {
         acknowledged: items.filter(i => i.status === "ACKNOWLEDGED").length,
     }), [items]);
 
+    const { confirm, ConfirmDialog } = useConfirm();
     const filtered = useMemo(() => {
         if (!search.trim()) return items;
         const q = search.toLowerCase();
@@ -90,7 +93,7 @@ export default function RegulatoryFilingsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this filing?")) return;
+        if (!await confirm({ message: "Delete this filing?", variant: "danger" })) return;
         try {
             await regulatoryFilingService.delete(id);
             toast.success("Deleted");
@@ -269,6 +272,7 @@ export default function RegulatoryFilingsPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

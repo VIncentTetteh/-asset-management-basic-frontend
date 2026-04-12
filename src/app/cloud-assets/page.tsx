@@ -10,9 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Cloud, DollarSign } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const PROVIDER_COLORS: Record<string, string> = {
     AWS: "bg-orange-100 text-orange-700",
@@ -48,6 +51,7 @@ export default function CloudAssetsPage() {
 
     const assetForm = useForm<CloudAssetDto>();
     const costForm = useForm<CloudMonthlyCostDto>();
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const fetchAll = async (p = 0) => {
         try {
@@ -106,7 +110,7 @@ export default function CloudAssetsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this cloud asset?")) return;
+        if (!await confirm({ message: "Delete this cloud asset?", variant: "danger" })) return;
         setDeletingId(id);
         try {
             await cloudAssetService.delete(id);
@@ -214,7 +218,7 @@ export default function CloudAssetsPage() {
                 <CardContent className="p-0">
                     {isLoading ? (
                         <div className="h-40 flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+                            <PageSpinner />
                         </div>
                     ) : assets.length === 0 ? (
                         <div className="flex flex-col items-center justify-center p-12 text-center">
@@ -393,6 +397,7 @@ export default function CloudAssetsPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

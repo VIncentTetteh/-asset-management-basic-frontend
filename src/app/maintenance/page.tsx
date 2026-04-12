@@ -12,11 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { Plus, Pencil, Trash2, Wrench, Calendar, Hexagon, CheckCircle2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 export default function MaintenancePage() {
     const { format } = useCurrency();
@@ -56,6 +59,7 @@ export default function MaintenancePage() {
 
     const assetMap = useMemo(() => new Map(assets.map(a => [a.id, a.name])), [assets]);
     const assetTagMap = useMemo(() => new Map(assets.map(a => [a.id, a.assetTag])), [assets]);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const handleOpenCreate = () => {
         setEditingRecord(null);
@@ -89,7 +93,7 @@ export default function MaintenancePage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this maintenance log?")) return;
+        if (!await confirm({ message: "Are you sure you want to delete this maintenance log?", variant: "danger" })) return;
         setDeletingId(id);
         try {
             await maintenanceService.delete(id);
@@ -173,7 +177,7 @@ export default function MaintenancePage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+                        <PageSpinner />
                     </div>
                 ) : records.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
@@ -342,6 +346,7 @@ export default function MaintenancePage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

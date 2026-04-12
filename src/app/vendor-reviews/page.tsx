@@ -10,9 +10,12 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Star } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 const ScoreBadge = ({ score }: { score: number }) => {
     const color = score >= 4 ? "text-emerald-600 bg-emerald-50" : score >= 3 ? "text-amber-600 bg-amber-50" : "text-red-600 bg-red-50";
@@ -32,6 +35,7 @@ export default function VendorReviewsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingReview, setEditingReview] = useState<VendorReview | null>(null);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<VendorReviewDto>();
 
@@ -99,7 +103,7 @@ export default function VendorReviewsPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this review?")) return;
+        if (!await confirm({ message: "Delete this review?", variant: "danger" })) return;
         try {
             await vendorReviewService.delete(id);
             toast.success("Review deleted");
@@ -187,7 +191,7 @@ export default function VendorReviewsPage() {
                 <CardContent className="p-0">
                     {isLoading ? (
                         <div className="h-40 flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+                            <PageSpinner />
                         </div>
                     ) : reviews.length === 0 ? (
                         <div className="flex flex-col items-center justify-center p-12 text-center">
@@ -306,6 +310,7 @@ export default function VendorReviewsPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

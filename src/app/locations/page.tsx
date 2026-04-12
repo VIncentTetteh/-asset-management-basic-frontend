@@ -9,10 +9,13 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, MapPin, Building2, Layers, Navigation, AlertCircle, LocateFixed, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 export default function LocationsPage() {
     const [locations, setLocations] = useState<Location[]>([]);
@@ -21,6 +24,7 @@ export default function LocationsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingLocation, setEditingLocation] = useState<Location | null>(null);
     const [geoDetecting, setGeoDetecting] = useState(false);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<LocationDto>();
 
@@ -50,7 +54,8 @@ export default function LocationsPage() {
         navigator.geolocation.getCurrentPosition(
             async ({ coords }) => {
                 const { latitude, longitude } = coords;
-                setValue("geoCoordinates", `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+                setValue("latitude", parseFloat(latitude.toFixed(6)));
+                setValue("longitude", parseFloat(longitude.toFixed(6)));
                 try {
                     const res = await fetch(
                         `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
@@ -63,6 +68,9 @@ export default function LocationsPage() {
                         }
                         if (data.address?.country) {
                             setValue("country", data.address.country);
+                        }
+                        if (data.display_name) {
+                            setValue("address", data.display_name);
                         }
                     }
                 } catch {
@@ -81,7 +89,7 @@ export default function LocationsPage() {
 
     const handleOpenCreate = () => {
         setEditingLocation(null);
-        reset({ name: "", building: "", floor: "", room: "", city: "", country: "", geoCoordinates: "", parentLocationId: "" });
+        reset({ name: "", building: "", floor: "", room: "", city: "", country: "", address: "", latitude: null, longitude: null, parentLocationId: "" });
         setIsModalOpen(true);
     };
 
@@ -94,14 +102,16 @@ export default function LocationsPage() {
             room: location.room || "",
             city: location.city || "",
             country: location.country || "",
-            geoCoordinates: location.geoCoordinates || "",
+            address: location.address || "",
+            latitude: location.latitude ?? null,
+            longitude: location.longitude ?? null,
             parentLocationId: location.parentLocationId || "",
         });
         setIsModalOpen(true);
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this location?")) return;
+        if (!await confirm({ message: "Are you sure you want to delete this location?", variant: "danger" })) return;
         setDeletingId(id);
         try {
             await locationService.delete(id);
@@ -125,14 +135,17 @@ export default function LocationsPage() {
             return;
         }
 
-        // Clean empty optional strings
+        // Clean empty optional fields
         if (!data.parentLocationId) delete data.parentLocationId;
         if (!data.building) delete data.building;
         if (!data.floor) delete data.floor;
         if (!data.room) delete data.room;
         if (!data.city) delete data.city;
         if (!data.country) delete data.country;
-        if (!data.geoCoordinates) delete data.geoCoordinates;
+        if (!data.address) delete data.address;
+        if (data.latitude == null || isNaN(Number(data.latitude))) delete data.latitude;
+        if (data.longitude == null || isNaN(Number(data.longitude))) delete data.longitude;
+        delete data.geoCoordinates; // managed server-side from lat/lng
 
         try {
             if (editingLocation) {
@@ -170,7 +183,7 @@ export default function LocationsPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-600"></div>
+                        <PageSpinner />
                     </div>
                 ) : locations.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
@@ -237,14 +250,26 @@ export default function LocationsPage() {
                                         <p className="text-xs text-slate-400 italic">No physical space details.</p>
                                     )}
 
+                                    {/* Address */}
+                                    {location.address && (
+                                        <div className="pt-2 border-t border-slate-100">
+                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                                                <MapPin className="h-3.5 w-3.5" /> Address
+                                            </h4>
+                                            <p className="text-xs text-slate-600 leading-relaxed line-clamp-2" title={location.address}>
+                                                {location.address}
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {/* Geo Coordinates */}
-                                    {location.geoCoordinates && (
+                                    {(location.latitude != null && location.longitude != null) && (
                                         <div className="pt-2 border-t border-slate-100">
                                             <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
                                                 <Navigation className="h-3.5 w-3.5" /> Coordinates
                                             </h4>
-                                            <p className="text-xs font-mono text-slate-600 bg-slate-50 border border-slate-200 rounded px-2 py-1 truncate" title={location.geoCoordinates}>
-                                                {location.geoCoordinates}
+                                            <p className="text-xs font-mono text-slate-600 bg-slate-50 border border-slate-200 rounded px-2 py-1 truncate">
+                                                {location.latitude}, {location.longitude}
                                             </p>
                                         </div>
                                     )}
@@ -258,7 +283,7 @@ export default function LocationsPage() {
                                     )}
 
                                     {/* Empty Fallback */}
-                                    {!location.building && !location.floor && !location.room && !location.geoCoordinates && !location.parentLocationId && (
+                                    {!location.building && !location.floor && !location.room && !location.address && location.latitude == null && !location.parentLocationId && (
                                         <div className="flex flex-col items-center justify-center opacity-50 py-2">
                                             <AlertCircle className="h-5 w-5 text-slate-300 mb-1" />
                                             <span className="text-[10px] text-slate-400 font-medium">BASIC RECORD</span>
@@ -329,16 +354,44 @@ export default function LocationsPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <Label htmlFor="geoCoordinates">Geo Coordinates</Label>
-                        <div className="flex gap-2">
-                            <Input id="geoCoordinates" placeholder="5.603700, -0.187000" {...register("geoCoordinates")} className="font-mono text-sm flex-1" />
-                            <Button type="button" variant="outline" size="sm" onClick={detectLocation} disabled={geoDetecting} className="shrink-0 gap-1.5">
-                                {geoDetecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}
-                                {geoDetecting ? "Detecting…" : "Detect"}
+                    <div className="pt-2 border-t">
+                        <div className="flex items-center justify-between mb-3">
+                            <p className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Coordinates</p>
+                            <Button type="button" variant="outline" size="sm" onClick={detectLocation} disabled={geoDetecting} className="gap-1.5 h-7 text-xs">
+                                {geoDetecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <LocateFixed className="h-3 w-3" />}
+                                {geoDetecting ? "Detecting…" : "Detect GPS"}
                             </Button>
                         </div>
-                        <p className="text-[11px] text-slate-400">Click Detect to auto-fill from your device's GPS and reverse-geocode city &amp; country.</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="latitude">Latitude</Label>
+                                <Input
+                                    id="latitude"
+                                    type="number"
+                                    step="any"
+                                    placeholder="5.657220"
+                                    {...register("latitude", { valueAsNumber: true })}
+                                    className="font-mono text-sm"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="longitude">Longitude</Label>
+                                <Input
+                                    id="longitude"
+                                    type="number"
+                                    step="any"
+                                    placeholder="-0.246748"
+                                    {...register("longitude", { valueAsNumber: true })}
+                                    className="font-mono text-sm"
+                                />
+                            </div>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1.5">Click "Detect GPS" to auto-fill from your device and reverse-geocode city, country &amp; address.</p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label htmlFor="address">Address <span className="text-slate-400 font-normal">(optional)</span></Label>
+                        <Input id="address" placeholder="123 Main St, Accra, Ghana" {...register("address")} />
                     </div>
 
                     <div className="space-y-1.5 pt-2 border-t">
@@ -360,6 +413,7 @@ export default function LocationsPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

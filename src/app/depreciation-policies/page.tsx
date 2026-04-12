@@ -10,10 +10,13 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Calculator, Info, CalendarClock, DollarSign } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+
 
 export default function DepreciationPoliciesPage() {
     const [policies, setPolicies] = useState<DepreciationPolicy[]>([]);
@@ -22,6 +25,7 @@ export default function DepreciationPoliciesPage() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingPolicy, setEditingPolicy] = useState<DepreciationPolicy | null>(null);
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<DepreciationPolicyDto>();
 
@@ -73,7 +77,7 @@ export default function DepreciationPoliciesPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this policy? Assets using it may be affected.")) return;
+        if (!await confirm({ message: "Are you sure you want to delete this policy? Assets using it may be affected.", variant: "danger" })) return;
         setDeletingId(id);
         try {
             await depreciationPolicyService.delete(id);
@@ -145,7 +149,7 @@ export default function DepreciationPoliciesPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        <PageSpinner />
                     </div>
                 ) : policies.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
@@ -264,6 +268,7 @@ export default function DepreciationPoliciesPage() {
                         </Button>
                     </div>
                 </form>
+        {ConfirmDialog}
             </Modal>
         </div>
     );

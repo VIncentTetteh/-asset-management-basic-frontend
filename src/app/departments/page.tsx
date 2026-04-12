@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Department, DepartmentDto } from "@/types";
 import { departmentService } from "@/services/departmentService";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, Layers, DollarSign, Users, Building, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Layers, DollarSign, Users, Building, AlertCircle, Search } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 export default function DepartmentsPage() {
     const [departments, setDepartments] = useState<Department[]>([]);
@@ -21,6 +23,22 @@ export default function DepartmentsPage() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDept, setEditingDept] = useState<Department | null>(null);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+    const { format, symbol } = useCurrency();
+
+    const filteredDepts = useMemo(() => {
+        const q = searchTerm.trim().toLowerCase();
+        if (!q) return departments;
+        return departments.filter(d =>
+            d.name.toLowerCase().includes(q) ||
+            d.departmentCode?.toLowerCase().includes(q) ||
+            d.description?.toLowerCase().includes(q) ||
+            d.costCenterCode?.toLowerCase().includes(q)
+        );
+    }, [departments, searchTerm]);
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<DepartmentDto>();
 
@@ -67,11 +85,17 @@ export default function DepartmentsPage() {
         setIsModalOpen(true);
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this department?")) return;
-        setDeletingId(id);
+    const handleDelete = (id: string) => {
+        setDeleteTargetId(id);
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTargetId) return;
+        setDeletingId(deleteTargetId);
+        setIsDeleteModalOpen(false);
         try {
-            await departmentService.delete(id);
+            await departmentService.delete(deleteTargetId);
             toast.success("Department deleted");
             fetchData();
         } catch (error) {
@@ -79,28 +103,50 @@ export default function DepartmentsPage() {
             console.error(error);
         } finally {
             setDeletingId(null);
+            setDeleteTargetId(null);
         }
     };
 
     const onSubmit = async (data: DepartmentDto) => {
-        const isDuplicate = departments.some(
-            dept => dept.name.toLowerCase() === data.name.toLowerCase() && dept.id !== editingDept?.id
-        );
+        const otherdepts = departments.filter(dept => dept.id !== editingDept?.id);
 
-        if (isDuplicate) {
-            toast.error(`Department "${data.name}" already exists.`);
+        const duplicateName = otherdepts.find(dept => dept.name.toLowerCase() === data.name.toLowerCase());
+        if (duplicateName) {
+            toast.error(`A department named "${data.name}" already exists.`);
+            return;
+        }
+
+        const duplicateCode = data.departmentCode && otherdepts.find(
+            dept => dept.departmentCode?.toLowerCase() === data.departmentCode!.toLowerCase()
+        );
+        if (duplicateCode) {
+            toast.error(`Department code "${data.departmentCode}" is already used by "${duplicateCode.name}".`);
+            return;
+        }
+
+        const duplicateCostCenter = data.costCenterCode && otherdepts.find(
+            dept => dept.costCenterCode?.toLowerCase() === data.costCenterCode!.toLowerCase()
+        );
+        if (duplicateCostCenter) {
+            toast.error(`Cost center code "${data.costCenterCode}" is already used by "${duplicateCostCenter.name}".`);
             return;
         }
 
         // Clean empty optional properties
-        if (!data.description) delete data.description;
         if (!data.departmentCode) delete data.departmentCode;
         if (!data.costCenterCode) delete data.costCenterCode;
         if (data.budgetLimit) data.budgetLimit = Number(data.budgetLimit);
 
         try {
             if (editingDept) {
-                const patch = buildPatchPayload<DepartmentDto>(editingDept as unknown as Partial<DepartmentDto>, data);
+                // Normalize description to "" so undefined/null and empty string compare as equal,
+                // and so that clearing a description is correctly detected as a change.
+                if (!data.description) data.description = "";
+                const prevForPatch: Partial<DepartmentDto> = {
+                    ...(editingDept as unknown as Partial<DepartmentDto>),
+                    description: editingDept.description ?? "",
+                };
+                const patch = buildPatchPayload<DepartmentDto>(prevForPatch, data);
                 if (Object.keys(patch).length === 0) {
                     toast("No changes to update");
                     return;
@@ -108,45 +154,66 @@ export default function DepartmentsPage() {
                 await departmentService.update(editingDept.id!, patch);
                 toast.success("Department updated");
             } else {
+                if (!data.description) delete data.description;
                 await departmentService.create(data);
                 toast.success("Department created");
             }
             setIsModalOpen(false);
             fetchData();
-        } catch (error) {
-            toast.error("Failed to save department");
+        } catch (error: any) {
+            const status = error?.response?.status ?? error?.status;
+            if (status === 409) {
+                toast.error("A department with that name, code, or cost center already exists.");
+            } else {
+                toast.error("Failed to save department");
+            }
             console.error(error);
         }
     };
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Departments</h1>
-                    <p className="text-slate-500">Manage departments and their organization assignments.</p>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">Departments</h1>
+                    <p className="text-slate-500 text-sm mt-0.5">Manage organizational departments, cost centers, and hierarchies.</p>
                 </div>
-                <Button onClick={handleOpenCreate}>
-                    <Plus className="mr-2 h-4 w-4" /> Add Department
-                </Button>
+                <div className="flex items-center gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400" />
+                        <Input
+                            placeholder="Search departments…"
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="pl-8 h-9 w-52 text-sm"
+                        />
+                    </div>
+                    <Button onClick={handleOpenCreate} className="bg-indigo-600 hover:bg-indigo-700 shadow-sm">
+                        <Plus className="mr-2 h-4 w-4" /> Add Department
+                    </Button>
+                </div>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
-                    <div className="col-span-full h-64 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                    </div>
-                ) : departments.length === 0 ? (
+                    Array.from({ length: 8 }).map((_, i) => <CardSkeleton key={i} />)
+                ) : filteredDepts.length === 0 ? (
                     <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
                         <Layers className="h-12 w-12 text-slate-300 mb-4" />
-                        <h3 className="text-lg font-medium text-slate-900">No departments found</h3>
-                        <p className="text-slate-500 mt-1 max-w-sm">Create departments to organize your assets and users logically.</p>
-                        <Button onClick={handleOpenCreate} className="mt-6 border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300">
-                            Add Department
-                        </Button>
+                        <h3 className="text-lg font-medium text-slate-900">
+                            {searchTerm ? "No matching departments" : "No departments found"}
+                        </h3>
+                        <p className="text-slate-500 mt-1 max-w-sm">
+                            {searchTerm ? `No departments match "${searchTerm}".` : "Create departments to organize your assets and users logically."}
+                        </p>
+                        {!searchTerm && (
+                            <Button onClick={handleOpenCreate} className="mt-6 bg-indigo-600 hover:bg-indigo-700">
+                                Add Department
+                            </Button>
+                        )}
                     </div>
                 ) : (
-                    departments.map((dept) => (
+                    filteredDepts.map((dept) => (
                         <Card key={dept.id} className="overflow-hidden hover:shadow-md transition-all flex flex-col h-full border-slate-200">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-slate-50/50 border-b border-slate-100">
                                 <div className="flex items-center gap-3">
@@ -214,7 +281,7 @@ export default function DepartmentsPage() {
                                                 {dept.budgetLimit !== undefined && (
                                                     <div className="flex items-center gap-1.5 text-sm text-slate-600">
                                                         <DollarSign className="h-4 w-4 text-emerald-500 shrink-0" />
-                                                        <span className="font-medium text-slate-800">${dept.budgetLimit.toLocaleString()}</span>
+                                                        <span className="font-medium text-slate-800">{format(dept.budgetLimit)}</span>
                                                         <span className="text-xs text-slate-400">budget</span>
                                                     </div>
                                                 )}
@@ -244,6 +311,31 @@ export default function DepartmentsPage() {
                     ))
                 )}
             </div>
+
+            <Modal
+                isOpen={isDeleteModalOpen}
+                onClose={() => { setIsDeleteModalOpen(false); setDeleteTargetId(null); }}
+                title="Delete Department"
+                description="This action cannot be undone. The department will be permanently removed."
+            >
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => { setIsDeleteModalOpen(false); setDeleteTargetId(null); }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        isLoading={!!deletingId}
+                        onClick={confirmDelete}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                        Delete
+                    </Button>
+                </div>
+            </Modal>
 
             <Modal
                 isOpen={isModalOpen}
@@ -279,7 +371,7 @@ export default function DepartmentsPage() {
                             <Input id="costCenterCode" placeholder="CC-001" {...register("costCenterCode")} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="budgetLimit">Budget Limit ($)</Label>
+                            <Label htmlFor="budgetLimit">Budget Limit ({symbol})</Label>
                             <Input type="number" step="0.01" id="budgetLimit" placeholder="150000.00" {...register("budgetLimit")} />
                         </div>
                     </div>
