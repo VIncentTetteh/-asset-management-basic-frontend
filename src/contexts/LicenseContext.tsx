@@ -30,6 +30,24 @@ import React, {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type AppMode = "cloud" | "standalone";
+export type StandaloneLicenseState = "valid" | "grace_period" | "expired" | "revoked" | "error";
+export type LicenseFeatureValue = boolean | number | string;
+
+export interface LicenseFeatures {
+    [key: string]: LicenseFeatureValue | undefined;
+    apiAccess?: boolean;
+    customFields?: boolean;
+    analytics?: "basic" | "full";
+    sso?: boolean;
+    auditLogDays?: number;
+}
+
+export interface LicenseLimits {
+    [key: string]: number | undefined;
+    assets?: number;
+    users?: number;
+    departments?: number;
+}
 
 /**
  * Returned by useLicenseStatus() in both modes.
@@ -44,24 +62,20 @@ export interface LicenseStatus {
     readOnly?: boolean;
     /** Days remaining on the current license key. */
     daysRemaining?: number;
+    /** Current standalone license lifecycle state. */
+    status?: StandaloneLicenseState;
+    /** User-facing backend message describing the current license state. */
+    message?: string;
     /** Licence plan name e.g. "professional". */
     plan?: string;
     /** ISO timestamp when the key expires. */
     expiresAt?: string;
+    /** ISO timestamp when the last remote validation succeeded. */
+    lastRemoteValidationAt?: string;
     /** Feature flags from the license payload. */
-    features?: {
-        apiAccess?: boolean;
-        customFields?: boolean;
-        analytics?: "basic" | "full";
-        sso?: boolean;
-        auditLogDays?: number;
-    };
+    features?: LicenseFeatures;
     /** Plan limits from the license payload. */
-    limits?: {
-        assets?: number;
-        users?: number;
-        departments?: number;
-    };
+    limits?: LicenseLimits;
     /** Last error message from the license server, if any. */
     error?: string;
 }

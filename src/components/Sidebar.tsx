@@ -45,7 +45,6 @@ import {
 } from "lucide-react";
 import { organisationService } from "@/services/organisationService";
 import { usePermissions } from "@/contexts/PermissionContext";
-import { User } from "@/types";
 
 export function Sidebar() {
     const router = useRouter();
@@ -56,15 +55,12 @@ export function Sidebar() {
     useEffect(() => {
         const loadOrgName = async () => {
             try {
-                const storedUserStr = localStorage.getItem("user");
-                if (storedUserStr) {
-                    const user = JSON.parse(storedUserStr) as User;
-                    if (user.organisationId) {
-                        const orgs = await organisationService.getAll();
-                        if (orgs.length > 0) {
-                            setOrgName(orgs[0].name);
-                        }
-                    }
+                const token = localStorage.getItem("token");
+                if (!token) return;
+
+                const orgs = await organisationService.getAll();
+                if (orgs.length > 0) {
+                    setOrgName(orgs[0].name);
                 }
             } catch (error) {
                 console.error("Failed to load org name in sidebar:", error);

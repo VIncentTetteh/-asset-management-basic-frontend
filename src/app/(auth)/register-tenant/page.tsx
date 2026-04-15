@@ -29,6 +29,7 @@ export default function RegisterTenantPage() {
                 lastName: response.lastName,
                 email: response.email,
                 role: response.role,
+                organisationId: response.organisationId,
             }));
             toast.success(`Workspace "${response.organisationName}" created! Welcome, ${response.firstName}.`);
             router.push("/dashboard");

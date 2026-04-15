@@ -27,12 +27,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { authService } from "@/services/authService";
+import { assetService } from "@/services/assetService";
 import { assetTransferService } from "@/services/assetTransferService";
 import { budgetService } from "@/services/budgetService";
 import { dashboardService } from "@/services/dashboardService";
+import { licenseService } from "@/services/licenseService";
 import { organisationService } from "@/services/organisationService";
+import { purchaseOrderService } from "@/services/purchaseOrderService";
 import { userService } from "@/services/userService";
-import { AssetsByDepartment, Budget, DepreciationSummary, Organisation } from "@/types";
+import { Asset, AssetsByDepartment, Budget, DepreciationSummary, Organisation, PurchaseOrder, SoftwareLicense } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -129,6 +132,17 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
 const asRecord = (value: unknown): Record<string, unknown> | null =>
     typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
 
+const unwrapPayloadRecord = (value: unknown): Record<string, unknown> => {
+    const direct = asRecord(value);
+    if (!direct) return {};
+
+    const wrapped = asRecord(direct.data) ?? asRecord(direct.content) ?? asRecord(direct.item);
+    return wrapped ?? direct;
+};
+
+const asNonEmptyString = (value: unknown): string | undefined =>
+    typeof value === "string" && value.trim() ? value.trim() : undefined;
+
 const toNumber = (value: unknown): number => {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value === "string") {
@@ -145,10 +159,47 @@ const formatLabel = (value: string) =>
         .map(part => part.charAt(0).toUpperCase() + part.slice(1))
         .join(" ");
 
+const getProfileOrganisationId = (payload: unknown): string | undefined => {
+    const raw = asRecord(payload) ?? {};
+    return asNonEmptyString(raw.organisationId ?? raw.organizationId);
+};
+
+const persistResolvedUser = (payload: unknown, organisationId?: string) => {
+    if (typeof window === "undefined") return;
+
+    const profile = asRecord(payload);
+    if (!profile && !organisationId) return;
+
+    try {
+        const current = JSON.parse(localStorage.getItem("user") || "{}") as Record<string, unknown>;
+        const merged = {
+            ...current,
+            ...(profile ?? {}),
+            ...(organisationId ? { organisationId } : {}),
+        };
+        localStorage.setItem("user", JSON.stringify(merged));
+    } catch {
+        if (!profile && !organisationId) return;
+        const fallback = {
+            ...(profile ?? {}),
+            ...(organisationId ? { organisationId } : {}),
+        };
+        localStorage.setItem("user", JSON.stringify(fallback));
+    }
+};
+
+const pickOrganisation = (organisations: Organisation[], organisationId?: string): Organisation | null => {
+    if (!organisations.length) return null;
+    if (organisationId) {
+        return organisations.find(org => org.id === organisationId) ?? organisations[0];
+    }
+    return organisations[0];
+};
+
 // ── Normalization ─────────────────────────────────────────────────────────────
 
 const normalizeDashboardSummary = (payload: unknown): DashboardStats => {
-    const raw = asRecord(payload) ?? {};
+    const raw = unwrapPayloadRecord(payload);
     return {
         ...EMPTY_STATS,
         totalAssets: toNumber(raw.totalAssets),
@@ -163,6 +214,32 @@ const normalizeDashboardSummary = (payload: unknown): DashboardStats => {
         totalUsers: toNumber(raw.totalUsers),
         pendingTransfers: 0, // populated separately
     };
+};
+
+const hasUsableSummary = (stats: DashboardStats): boolean =>
+    stats.totalAssets > 0
+    || stats.activeAssets > 0
+    || stats.totalAssetValue > 0
+    || stats.openPurchaseOrders > 0
+    || stats.pendingApprovals > 0
+    || stats.overdueMaintenanceCount > 0
+    || stats.upcomingMaintenanceCount > 0
+    || stats.expiredLicenses > 0
+    || stats.totalUsers > 0;
+
+const fillMissingStats = (
+    base: DashboardStats,
+    incoming: Partial<DashboardStats>,
+    keys: Array<keyof DashboardStats>
+): DashboardStats => {
+    const next = { ...base };
+    for (const key of keys) {
+        const candidate = incoming[key];
+        if (typeof candidate === "number" && candidate > 0 && next[key] === 0) {
+            next[key] = candidate;
+        }
+    }
+    return next;
 };
 
 const normalizeAssetsByStatus = (payload: unknown): AssetStatusBreakdownItem[] => {
@@ -273,16 +350,56 @@ const normalizeMaintenanceAlerts = (payload: unknown): DashboardMaintenanceAlert
     };
 };
 
+const deriveStatsFromStatusBreakdown = (items: AssetStatusBreakdownItem[]): Pick<DashboardStats, "totalAssets" | "activeAssets" | "totalAssetValue"> => ({
+    totalAssets: items.reduce((sum, item) => sum + item.count, 0),
+    activeAssets: items
+        .filter(item => item.key === "IN_USE")
+        .reduce((sum, item) => sum + item.count, 0),
+    totalAssetValue: items.reduce((sum, item) => sum + item.value, 0),
+});
+
+const deriveStatsFromAssets = (assets: Asset[]): Pick<DashboardStats, "totalAssets" | "activeAssets" | "totalAssetValue"> => ({
+    totalAssets: assets.length,
+    activeAssets: assets.filter(asset => String(asset.status ?? "").toUpperCase() === "IN_USE").length,
+    totalAssetValue: assets.reduce((sum, asset) => sum + (asset.purchaseCost ?? asset.currentBookValue ?? 0), 0),
+});
+
+const deriveStatsFromPurchaseOrders = (purchaseOrders: PurchaseOrder[]): Pick<DashboardStats, "openPurchaseOrders" | "pendingApprovals"> => ({
+    openPurchaseOrders: purchaseOrders.filter(order => {
+        const status = String(order.status ?? "").toUpperCase();
+        return !["DELIVERED", "REJECTED", "CANCELLED"].includes(status);
+    }).length,
+    pendingApprovals: purchaseOrders.filter(order => {
+        const status = String(order.status ?? "").toUpperCase();
+        return status === "SUBMITTED" || status === "PENDING";
+    }).length,
+});
+
+const countExpiredLicenses = (licenses: SoftwareLicense[]): number => {
+    const now = Date.now();
+    return licenses.filter(license => {
+        const status = String(license.status ?? "").toUpperCase();
+        if (status === "EXPIRED") return true;
+
+        const expiryDate = asNonEmptyString(license.expiryDate);
+        if (!expiryDate) return false;
+
+        const parsed = new Date(expiryDate);
+        return !Number.isNaN(parsed.getTime()) && parsed.getTime() < now;
+    }).length;
+};
+
 const computeBudgetStats = (budgets: Budget[]): BudgetStats => {
     if (!budgets.length) return EMPTY_BUDGET_STATS;
-    const activeBudgets = budgets.filter(b => b.status === "ACTIVE");
+    const activeStatuses = new Set(["ACTIVE", "OPEN", "APPROVED"]);
+    const activeBudgets = budgets.filter(b => activeStatuses.has(String(b.status ?? "").toUpperCase()));
     const totalAmount = activeBudgets.reduce((s, b) => s + (b.totalAmount ?? 0), 0);
     const totalSpent = activeBudgets.reduce((s, b) => s + (b.spentAmount ?? 0), 0);
     return {
         totalBudgetAmount: totalAmount,
         totalSpentAmount: totalSpent,
         activeBudgets: activeBudgets.length,
-        exceededBudgets: budgets.filter(b => b.status === "EXCEEDED").length,
+        exceededBudgets: budgets.filter(b => String(b.status ?? "").toUpperCase() === "EXCEEDED").length,
         utilizationPct: totalAmount > 0 ? Math.round((totalSpent / totalAmount) * 100) : 0,
     };
 };
@@ -325,45 +442,84 @@ export default function DashboardPage() {
 
         const load = async () => {
             try {
-                const profile = await authService.getProfile();
-                const orgId = asRecord(profile)?.organisationId;
-
-                const [summary, profileOrg] = await Promise.all([
-                    dashboardService.getSummary(),
-                    typeof orgId === "string" && orgId
-                        ? organisationService.get(orgId)
-                        : Promise.resolve(null),
+                const [profileResult, organisationsResult] = await Promise.allSettled([
+                    authService.getProfile(),
+                    organisationService.getAll(),
                 ]);
 
                 if (!isActive) return;
-                if (profileOrg) setMyOrg(profileOrg);
+                const profileOrgId = profileResult.status === "fulfilled"
+                    ? getProfileOrganisationId(profileResult.value)
+                    : undefined;
+                const resolvedOrg = organisationsResult.status === "fulfilled"
+                    ? pickOrganisation(organisationsResult.value, profileOrgId)
+                    : null;
+                const resolvedOrgId = profileOrgId || resolvedOrg?.id;
 
-                const baseStats = normalizeDashboardSummary(summary);
+                if (organisationsResult.status === "fulfilled") {
+                    setMyOrg(resolvedOrg);
+                }
+                if (profileResult.status === "fulfilled" || resolvedOrgId) {
+                    persistResolvedUser(
+                        profileResult.status === "fulfilled" ? profileResult.value : null,
+                        resolvedOrgId
+                    );
+                }
+
+                const summaryResult = await Promise.allSettled([
+                    dashboardService.getSummary(resolvedOrgId),
+                ]);
+                const summary = summaryResult[0];
+
+                const normalizedSummary = summary.status === "fulfilled"
+                    ? normalizeDashboardSummary(summary.value)
+                    : { ...EMPTY_STATS };
+                const hasSummary = summary.status === "fulfilled";
+                const summaryIsUsable = hasSummary && hasUsableSummary(normalizedSummary);
+                let nextStats = { ...normalizedSummary };
 
                 const [
                     statusResult,
+                    assetsResult,
                     deptResult,
                     depreciationResult,
                     alertsResult,
                     usersResult,
                     budgetsResult,
                     transfersResult,
+                    purchaseOrdersResult,
+                    licensesResult,
                 ] = await Promise.allSettled([
-                    dashboardService.getAssetsByStatus(),
-                    dashboardService.getAssetsByDepartment(),
-                    dashboardService.getDepreciationSummary(),
-                    dashboardService.getMaintenanceAlerts(),
+                    dashboardService.getAssetsByStatus(resolvedOrgId),
+                    assetService.getAll(),
+                    dashboardService.getAssetsByDepartment(resolvedOrgId),
+                    dashboardService.getDepreciationSummary(resolvedOrgId),
+                    dashboardService.getMaintenanceAlerts(resolvedOrgId),
                     userService.getAll(),
                     budgetService.getAll(),
                     assetTransferService.getAll(),
+                    purchaseOrderService.getAll(),
+                    licenseService.getAll(),
                 ]);
 
                 if (!isActive) return;
 
-                const nextStats = { ...baseStats };
-
                 if (statusResult.status === "fulfilled") {
-                    setAssetStatusBreakdown(normalizeAssetsByStatus(statusResult.value));
+                    const normalizedStatus = normalizeAssetsByStatus(statusResult.value);
+                    setAssetStatusBreakdown(normalizedStatus);
+                    nextStats = fillMissingStats(
+                        nextStats,
+                        deriveStatsFromStatusBreakdown(normalizedStatus),
+                        ["totalAssets", "activeAssets", "totalAssetValue"]
+                    );
+                }
+                if (assetsResult.status === "fulfilled") {
+                    const assetStats = deriveStatsFromAssets(assetsResult.value);
+                    nextStats = fillMissingStats(nextStats, assetStats, [
+                        "totalAssets",
+                        "activeAssets",
+                        "totalAssetValue",
+                    ]);
                 }
                 if (deptResult.status === "fulfilled") {
                     setAssetsByDepartment(normalizeAssetsByDepartment(deptResult.value));
@@ -372,7 +528,14 @@ export default function DashboardPage() {
                     setDepreciationSummary(normalizeDepreciationSummary(depreciationResult.value));
                 }
                 if (alertsResult.status === "fulfilled") {
-                    setMaintenanceAlerts(normalizeMaintenanceAlerts(alertsResult.value));
+                    const normalizedAlerts = normalizeMaintenanceAlerts(alertsResult.value);
+                    setMaintenanceAlerts(normalizedAlerts);
+                    if (normalizedAlerts) {
+                        nextStats = fillMissingStats(nextStats, {
+                            overdueMaintenanceCount: normalizedAlerts.critical,
+                            upcomingMaintenanceCount: normalizedAlerts.scheduled,
+                        }, ["overdueMaintenanceCount", "upcomingMaintenanceCount"]);
+                    }
                 }
                 if (usersResult.status === "fulfilled") {
                     nextStats.totalUsers = usersResult.value.length;
@@ -382,9 +545,28 @@ export default function DashboardPage() {
                 }
                 if (transfersResult.status === "fulfilled") {
                     const pending = transfersResult.value.filter(
-                        t => String(t.status ?? "").toUpperCase() === "PENDING"
+                        t => {
+                            const status = String(t.status ?? "").toUpperCase();
+                            return status === "PENDING" || status === "REQUESTED";
+                        }
                     ).length;
                     nextStats.pendingTransfers = pending;
+                }
+                if (purchaseOrdersResult.status === "fulfilled") {
+                    nextStats = fillMissingStats(
+                        nextStats,
+                        deriveStatsFromPurchaseOrders(purchaseOrdersResult.value),
+                        ["openPurchaseOrders", "pendingApprovals"]
+                    );
+                }
+                if (licensesResult.status === "fulfilled") {
+                    nextStats = fillMissingStats(nextStats, {
+                        expiredLicenses: countExpiredLicenses(licensesResult.value),
+                    }, ["expiredLicenses"]);
+                }
+
+                if (hasSummary && !summaryIsUsable) {
+                    console.warn("Dashboard summary response fulfilled but missing expected metrics; using fallback data merges.");
                 }
 
                 setStats(nextStats);
@@ -992,9 +1174,9 @@ export default function DashboardPage() {
                                     highlight: budgetStats.exceededBudgets > 0,
                                 },
                             ].map(item => (
-                                <div key={item.label} className={`rounded-lg border p-4 ${(item as any).highlight ? "border-rose-200 bg-rose-50" : "border-slate-100 bg-slate-50"}`}>
+                                <div key={item.label} className={`rounded-lg border p-4 ${item.highlight ? "border-rose-200 bg-rose-50" : "border-slate-100 bg-slate-50"}`}>
                                     <p className="text-xs text-slate-500 mb-1">{item.label}</p>
-                                    <p className={`text-xl font-bold ${(item as any).highlight ? "text-rose-700" : "text-slate-800"}`}>{item.value}</p>
+                                    <p className={`text-xl font-bold ${item.highlight ? "text-rose-700" : "text-slate-800"}`}>{item.value}</p>
                                     <p className="text-xs text-slate-400 mt-0.5">{item.sub}</p>
                                 </div>
                             ))}

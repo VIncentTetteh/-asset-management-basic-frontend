@@ -8,12 +8,16 @@ import { Button } from "@/components/ui/button";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { Modal } from "@/components/ui/modal";
 import { billingService } from "@/services/billingService";
+import { authService } from "@/services/authService";
+import { organisationService } from "@/services/organisationService";
 import { Subscription } from "@/types";
 import { CurrencyProvider, useCurrency } from "@/contexts/CurrencyContext";
 import { PermissionProvider, usePermissions } from "@/contexts/PermissionContext";
 import { LicenseProvider } from "@/contexts/LicenseContext";
+import { LicenseBanner } from "@/components/LicenseBanner";
 import { ConfirmDialogHost } from "@/hooks/useConfirm";
 import { AiAssistant } from "@/components/AiAssistant";
+import { LicenseSetupWizard } from "@/components/LicenseSetupWizard";
 
 // Routes that require a specific permission — mirrors Sidebar route map.
 // Any path that starts with a pattern AND the user lacks the permission triggers
@@ -72,20 +76,35 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const fetchOrg = async () => {
             const storedUserStr = localStorage.getItem("user");
-            if (storedUserStr) {
-                const user = JSON.parse(storedUserStr);
-                if (user?.role) setUserRole(user.role);
-                if (user.organisationId) {
-                    try {
-                        const { organisationService } = await import("@/services/organisationService");
-                        const orgs = await organisationService.getAll();
-                        if (orgs.length > 0) {
-                            setOrgName(orgs[0].name);
-                        }
-                    } catch (e) {
-                        console.error("Failed to fetch org name for layout:", e);
+            if (!storedUserStr) return;
+
+            let user = JSON.parse(storedUserStr);
+            if (user?.role) setUserRole(user.role);
+
+            try {
+                const profile = await authService.getProfile();
+                user = { ...user, ...profile };
+            } catch (e) {
+                console.error("Failed to hydrate profile for layout:", e);
+            }
+
+            try {
+                const orgs = await organisationService.getAll();
+                if (orgs.length > 0) {
+                    setOrgName(orgs[0].name);
+                    if (!user?.organisationId) {
+                        user = { ...user, organisationId: orgs[0].id };
                     }
                 }
+            } catch (e) {
+                console.error("Failed to fetch org name for layout:", e);
+            }
+
+            try {
+                localStorage.setItem("user", JSON.stringify(user));
+                if (user?.role) setUserRole(user.role);
+            } catch (e) {
+                console.error("Failed to persist hydrated user for layout:", e);
             }
         };
         if (isAuthorized) fetchOrg();
@@ -254,11 +273,16 @@ export function AppLayoutClient({ children }: { children: React.ReactNode }) {
         // it makes zero API calls and adds zero overhead when
         // NEXT_PUBLIC_APP_MODE=cloud (the default).
         <LicenseProvider>
+            {/* Banner is a no-op in cloud mode — renders null */}
+            <LicenseBanner />
             <CurrencyProvider>
                 <PermissionProvider>
                     <AppLayoutInner>{children}</AppLayoutInner>
                     <ConfirmDialogHost />
                     <AiAssistant />
+                    {/* First-run wizard: shown in standalone mode when no key is active.
+                        No-op (renders null) in cloud mode and after key activation. */}
+                    <LicenseSetupWizard />
                 </PermissionProvider>
             </CurrencyProvider>
         </LicenseProvider>

@@ -344,6 +344,7 @@ export interface User extends BaseEntity {
     phone?: string;
     employeeId?: string;
     jobTitle?: string;
+    role?: string;
     roleId?: string;
     status?: UserStatus | string;
     organisationId?: string;
@@ -626,19 +627,29 @@ export interface PaginatedResponse<T> {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export interface DashboardSummary {
-    totalAssets: number;
-    activeAssets: number;
-    inMaintenanceAssets: number;
-    disposedAssets: number;
-    totalOrganisations: number;
-    totalUsers: number;
-    pendingPOs: number;
-    approvedPOs: number;
-    scheduledMaintenance: number;
-    inProgressMaintenance: number;
-    totalWebhooks: number;
-    activeWebhooks: number;
-    generatedAt: string;
+    totalAssets?: number;
+    activeAssets?: number;
+    assetsInUse?: number;
+    totalAssetValue?: number;
+    inMaintenanceAssets?: number;
+    disposedAssets?: number;
+    totalOrganisations?: number;
+    totalUsers?: number;
+    pendingPOs?: number;
+    pendingPurchaseOrders?: number;
+    openPurchaseOrders?: number;
+    approvedPOs?: number;
+    pendingApprovals?: number;
+    scheduledMaintenance?: number;
+    upcomingMaintenanceCount?: number;
+    overdueMaintenanceCount?: number;
+    maintenanceAlerts?: number;
+    inProgressMaintenance?: number;
+    assetsNeedingMaintenance?: number;
+    expiredLicenses?: number;
+    totalWebhooks?: number;
+    activeWebhooks?: number;
+    generatedAt?: string;
 }
 
 export interface AssetsByStatus {
@@ -661,7 +672,9 @@ export interface MaintenanceAlerts {
         message: string;
         assetName: string;
         severity: string;
-        dueDate: string;
+        dueDate?: string;
+        nextDueDate?: string;
+        daysOverdue?: number;
     }[];
 }
 
