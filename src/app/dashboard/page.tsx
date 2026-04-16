@@ -35,6 +35,11 @@ import { licenseService } from "@/services/licenseService";
 import { organisationService } from "@/services/organisationService";
 import { purchaseOrderService } from "@/services/purchaseOrderService";
 import { userService } from "@/services/userService";
+import {
+    getOrganisationIdFromStorage,
+    mergeStoredUser,
+    verifyOrganisationContext,
+} from "@/lib/authContext";
 import { Asset, AssetsByDepartment, Budget, DepreciationSummary, Organisation, PurchaseOrder, SoftwareLicense } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -158,43 +163,6 @@ const formatLabel = (value: string) =>
         .split("_")
         .map(part => part.charAt(0).toUpperCase() + part.slice(1))
         .join(" ");
-
-const getProfileOrganisationId = (payload: unknown): string | undefined => {
-    const raw = asRecord(payload) ?? {};
-    return asNonEmptyString(raw.organisationId ?? raw.organizationId);
-};
-
-const persistResolvedUser = (payload: unknown, organisationId?: string) => {
-    if (typeof window === "undefined") return;
-
-    const profile = asRecord(payload);
-    if (!profile && !organisationId) return;
-
-    try {
-        const current = JSON.parse(localStorage.getItem("user") || "{}") as Record<string, unknown>;
-        const merged = {
-            ...current,
-            ...(profile ?? {}),
-            ...(organisationId ? { organisationId } : {}),
-        };
-        localStorage.setItem("user", JSON.stringify(merged));
-    } catch {
-        if (!profile && !organisationId) return;
-        const fallback = {
-            ...(profile ?? {}),
-            ...(organisationId ? { organisationId } : {}),
-        };
-        localStorage.setItem("user", JSON.stringify(fallback));
-    }
-};
-
-const pickOrganisation = (organisations: Organisation[], organisationId?: string): Organisation | null => {
-    if (!organisations.length) return null;
-    if (organisationId) {
-        return organisations.find(org => org.id === organisationId) ?? organisations[0];
-    }
-    return organisations[0];
-};
 
 // ── Normalization ─────────────────────────────────────────────────────────────
 
@@ -442,33 +410,38 @@ export default function DashboardPage() {
 
         const load = async () => {
             try {
-                const [profileResult, organisationsResult] = await Promise.allSettled([
-                    authService.getProfile(),
-                    organisationService.getAll(),
-                ]);
+                let resolvedOrgId = getOrganisationIdFromStorage();
+                if (!resolvedOrgId) {
+                    try {
+                        const profile = await authService.getProfile();
+                        if (!isActive) return;
 
-                if (!isActive) return;
-                const profileOrgId = profileResult.status === "fulfilled"
-                    ? getProfileOrganisationId(profileResult.value)
-                    : undefined;
-                const resolvedOrg = organisationsResult.status === "fulfilled"
-                    ? pickOrganisation(organisationsResult.value, profileOrgId)
-                    : null;
-                const resolvedOrgId = profileOrgId || resolvedOrg?.id;
-
-                if (organisationsResult.status === "fulfilled") {
-                    setMyOrg(resolvedOrg);
-                }
-                if (profileResult.status === "fulfilled" || resolvedOrgId) {
-                    persistResolvedUser(
-                        profileResult.status === "fulfilled" ? profileResult.value : null,
-                        resolvedOrgId
-                    );
+                        mergeStoredUser(profile);
+                        resolvedOrgId = verifyOrganisationContext(profile);
+                    } catch (error) {
+                        console.error("Failed to hydrate profile for dashboard:", error);
+                    }
                 }
 
-                const summaryResult = await Promise.allSettled([
-                    dashboardService.getSummary(resolvedOrgId),
-                ]);
+                if (!resolvedOrgId) {
+                    console.warn("Dashboard bootstrap skipped because no verified organisation ID is available.");
+                    return;
+                }
+
+                try {
+                    const org = await organisationService.get(resolvedOrgId);
+                    if (!isActive) return;
+
+                    setMyOrg(org);
+                    mergeStoredUser({
+                        organisationId: resolvedOrgId,
+                        organisationName: org.name,
+                    });
+                } catch (error) {
+                    console.error("Failed to load organisation for dashboard:", error);
+                }
+
+                const summaryResult = await Promise.allSettled([dashboardService.getSummary(resolvedOrgId)]);
                 const summary = summaryResult[0];
 
                 const normalizedSummary = summary.status === "fulfilled"
@@ -713,7 +686,7 @@ export default function DashboardPage() {
                             <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
                                 <Link href="/assets" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Portfolio Value</p>
-                                    <p className="mt-2 text-[2rem] font-black leading-none text-white lg:text-[2.25rem]">
+                                    <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-xl font-black leading-tight text-white sm:text-2xl">
                                         {formatCompactCurrency(stats.totalAssetValue, currency)}
                                     </p>
                                     <p className="mt-2 text-xs text-slate-300">
@@ -722,7 +695,7 @@ export default function DashboardPage() {
                                 </Link>
                                 <Link href="/assets" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">In Service</p>
-                                    <p className="mt-2 text-[2rem] font-black leading-none text-white lg:text-[2.25rem]">
+                                    <p className="mt-2 text-xl font-black leading-tight text-white sm:text-2xl">
                                         {assetUtilization}%
                                     </p>
                                     <p className="mt-2 text-xs text-slate-300">
@@ -731,7 +704,7 @@ export default function DashboardPage() {
                                 </Link>
                                 <Link href="/maintenance" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Maintenance Due</p>
-                                    <p className={`mt-2 text-[2rem] font-black leading-none lg:text-[2.25rem] ${stats.overdueMaintenanceCount > 0 ? "text-rose-400" : "text-white"}`}>
+                                    <p className={`mt-2 text-xl font-black leading-tight sm:text-2xl ${stats.overdueMaintenanceCount > 0 ? "text-rose-400" : "text-white"}`}>
                                         {maintenanceLoad.toLocaleString()}
                                     </p>
                                     <p className="mt-2 text-xs text-slate-300">
@@ -740,7 +713,7 @@ export default function DashboardPage() {
                                 </Link>
                                 <Link href="/purchase-orders" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">PO Approvals</p>
-                                    <p className="mt-2 text-[2rem] font-black leading-none text-white lg:text-[2.25rem]">
+                                    <p className="mt-2 text-xl font-black leading-tight text-white sm:text-2xl">
                                         {stats.openPurchaseOrders.toLocaleString()}
                                     </p>
                                     <p className="mt-2 text-xs text-slate-300">
@@ -863,7 +836,7 @@ export default function DashboardPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-3xl font-black text-slate-900">{format(stats.totalAssetValue)}</div>
+                            <div className="overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold text-slate-900 sm:text-xl">{format(stats.totalAssetValue)}</div>
                             <p className="mt-1 text-xs text-slate-500">
                                 Net book value: {format(depreciationSummary?.netBookValue ?? 0)}
                             </p>

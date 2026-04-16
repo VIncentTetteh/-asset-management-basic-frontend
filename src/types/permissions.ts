@@ -1,0 +1,141 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTO-GENERATED — do not edit by hand.
+// Source of truth: Enterprise-Asset-Manager/src/main/java/com/assetiq/enums/Permission.java
+// Regenerate: node Enterprise-Asset-Manager/scripts/generate-permissions.mjs
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Union type of every permission string recognised by the backend.
+ * Consumers should use this type instead of `string` for permission props
+ * and checks so that typos are caught at compile time.
+ */
+export type Permission =
+  | "VIEW_ASSETS"
+  | "CREATE_ASSET"
+  | "EDIT_ASSET"
+  | "DELETE_ASSET"
+  | "DISPOSE_ASSET"
+  | "TRANSFER_ASSET"
+  | "APPROVE_REQUESTS"
+  | "REJECT_REQUESTS"
+  | "ESCALATE_REQUESTS"
+  | "MANAGE_BUDGETS"
+  | "VIEW_BUDGETS"
+  | "APPROVE_BUDGET"
+  | "MANAGE_USERS"
+  | "VIEW_USERS"
+  | "EDIT_USER"
+  | "DELETE_USER"
+  | "MANAGE_DEPARTMENTS"
+  | "VIEW_DEPARTMENTS"
+  | "SCHEDULE_MAINTENANCE"
+  | "VIEW_MAINTENANCE"
+  | "MARK_MAINTENANCE_COMPLETE"
+  | "CONDUCT_AUDIT"
+  | "VIEW_AUDIT_LOGS"
+  | "EXPORT_AUDIT_LOGS"
+  | "VIEW_REPORTS"
+  | "GENERATE_REPORTS"
+  | "EXPORT_REPORTS"
+  | "MANAGE_ORGANIZATION_SETTINGS"
+  | "MANAGE_SECURITY_SETTINGS"
+  | "SYSTEM_ADMIN"
+  | "CHECKOUT_ASSET"
+  | "MANAGE_EXPENSES"
+  | "VIEW_TCO"
+  | "MANAGE_EXCHANGE_RATES"
+  | "MANAGE_LEASES"
+  | "REGENERATE_QR"
+  | "REVIEW_ACCESS"
+  | "VIEW_ROLES"
+  | "MANAGE_ROLES"
+  | "VIEW_LOCATIONS"
+  | "MANAGE_LOCATIONS"
+  | "VIEW_CATEGORIES"
+  | "MANAGE_CATEGORIES"
+  | "VIEW_SUPPLIERS"
+  | "MANAGE_SUPPLIERS"
+  | "VIEW_PROCUREMENT"
+  | "MANAGE_PROCUREMENT"
+  | "APPROVE_PROCUREMENT"
+  | "VIEW_SOFTWARE_LICENSES"
+  | "MANAGE_SOFTWARE_LICENSES"
+  | "VIEW_CONTRACTS"
+  | "MANAGE_CONTRACTS"
+  | "VIEW_COMPLIANCE"
+  | "MANAGE_COMPLIANCE"
+  | "VIEW_NETWORK_DISCOVERY"
+  | "MANAGE_NETWORK_DISCOVERY"
+  | "VIEW_CLOUD_ASSETS"
+  | "MANAGE_CLOUD_ASSETS"
+  | "VIEW_DEPRECIATION"
+  | "MANAGE_DEPRECIATION"
+  | "VIEW_VENDOR_REVIEWS";
+
+/**
+ * Compile-time exhaustive array of all permissions.
+ * Useful for permission pickers, admin UIs, and test fixtures.
+ */
+export const ALL_PERMISSIONS: Permission[] = [
+  "VIEW_ASSETS",
+  "CREATE_ASSET",
+  "EDIT_ASSET",
+  "DELETE_ASSET",
+  "DISPOSE_ASSET",
+  "TRANSFER_ASSET",
+  "APPROVE_REQUESTS",
+  "REJECT_REQUESTS",
+  "ESCALATE_REQUESTS",
+  "MANAGE_BUDGETS",
+  "VIEW_BUDGETS",
+  "APPROVE_BUDGET",
+  "MANAGE_USERS",
+  "VIEW_USERS",
+  "EDIT_USER",
+  "DELETE_USER",
+  "MANAGE_DEPARTMENTS",
+  "VIEW_DEPARTMENTS",
+  "SCHEDULE_MAINTENANCE",
+  "VIEW_MAINTENANCE",
+  "MARK_MAINTENANCE_COMPLETE",
+  "CONDUCT_AUDIT",
+  "VIEW_AUDIT_LOGS",
+  "EXPORT_AUDIT_LOGS",
+  "VIEW_REPORTS",
+  "GENERATE_REPORTS",
+  "EXPORT_REPORTS",
+  "MANAGE_ORGANIZATION_SETTINGS",
+  "MANAGE_SECURITY_SETTINGS",
+  "SYSTEM_ADMIN",
+  "CHECKOUT_ASSET",
+  "MANAGE_EXPENSES",
+  "VIEW_TCO",
+  "MANAGE_EXCHANGE_RATES",
+  "MANAGE_LEASES",
+  "REGENERATE_QR",
+  "REVIEW_ACCESS",
+  "VIEW_ROLES",
+  "MANAGE_ROLES",
+  "VIEW_LOCATIONS",
+  "MANAGE_LOCATIONS",
+  "VIEW_CATEGORIES",
+  "MANAGE_CATEGORIES",
+  "VIEW_SUPPLIERS",
+  "MANAGE_SUPPLIERS",
+  "VIEW_PROCUREMENT",
+  "MANAGE_PROCUREMENT",
+  "APPROVE_PROCUREMENT",
+  "VIEW_SOFTWARE_LICENSES",
+  "MANAGE_SOFTWARE_LICENSES",
+  "VIEW_CONTRACTS",
+  "MANAGE_CONTRACTS",
+  "VIEW_COMPLIANCE",
+  "MANAGE_COMPLIANCE",
+  "VIEW_NETWORK_DISCOVERY",
+  "MANAGE_NETWORK_DISCOVERY",
+  "VIEW_CLOUD_ASSETS",
+  "MANAGE_CLOUD_ASSETS",
+  "VIEW_DEPRECIATION",
+  "MANAGE_DEPRECIATION",
+  "VIEW_VENDOR_REVIEWS",
+];

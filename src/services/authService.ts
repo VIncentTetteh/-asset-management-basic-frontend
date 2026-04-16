@@ -37,9 +37,14 @@ export const authService = {
         return response.data;
     },
 
-    /** POST /auth/login */
+    /** POST /auth/login — JWT is now set as HttpOnly cookie by the backend (F-1).
+     *  Only non-sensitive user metadata is stored client-side. */
     login: async (data: { email: string; password: string; organisationId?: string }): Promise<LoginResponse> => {
         const response = await api.post<LoginResponse>("/auth/login", data);
+        // Store display-only metadata in sessionStorage (never the token itself)
+        if (typeof window !== "undefined" && response.data?.user) {
+            sessionStorage.setItem("user_meta", JSON.stringify(response.data.user));
+        }
         return response.data;
     },
 

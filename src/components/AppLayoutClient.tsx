@@ -11,6 +11,13 @@ import { billingService } from "@/services/billingService";
 import { authService } from "@/services/authService";
 import { organisationService } from "@/services/organisationService";
 import { Subscription } from "@/types";
+import {
+    extractOrganisationName,
+    getOrganisationIdFromStorage,
+    getStoredUser,
+    mergeStoredUser,
+    verifyOrganisationContext,
+} from "@/lib/authContext";
 import { CurrencyProvider, useCurrency } from "@/contexts/CurrencyContext";
 import { PermissionProvider, usePermissions } from "@/contexts/PermissionContext";
 import { LicenseProvider } from "@/contexts/LicenseContext";
@@ -60,6 +67,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
+    const [isBootstrappingAuth, setIsBootstrappingAuth] = useState(false);
     const [orgName, setOrgName] = useState<string>("AssetIQ");
     const [userRole, setUserRole] = useState<string>("ROLE_USER");
     const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -72,47 +80,81 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const publicPaths = ["/", "/login", "/register", "/register-tenant", "/forgot-password", "/reset-password"];
     const isPublicPage = publicPaths.includes(pathname);
     const breadcrumb = pathname.split("/").filter(Boolean).join(" / ") || "home";
+    const requiresOrgBootstrap =
+        typeof window !== "undefined"
+        && isMounted
+        && !isPublicPage
+        && Boolean(localStorage.getItem("token"))
+        && !getOrganisationIdFromStorage();
 
     useEffect(() => {
-        const fetchOrg = async () => {
-            const storedUserStr = localStorage.getItem("user");
-            if (!storedUserStr) return;
+        if (!isMounted || isPublicPage || !isAuthorized) return;
 
-            let user = JSON.parse(storedUserStr);
-            if (user?.role) setUserRole(user.role);
+        let isActive = true;
+
+        const bootstrapAuthContext = async () => {
+            setIsBootstrappingAuth(true);
+
+            const storedUser = getStoredUser();
+            const cachedOrgName = extractOrganisationName(storedUser);
+            if (cachedOrgName) setOrgName(cachedOrgName);
+            if (typeof storedUser?.role === "string" && storedUser.role) {
+                setUserRole(storedUser.role);
+            }
+
+            let resolvedOrgId = getOrganisationIdFromStorage();
 
             try {
                 const profile = await authService.getProfile();
-                user = { ...user, ...profile };
-            } catch (e) {
-                console.error("Failed to hydrate profile for layout:", e);
-            }
+                if (!isActive) return;
 
-            try {
-                const orgs = await organisationService.getAll();
-                if (orgs.length > 0) {
-                    setOrgName(orgs[0].name);
-                    if (!user?.organisationId) {
-                        user = { ...user, organisationId: orgs[0].id };
-                    }
+                const mergedUser = mergeStoredUser(profile) ?? storedUser;
+                const profileOrgId = verifyOrganisationContext(profile);
+                resolvedOrgId = profileOrgId || resolvedOrgId;
+
+                if (typeof mergedUser?.role === "string" && mergedUser.role) {
+                    setUserRole(mergedUser.role);
                 }
-            } catch (e) {
-                console.error("Failed to fetch org name for layout:", e);
+
+                const profileOrgName = extractOrganisationName(profile);
+                if (profileOrgName) {
+                    setOrgName(profileOrgName);
+                }
+            } catch (error) {
+                console.error("Failed to hydrate profile for layout:", error);
             }
 
-            try {
-                localStorage.setItem("user", JSON.stringify(user));
-                if (user?.role) setUserRole(user.role);
-            } catch (e) {
-                console.error("Failed to persist hydrated user for layout:", e);
+            if (!isActive) return;
+
+            if (resolvedOrgId) {
+                try {
+                    const org = await organisationService.get(resolvedOrgId);
+                    if (!isActive) return;
+
+                    setOrgName(org.name);
+                    mergeStoredUser({
+                        organisationId: resolvedOrgId,
+                        organisationName: org.name,
+                    });
+                } catch (error) {
+                    console.error("Failed to fetch org name for layout:", error);
+                }
+            }
+
+            if (isActive) {
+                setIsBootstrappingAuth(false);
             }
         };
-        if (isAuthorized) fetchOrg();
-    }, [isAuthorized]);
+
+        bootstrapAuthContext();
+        return () => {
+            isActive = false;
+        };
+    }, [isAuthorized, isMounted, isPublicPage]);
 
     useEffect(() => {
         const loadSubscription = async () => {
-            if (!isAuthorized || isPublicPage) return;
+            if (!isAuthorized || isPublicPage || isBootstrappingAuth || !getOrganisationIdFromStorage()) return;
             try {
                 const sub = await billingService.getSubscription();
                 setSubscription(sub);
@@ -121,7 +163,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
             }
         };
         loadSubscription();
-    }, [isAuthorized, isPublicPage, pathname]);
+    }, [isAuthorized, isBootstrappingAuth, isPublicPage, pathname]);
 
     useEffect(() => {
         const timer = setTimeout(() => setIsMounted(true), 0);
@@ -133,9 +175,11 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         const token = localStorage.getItem("token");
         if (!token && !isPublicPage) {
             setIsAuthorized(false);
+            setIsBootstrappingAuth(false);
             router.push("/login");
         } else {
-            setIsAuthorized(true);
+            setIsAuthorized(Boolean(token));
+            setIsBootstrappingAuth(Boolean(token) && !isPublicPage && !getOrganisationIdFromStorage());
         }
     }, [pathname, router, isPublicPage, isMounted]);
 
@@ -152,12 +196,12 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     // After permissions load, redirect away from any page this user isn't allowed to see.
     // This covers direct URL entry, page refresh, and Ctrl+K quick navigation.
     useEffect(() => {
-        if (permLoading || isPublicPage || !isAuthorized) return;
+        if (permLoading || isBootstrappingAuth || requiresOrgBootstrap || isPublicPage || !isAuthorized) return;
         const match = ROUTE_PERMISSIONS.find(r => pathname.startsWith(r.pattern));
         if (match && !hasPermission(match.permission)) {
             router.replace("/dashboard");
         }
-    }, [permLoading, pathname, isPublicPage, isAuthorized, hasPermission, router]);
+    }, [permLoading, isBootstrappingAuth, requiresOrgBootstrap, pathname, isPublicPage, isAuthorized, hasPermission, router]);
 
     if (!isMounted) return null;
     if (!isAuthorized && !isPublicPage) return null;
@@ -166,7 +210,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     // Block the entire authenticated shell while permissions are being fetched.
     // This closes the race-condition window where users could click restricted
     // sidebar items or search results before permission data arrives.
-    if (permLoading) {
+    if (permLoading || isBootstrappingAuth || requiresOrgBootstrap) {
         return (
             <div className="flex h-screen items-center justify-center bg-slate-50">
                 <div className="flex flex-col items-center gap-3 text-slate-500">

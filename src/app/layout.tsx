@@ -3,6 +3,7 @@ import { Manrope, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { AppLayoutClient } from "@/components/AppLayoutClient";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -32,10 +33,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${manrope.variable} ${ibmPlexSans.variable}`}>
-        <AppLayoutClient>
-          {children}
-        </AppLayoutClient>
-        <Toaster position="top-right" />
+        {/* AuthProvider wraps the entire app — provides useAuth() and <Can> everywhere */}
+        <AuthProvider>
+          <AppLayoutClient>
+            {children}
+          </AppLayoutClient>
+          <Toaster position="top-right" />
+        </AuthProvider>
       </body>
     </html>
   );

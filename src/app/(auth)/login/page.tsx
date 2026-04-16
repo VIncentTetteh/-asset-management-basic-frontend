@@ -15,6 +15,7 @@ import {
 import { authService } from "@/services/authService";
 import { mfaService } from "@/services/mfaService";
 import api from "@/lib/axios";
+import { clearVerifiedOrganisationId, setStoredUser } from "@/lib/authContext";
 import { Smartphone } from "lucide-react";
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -45,8 +46,12 @@ export default function LoginPage() {
             // ── Normal login success ──────────────────────────────────────────
             if ("token" in response && response.token) {
                 localStorage.setItem("token", response.token);
-                localStorage.setItem("user", JSON.stringify(response.user));
+                clearVerifiedOrganisationId();
+                setStoredUser(response.user);
                 api.defaults.headers.common["Authorization"] = `Bearer ${response.token}`;
+                // Notify PermissionContext (and any other auth-aware providers)
+                // so they refetch with the new token before we navigate.
+                window.dispatchEvent(new Event("auth-changed"));
                 toast.success(`Welcome back, ${response.user.firstName}!`);
                 router.push("/dashboard");
             } else {
@@ -71,8 +76,10 @@ export default function LoginPage() {
             const res = await mfaService.challenge({ mfaChallengeToken, code: mfaCode });
             if (res.token) {
                 localStorage.setItem("token", res.token);
-                localStorage.setItem("user", JSON.stringify(res.user));
+                clearVerifiedOrganisationId();
+                setStoredUser(res.user);
                 api.defaults.headers.common["Authorization"] = `Bearer ${res.token}`;
+                window.dispatchEvent(new Event("auth-changed"));
                 toast.success(`Welcome back, ${res.user.firstName}!`);
                 router.push("/dashboard");
             }

@@ -1,24 +1,19 @@
 import type { NextConfig } from "next";
 
 /**
- * NEXT_PUBLIC_API_URL   — full origin of the Spring Boot backend, no trailing slash.
- *                         Defaults to http://localhost:8080 for local development.
+ * API proxying is handled by the catch-all Next.js API route at
+ * src/app/api/[...path]/route.ts, which reads the API_TARGET_BASE env var.
  *
- * All /api/v1/* requests from the browser are rewritten through Next.js to the
- * backend, keeping CORS out of the picture and making the SPA and backend appear
- * on the same origin.
+ * Set API_TARGET_BASE to the full base of your Spring Boot API, e.g.:
+ *   API_TARGET_BASE=https://your-backend.railway.app/api
+ *
+ * Defaults to http://localhost:8085/api for local development.
+ *
+ * NOTE: A next.config.ts rewrite for /api/v1/* was previously present here but
+ * was dead code — Next.js App Router API routes always take precedence over
+ * rewrites when the path matches. The proxy route is the single source of truth.
  */
-const BACKEND_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8085";
 
-const nextConfig: NextConfig = {
-    async rewrites() {
-        return [
-            {
-                source: "/api/v1/:path*",
-                destination: `${BACKEND_ORIGIN}/api/v1/:path*`,
-            },
-        ];
-    },
-};
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

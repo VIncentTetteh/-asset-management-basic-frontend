@@ -45,6 +45,12 @@ import {
 } from "lucide-react";
 import { organisationService } from "@/services/organisationService";
 import { usePermissions } from "@/contexts/PermissionContext";
+import {
+    clearVerifiedOrganisationId,
+    extractOrganisationName,
+    getOrganisationIdFromStorage,
+    getStoredUser,
+} from "@/lib/authContext";
 
 export function Sidebar() {
     const router = useRouter();
@@ -58,10 +64,17 @@ export function Sidebar() {
                 const token = localStorage.getItem("token");
                 if (!token) return;
 
-                const orgs = await organisationService.getAll();
-                if (orgs.length > 0) {
-                    setOrgName(orgs[0].name);
+                const storedUser = getStoredUser();
+                const cachedOrgName = extractOrganisationName(storedUser);
+                if (cachedOrgName) {
+                    setOrgName(cachedOrgName);
                 }
+
+                const orgId = getOrganisationIdFromStorage();
+                if (!orgId) return;
+
+                const org = await organisationService.get(orgId);
+                setOrgName(org.name);
             } catch (error) {
                 console.error("Failed to load org name in sidebar:", error);
             }
@@ -176,6 +189,9 @@ export function Sidebar() {
     const handleLogout = () => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        clearVerifiedOrganisationId();
+        // Reset PermissionContext so a subsequent login starts from a clean slate.
+        window.dispatchEvent(new Event("auth-changed"));
         router.push("/login");
     };
 

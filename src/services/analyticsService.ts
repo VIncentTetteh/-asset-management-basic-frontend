@@ -24,6 +24,22 @@ const toNumber = (value: unknown): number => {
     return 0;
 };
 
+/**
+ * Unwraps common API response envelopes like { data: { ... } }, { content: { ... } },
+ * { result: { ... } } so normalizers can access the actual payload fields directly.
+ * If `value.data` is a non-array object it is treated as the inner payload.
+ * If `value.data` is an array (items list) or absent, the outer object is returned as-is.
+ */
+const unwrapPayload = (value: unknown): Record<string, unknown> => {
+    const outer = asRecord(value);
+    if (!outer) return {};
+    const inner = outer.data ?? outer.content ?? outer.result;
+    if (inner !== null && typeof inner === "object" && !Array.isArray(inner)) {
+        return inner as Record<string, unknown>;
+    }
+    return outer;
+};
+
 const getOptionalNumber = (raw: Record<string, unknown>, ...keys: string[]): number | undefined => {
     for (const key of keys) {
         if (Object.prototype.hasOwnProperty.call(raw, key) && raw[key] != null) {
@@ -34,21 +50,24 @@ const getOptionalNumber = (raw: Record<string, unknown>, ...keys: string[]): num
 };
 
 const normalizeAssetAnalytics = (payload: unknown): AssetAnalytics => {
-    const raw = asRecord(payload) ?? {};
+    const raw = unwrapPayload(payload);
+    const outer = asRecord(payload) ?? {};
     const breakdown = asRecord(raw.breakdown);
     const data = Array.isArray(raw.data)
         ? raw.data
-        : breakdown
-            ? Object.entries(breakdown).map(([name, value]) => {
-                const item = asRecord(value) ?? {};
-                return {
-                    name,
-                    count: toNumber(item.count),
-                    value: toNumber(item.value),
-                    percentage: 0,
-                };
-            })
-            : [];
+        : Array.isArray(outer.data)
+            ? outer.data
+            : breakdown
+                ? Object.entries(breakdown).map(([name, value]) => {
+                    const item = asRecord(value) ?? {};
+                    return {
+                        name,
+                        count: toNumber(item.count),
+                        value: toNumber(item.value),
+                        percentage: 0,
+                    };
+                })
+                : [];
 
     const normalizedData = data
         .map(item => {
@@ -62,8 +81,8 @@ const normalizeAssetAnalytics = (payload: unknown): AssetAnalytics => {
         })
         .filter(item => item.count > 0 || item.value > 0);
 
-    const total = toNumber(raw.total ?? raw.totalAssets) || normalizedData.reduce((sum, item) => sum + item.count, 0);
-    const totalValue = toNumber(raw.totalValue) || normalizedData.reduce((sum, item) => sum + item.value, 0);
+    const total = toNumber(raw.total ?? raw.totalAssets ?? outer.total ?? outer.totalAssets) || normalizedData.reduce((sum, item) => sum + item.count, 0);
+    const totalValue = toNumber(raw.totalValue ?? outer.totalValue) || normalizedData.reduce((sum, item) => sum + item.value, 0);
 
     return {
         period: String(raw.period ?? ""),
@@ -78,7 +97,7 @@ const normalizeAssetAnalytics = (payload: unknown): AssetAnalytics => {
 };
 
 const normalizeFinancialAnalytics = (payload: unknown): FinancialAnalytics => {
-    const raw = asRecord(payload) ?? {};
+    const raw = unwrapPayload(payload);
     const byCategory = asRecord(asRecord(raw.breakdown)?.byCategory) ?? asRecord(raw.byCategory) ?? {};
 
     const categoryEntries = Object.entries(byCategory).reduce<NonNullable<FinancialAnalytics["breakdown"]>["byCategory"]>((acc, [name, value]) => {
@@ -121,7 +140,7 @@ const normalizeFinancialAnalytics = (payload: unknown): FinancialAnalytics => {
 };
 
 const normalizePurchaseOrderAnalytics = (payload: unknown): PurchaseOrderAnalytics => {
-    const raw = asRecord(payload) ?? {};
+    const raw = unwrapPayload(payload);
     const byStatus = asRecord(raw.byStatus) ?? {};
     const topSuppliers = Array.isArray(raw.topSuppliers) ? raw.topSuppliers : [];
 
@@ -149,7 +168,7 @@ const normalizePurchaseOrderAnalytics = (payload: unknown): PurchaseOrderAnalyti
 };
 
 const normalizeMaintenanceAnalytics = (payload: unknown): MaintenanceAnalytics => {
-    const raw = asRecord(payload) ?? {};
+    const raw = unwrapPayload(payload);
     const byType = asRecord(raw.byType) ?? {};
     const totalRecords = toNumber(raw.totalRecords);
     const totalCost = toNumber(raw.totalMaintenanceCost ?? raw.totalCost);
@@ -178,7 +197,7 @@ const normalizeMaintenanceAnalytics = (payload: unknown): MaintenanceAnalytics =
 };
 
 const normalizeDepreciationTrend = (payload: unknown): DepreciationTrend => {
-    const raw = asRecord(payload) ?? {};
+    const raw = unwrapPayload(payload);
     const items = Array.isArray(raw.data)
         ? raw.data
         : Array.isArray(raw.trend)

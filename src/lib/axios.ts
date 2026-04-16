@@ -1,80 +1,112 @@
 import axios from "axios";
-import { getOrganisationIdFromStorage } from "@/lib/authContext";
+import { clearVerifiedOrganisationId, getOrganisationIdFromStorage } from "@/lib/authContext";
 
+/**
+ * Axios instance for all API requests.
+ *
+ * F-1 Security change: the JWT is now stored in an HttpOnly cookie set by the
+ * backend on login/refresh. The browser sends it automatically on every
+ * credentialed request — JavaScript can never read it, which eliminates the
+ * XSS token-theft attack surface.
+ *
+ * The Authorization: Bearer header path is preserved for the desktop (Electron)
+ * app and direct API clients that still use localStorage-based tokens.
+ */
 const api = axios.create({
     baseURL: "/api/v1",
+    withCredentials: true,   // F-1: send HttpOnly cookie on every request
     headers: {
         "Content-Type": "application/json",
-        "X-Requested-With": "XMLHttpRequest"
+        "X-Requested-With": "XMLHttpRequest",
     },
 });
 
-// ── Boot-time token re-hydration ──────────────────────────────────────────────
-// Restore the Authorization header from localStorage on every module load so
-// that requests fired before the first interceptor run (e.g. during SSR or
-// early effects) still carry the correct token.
-if (typeof window !== "undefined") {
-    const _bootToken = localStorage.getItem("token");
-    if (_bootToken) {
-        api.defaults.headers.common["Authorization"] = `Bearer ${_bootToken}`;
+const MAX_AUTH_TOKEN_HEADER_LENGTH = 4096;
+
+/**
+ * Returns a stored Bearer token if one exists in localStorage.
+ * Used only for desktop-app compatibility — browser sessions rely on the cookie.
+ */
+const getSafeToken = (): string | null => {
+    if (typeof window === "undefined") return null;
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+    const normalized = token.trim();
+    if (!normalized || normalized.length > MAX_AUTH_TOKEN_HEADER_LENGTH) {
+        localStorage.removeItem("token");
+        return null;
     }
-}
+    return normalized;
+};
 
 // ── Helper: clear all auth state ─────────────────────────────────────────────
 export const clearAuthState = (): void => {
+    // Remove any localStorage token (desktop/legacy compatibility)
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    sessionStorage.removeItem("user_meta");
+    clearVerifiedOrganisationId();
     delete api.defaults.headers.common["Authorization"];
 };
 
-// Request interceptor: Attach token to every request automatically
+const isPublicAuthEndpoint = (url?: string): boolean =>
+    Boolean(
+        url?.includes("/auth/login")
+        || url?.includes("/auth/register")
+        || url?.includes("/auth/forgot-password")
+        || url?.includes("/auth/reset-password")
+        || url?.includes("/mfa/challenge")
+        || url?.includes("/auth/sso/public")
+    );
+
+const shouldSkipOrganisationHeader = (url?: string): boolean =>
+    Boolean(
+        isPublicAuthEndpoint(url)
+        || url?.includes("/auth/profile")
+        || url?.includes("/auth/me/permissions")
+        || url?.includes("/users/me")
+        || url?.includes("/auth/refresh")
+    );
+
+// ── Request interceptor ───────────────────────────────────────────────────────
+// For browser sessions the HttpOnly cookie is sent automatically via withCredentials.
+// If a localStorage token also exists (desktop/legacy) it is added as a Bearer header
+// so the backend filter can accept it from either source.
 api.interceptors.request.use((config) => {
     if (typeof window !== "undefined") {
-        const token = localStorage.getItem("token");
-        // Never attach Bearer to public auth endpoints
-        const isPublicAuthEndpoint =
-            config.url?.includes("/auth/login") ||
-            config.url?.includes("/auth/register") ||
-            config.url?.includes("/auth/forgot-password") ||
-            config.url?.includes("/auth/reset-password") ||
-            config.url?.includes("/mfa/challenge") ||
-            config.url?.includes("/auth/sso/public");
-        if (token && config.headers && !isPublicAuthEndpoint) {
+        const token = getSafeToken();
+
+        if (config.headers && isPublicAuthEndpoint(config.url)) {
+            delete config.headers["Authorization"];
+        } else if (token && config.headers) {
+            // Desktop/legacy: add Bearer header when a stored token is present
             config.headers["Authorization"] = `Bearer ${token}`;
+        } else if (config.headers) {
+            delete config.headers["Authorization"];
         }
+
         const organisationId = getOrganisationIdFromStorage();
-        if (organisationId && config.headers) {
+        if (organisationId && config.headers && !shouldSkipOrganisationHeader(config.url)) {
             config.headers["X-Organisation-Id"] = organisationId;
+        } else if (config.headers) {
+            delete config.headers["X-Organisation-Id"];
         }
     }
     return config;
-}, (error) => {
-    return Promise.reject(error);
-});
+}, (error) => Promise.reject(error));
 
-// Track in-flight token refresh to avoid duplicate requests
-let _refreshingToken: Promise<string | null> | null = null;
+// ── Token refresh ─────────────────────────────────────────────────────────────
+let _refreshingToken: Promise<boolean> | null = null;
 
-async function refreshToken(): Promise<string | null> {
+async function refreshToken(): Promise<boolean> {
     if (_refreshingToken) return _refreshingToken;
     _refreshingToken = (async () => {
         try {
-            const current = localStorage.getItem("token");
-            if (!current) return null;
-            const res = await axios.post(
-                "/api/v1/auth/refresh",
-                {},
-                { headers: { Authorization: `Bearer ${current}` } }
-            );
-            const newToken: string = res.data?.token;
-            if (newToken) {
-                localStorage.setItem("token", newToken);
-                api.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
-                return newToken;
-            }
-            return null;
+            // POST /auth/refresh — backend reads the cookie and issues a new one
+            await api.post("/auth/refresh", {});
+            return true;
         } catch {
-            return null;
+            return false;
         } finally {
             _refreshingToken = null;
         }
@@ -82,42 +114,38 @@ async function refreshToken(): Promise<string | null> {
     return _refreshingToken;
 }
 
-// Response interceptor: Handle 401 and 403 globally
-api.interceptors.response.use((response) => {
-    return response;
-}, async (error) => {
+// ── Response interceptor ──────────────────────────────────────────────────────
+api.interceptors.response.use((response) => response, async (error) => {
     const originalRequest = error.config;
 
     if (typeof window !== "undefined" && error.response?.status === 403) {
         const message = String(error.response?.data?.message || "").toLowerCase();
         if (message.includes("plan") || message.includes("subscription") || message.includes("limit")) {
             window.dispatchEvent(new CustomEvent("plan-limit-error", {
-                detail: { message: error.response?.data?.message || "Plan limit reached" }
+                detail: { message: error.response?.data?.message || "Plan limit reached" },
             }));
             return Promise.reject(error);
         }
 
-        // Auto-refresh token on 403 (permissions may have been updated server-side)
-        // Only retry once to avoid infinite loops
+        // Auto-refresh on 403 — only retry once
         if (!originalRequest._permissionsRetried) {
             originalRequest._permissionsRetried = true;
-            const newToken = await refreshToken();
-            if (newToken) {
-                originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
+            const refreshed = await refreshToken();
+            if (refreshed) {
                 return api(originalRequest);
             }
         }
     }
 
     if (error.response?.status === 401) {
-        if (typeof window !== "undefined" &&
-            !window.location.pathname.startsWith("/login") &&
-            !window.location.pathname.startsWith("/register")) {
-            // Fully wipe auth state (localStorage + axios defaults) before redirect
+        if (typeof window !== "undefined"
+            && !window.location.pathname.startsWith("/login")
+            && !window.location.pathname.startsWith("/register")) {
             clearAuthState();
             window.location.href = "/login";
         }
     }
+
     return Promise.reject(error);
 });
 

@@ -1,34 +1,71 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import React from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+interface ProtectedRouteProps {
+    children: React.ReactNode;
+    /**
+     * Optional permission(s) required to access this route.
+     * If provided, authenticated users without the permission see <Forbidden />.
+     */
+    require?: string | string[];
+    /** Whether ANY of the listed permissions satisfies the check (default: ALL). */
+    requireAny?: boolean;
+}
+
+/**
+ * Route-level auth guard.
+ *
+ * - While loading: renders nothing (prevents flicker).
+ * - Unauthenticated: redirects to /login.
+ * - Authenticated but missing required permission: renders a Forbidden message.
+ * - Authenticated and authorized: renders children.
+ *
+ * Wrap entire page layouts or individual pages:
+ * @example
+ * <ProtectedRoute require="MANAGE_ROLES">
+ *   <RolesPage />
+ * </ProtectedRoute>
+ */
+export function ProtectedRoute({
+    children,
+    require: requiredPerms,
+    requireAny = false,
+}: ProtectedRouteProps) {
     const router = useRouter();
-    const pathname = usePathname();
-    const [isAuthorized, setIsAuthorized] = useState(false);
+    const { isAuthenticated, isReady, hasPermission, hasAnyPermission, hasAllPermissions } = useAuth();
 
-    useEffect(() => {
-        // Paths that don't require authentication
-        const publicPaths = ["/login", "/register"];
-
-        const checkAuth = () => {
-            const token = localStorage.getItem("token");
-            if (!token && !publicPaths.includes(pathname)) {
-                // If no token and trying to access protected route, redirect to login
-                setIsAuthorized(false);
-                router.push("/login");
-            } else {
-                setIsAuthorized(true);
-            }
-        };
-
-        checkAuth();
-    }, [pathname, router]);
-
-    // Show nothing while checking auth to prevent flicker of dashboard
-    if (!isAuthorized) {
+    // Still fetching the profile — render nothing to prevent a flash of unauthorized content
+    if (!isReady) {
         return null;
+    }
+
+    // Not authenticated — redirect to login
+    if (!isAuthenticated) {
+        router.replace("/login");
+        return null;
+    }
+
+    // Permission check (optional)
+    if (requiredPerms) {
+        const permArray = Array.isArray(requiredPerms) ? requiredPerms : [requiredPerms];
+        const allowed = requireAny
+            ? hasAnyPermission(...permArray)
+            : hasAllPermissions(...permArray);
+
+        if (!allowed) {
+            return (
+                <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
+                    <div className="text-6xl font-bold text-gray-300">403</div>
+                    <h1 className="text-2xl font-semibold text-gray-700">Access Denied</h1>
+                    <p className="max-w-sm text-gray-500">
+                        You don&apos;t have permission to view this page.
+                    </p>
+                </div>
+            );
+        }
     }
 
     return <>{children}</>;

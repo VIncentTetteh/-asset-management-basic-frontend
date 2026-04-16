@@ -17,6 +17,7 @@ import { toast } from "react-hot-toast";
 import { useForm } from "react-hook-form";
 import { UserCircle, Mail, Phone, Building, Briefcase, Shield, Save, ShieldCheck, ShieldOff } from "lucide-react";
 import { buildPatchPayload } from "@/lib/patch";
+import { mergeStoredUser, verifyOrganisationContext } from "@/lib/authContext";
 
 export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
@@ -88,6 +89,8 @@ export default function ProfilePage() {
             try {
                 // Always fetch fresh profile from the API — localStorage never contains mfaEnabled
                 const freshUser = await userService.getMe();
+                mergeStoredUser(freshUser);
+                verifyOrganisationContext(freshUser);
                 setUser(freshUser);
                 setMfaEnabled(Boolean(freshUser.mfaEnabled));
 
@@ -154,7 +157,8 @@ export default function ProfilePage() {
 
             // Merge the updated fields into the locally cached user object
             const merged = { ...user, ...updatedUser } as User;
-            localStorage.setItem("user", JSON.stringify(merged));
+            mergeStoredUser(merged);
+            verifyOrganisationContext(merged);
             setUser(merged);
 
             toast.success("Profile updated successfully");

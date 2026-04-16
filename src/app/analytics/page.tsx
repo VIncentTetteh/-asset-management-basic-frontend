@@ -325,28 +325,28 @@ export default function AnalyticsPage() {
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                     <p className="text-xs uppercase tracking-wide text-slate-400">Asset Value</p>
-                                    <p className="mt-2 text-[2rem] font-black leading-none lg:text-[2.25rem]">{heroAssetValue}</p>
+                                    <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-xl font-black leading-tight sm:text-2xl">{heroAssetValue}</p>
                                     <p className="mt-1 text-xs text-slate-300">
                                         Full value: {formatCurrency(financialAnalytics?.totalAssetValue ?? assetAnalytics?.totalValue)} · {assetAnalytics?.total?.toLocaleString() ?? "—"} assets in analysis
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                     <p className="text-xs uppercase tracking-wide text-slate-400">Book Value</p>
-                                    <p className="mt-2 text-[2rem] font-black leading-none lg:text-[2.25rem]">{heroBookValue}</p>
+                                    <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-xl font-black leading-tight sm:text-2xl">{heroBookValue}</p>
                                     <p className="mt-1 text-xs text-slate-300">
                                         Depreciation: {formatCurrency(financialAnalytics?.totalDepreciation)}
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                     <p className="text-xs uppercase tracking-wide text-slate-400">PO Volume</p>
-                                    <p className="mt-2 text-[2rem] font-black leading-none lg:text-[2.25rem]">{heroPoValue}</p>
+                                    <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-xl font-black leading-tight sm:text-2xl">{heroPoValue}</p>
                                     <p className="mt-1 text-xs text-slate-300">
                                         {poAnalytics?.totalPOs?.toLocaleString() ?? "—"} purchase orders
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                     <p className="text-xs uppercase tracking-wide text-slate-400">Maintenance Cost</p>
-                                    <p className="mt-2 text-[2rem] font-black leading-none lg:text-[2.25rem]">{heroMaintenanceCost}</p>
+                                    <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-xl font-black leading-tight sm:text-2xl">{heroMaintenanceCost}</p>
                                     <p className="mt-1 text-xs text-slate-300">
                                         {maintenanceAnalytics?.overdueCount?.toLocaleString() ?? "—"} overdue records
                                     </p>
@@ -453,7 +453,7 @@ export default function AnalyticsPage() {
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-black text-slate-900">{formatCurrency(financialAnalytics?.netBookValue)}</div>
+                                <div className="overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold text-slate-900 sm:text-xl">{formatCurrency(financialAnalytics?.netBookValue)}</div>
                                 <p className="mt-1 text-xs text-slate-500">
                                     Avg age: {financialAnalytics?.averageAssetAge != null ? financialAnalytics.averageAssetAge.toFixed(1) : "Not reported"}
                                 </p>
@@ -468,7 +468,7 @@ export default function AnalyticsPage() {
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-black text-slate-900">{formatCurrency(poAnalytics?.totalPOValue)}</div>
+                                <div className="overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold text-slate-900 sm:text-xl">{formatCurrency(poAnalytics?.totalPOValue)}</div>
                                 <p className="mt-1 text-xs text-slate-500">{poAnalytics?.approvedPOs ?? 0} approved orders</p>
                             </CardContent>
                         </Card>

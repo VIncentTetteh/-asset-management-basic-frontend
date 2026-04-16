@@ -321,9 +321,13 @@ export interface Role {
     id: string;
     name: string;
     description?: string;
-    permissions: string[] | string;
+    /** Flat array of permission names returned by the API (Phase 2 / B-1). */
+    permissions: string[];
     organisationId?: string;
-    isSystemRole?: boolean;
+    /** True if this is a built-in role that cannot be modified or deleted. */
+    systemRole?: boolean;
+    /** True if the bearer receives every permission in the system. */
+    grantAllPermissions?: boolean;
     createdAt?: string;
     updatedAt?: string;
 }
@@ -331,7 +335,9 @@ export interface Role {
 export interface RoleDto {
     name: string;                 // required
     description?: string;
-    permissions: string[] | string;
+    /** Plain array of permission names to assign, e.g. ["VIEW_ASSETS", "MANAGE_ROLES"]. */
+    permissions: string[];
+    grantAllPermissions?: boolean;
 }
 
 // ─── User ─────────────────────────────────────────────────────────────────────
@@ -344,8 +350,15 @@ export interface User extends BaseEntity {
     phone?: string;
     employeeId?: string;
     jobTitle?: string;
+    /** Display name of the user's primary role. */
     role?: string;
+    /** Primary role UUID — used for JWT claims and single-role queries. */
     roleId?: string;
+    /**
+     * All role UUIDs assigned to this user (Phase 2 / B-5 role composition).
+     * The effective permission set is the union of all assigned roles.
+     */
+    roleIds?: string[];
     status?: UserStatus | string;
     organisationId?: string;
     departmentId?: string;

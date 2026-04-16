@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { authService, TenantRegistrationDto } from "@/services/authService";
+import api from "@/lib/axios";
+import { setStoredUser, setVerifiedOrganisationId } from "@/lib/authContext";
 
 export default function RegisterTenantPage() {
     const router = useRouter();
@@ -23,14 +25,17 @@ export default function RegisterTenantPage() {
             const response = await authService.registerTenant(data);
             // API returns token + user info directly — auto-login the admin
             localStorage.setItem("token", response.token);
-            localStorage.setItem("user", JSON.stringify({
+            setStoredUser({
                 id: response.userId,
                 firstName: response.firstName,
                 lastName: response.lastName,
                 email: response.email,
                 role: response.role,
                 organisationId: response.organisationId,
-            }));
+            });
+            setVerifiedOrganisationId(response.organisationId);
+            api.defaults.headers.common["Authorization"] = `Bearer ${response.token}`;
+            window.dispatchEvent(new Event("auth-changed"));
             toast.success(`Workspace "${response.organisationName}" created! Welcome, ${response.firstName}.`);
             router.push("/dashboard");
         } catch (error: any) {

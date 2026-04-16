@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ssoAuthService, SsoCallbackResponse } from "@/services/ssoAuthService";
 import { authService } from "@/services/authService";
 import api from "@/lib/axios";
+import { clearVerifiedOrganisationId, setStoredUser, verifyOrganisationContext } from "@/lib/authContext";
 import toast from "react-hot-toast";
 import { Loader2, ShieldCheck } from "lucide-react";
 
@@ -34,6 +35,7 @@ export default function SsoCallbackPage() {
 
                 if (response.token) {
                     localStorage.setItem("token", response.token);
+                    clearVerifiedOrganisationId();
                     api.defaults.headers.common["Authorization"] = `Bearer ${response.token}`;
 
                     // Store user — fetch from /auth/profile if the callback didn't include it
@@ -46,8 +48,12 @@ export default function SsoCallbackPage() {
                         }
                     }
                     if (user) {
-                        localStorage.setItem("user", JSON.stringify(user));
+                        setStoredUser(user);
+                        verifyOrganisationContext(user);
                     }
+
+                    // Trigger PermissionContext refetch with the new token.
+                    window.dispatchEvent(new Event("auth-changed"));
 
                     setStatus("success");
                     toast.success(response.message || "SSO login successful!");
