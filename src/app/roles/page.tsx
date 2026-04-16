@@ -116,7 +116,7 @@ export default function RolesPage() {
 
     const handleOpenEdit = (role: Role) => {
         // System roles like SUPER_ADMIN usually can't be edited by normal UI flows, but we'll allow viewing
-        if (role.isSystemRole) {
+        if (role.systemRole) {
             toast("System roles cannot be modified.", { icon: "🔒" });
             // return; // Commented out to allow exploring the UI
         }
@@ -132,7 +132,7 @@ export default function RolesPage() {
     };
 
     const handleDelete = async (role: Role) => {
-        if (role.isSystemRole) {
+        if (role.systemRole) {
             toast.error("System roles cannot be deleted.");
             return;
         }
@@ -221,7 +221,7 @@ export default function RolesPage() {
                 ) : (
                     roles.map((role) => (
                         <Card key={role.id} className="overflow-hidden hover:shadow-md transition-all group border-slate-200 flex flex-col relative">
-                            {role.isSystemRole && (
+                            {role.systemRole && (
                                 <div className="absolute top-0 right-0 w-12 h-12 overflow-hidden pointer-events-none" title="System Role - Cannot be deleted">
                                     <div className="absolute top-[-10px] right-[-30px] w-[80px] h-[30px] bg-sky-500 rotate-45 transform origin-bottom-right z-10"></div>
                                     <Lock className="absolute top-[3px] right-[3px] h-3 w-3 text-white z-20 pointer-events-auto" />
@@ -231,7 +231,7 @@ export default function RolesPage() {
                                 <div className="truncate pr-2 w-full">
                                     <div className="flex justify-between items-start mb-1">
                                         <CardTitle className="text-lg font-semibold text-slate-900 flex items-center gap-1.5 truncate pr-6" title={role.name}>
-                                            <Shield className={`h-4 w-4 shrink-0 ${role.isSystemRole ? 'text-sky-600' : 'text-zinc-600'}`} />
+                                            <Shield className={`h-4 w-4 shrink-0 ${role.systemRole ? 'text-sky-600' : 'text-zinc-600'}`} />
                                             <span className="truncate">{role.name}</span>
                                         </CardTitle>
                                     </div>
@@ -262,7 +262,7 @@ export default function RolesPage() {
                                 </div>
 
                                 <div className="flex justify-end items-center gap-2 pt-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {role.isSystemRole ? (
+                                    {role.systemRole ? (
                                         <Button variant="outline" size="sm" onClick={() => handleOpenEdit(role)} className="h-8">
                                             <ShieldAlert className="h-3.5 w-3.5 mr-1" /> View System Policy
                                         </Button>

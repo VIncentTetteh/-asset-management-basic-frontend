@@ -1,6 +1,6 @@
 # Enterprise Asset Management — Complete API Reference
 
-**Base URL:** `http://localhost:8085`
+**Base URL:** `http://localhost:8080`
 **API Version:** v1
 **Content-Type:** `application/json` (unless stated otherwise)
 

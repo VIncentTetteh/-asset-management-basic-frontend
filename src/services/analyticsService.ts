@@ -169,50 +169,73 @@ const normalizePurchaseOrderAnalytics = (payload: unknown): PurchaseOrderAnalyti
 
 const normalizeMaintenanceAnalytics = (payload: unknown): MaintenanceAnalytics => {
     const raw = unwrapPayload(payload);
-    const byType = asRecord(raw.byType) ?? {};
-    const totalRecords = toNumber(raw.totalRecords);
+
+    // Backend returns "totalMaintenanceRecords" (not "totalRecords")
+    const totalRecords = toNumber(raw.totalMaintenanceRecords ?? raw.totalRecords);
     const totalCost = toNumber(raw.totalMaintenanceCost ?? raw.totalCost);
+
+    // Backend returns separate countByType and costByType maps; merge them.
+    // Also support legacy byType: { [type]: { count, cost } }
+    const countByType = asRecord(raw.countByType) ?? {};
+    const costByType = asRecord(raw.costByType) ?? {};
+    const legacyByType = asRecord(raw.byType) ?? {};
+
+    const allTypes = new Set([
+        ...Object.keys(countByType),
+        ...Object.keys(costByType),
+        ...Object.keys(legacyByType),
+    ]);
+
+    const byType = Array.from(allTypes).reduce<MaintenanceAnalytics["byType"]>((acc, type) => {
+        const legacy = asRecord(legacyByType[type]);
+        if (legacy) {
+            acc[type] = { count: toNumber(legacy.count), cost: toNumber(legacy.cost) };
+        } else {
+            acc[type] = {
+                count: toNumber(countByType[type]),
+                cost: toNumber(costByType[type]),
+            };
+        }
+        return acc;
+    }, {});
 
     return {
         period: typeof raw.period === "string" ? raw.period : undefined,
         totalRecords,
         totalMaintenanceCost: totalCost,
-        averageCost: toNumber(raw.averageCost) || (totalRecords > 0 ? totalCost / totalRecords : 0),
+        averageCost: toNumber(raw.averageMaintenanceCost ?? raw.averageCost) || (totalRecords > 0 ? totalCost / totalRecords : 0),
         completionRate: getOptionalNumber(raw, "completionRate"),
-        overdueCount: toNumber(raw.overdueCount),
-        byType: Object.entries(byType).reduce<MaintenanceAnalytics["byType"]>((acc, [type, value]) => {
-            const item = asRecord(value);
-            acc[type] = item
-                ? {
-                    count: toNumber(item.count),
-                    cost: toNumber(item.cost),
-                }
-                : {
-                    count: toNumber(value),
-                    cost: 0,
-                };
-            return acc;
-        }, {}),
+        // Backend returns "assetsNeedingMaintenance" (not "overdueCount")
+        overdueCount: toNumber(raw.assetsNeedingMaintenance ?? raw.overdueCount),
+        byType,
     };
 };
 
 const normalizeDepreciationTrend = (payload: unknown): DepreciationTrend => {
     const raw = unwrapPayload(payload);
-    const items = Array.isArray(raw.data)
-        ? raw.data
-        : Array.isArray(raw.trend)
-            ? raw.trend
-            : [];
+
+    // Backend returns "trends" array (not "data" or "trend")
+    // Each item has: month, totalValue (= netBookValue), monthlyDepreciation
+    const items = Array.isArray(raw.trends)
+        ? raw.trends
+        : Array.isArray(raw.data)
+            ? raw.data
+            : Array.isArray(raw.trend)
+                ? raw.trend
+                : [];
 
     return {
         period: typeof raw.period === "string" ? raw.period : undefined,
         data: items.map(item => {
             const entry = asRecord(item) ?? {};
+            // Backend: totalValue ≈ netBookValue, monthlyDepreciation ≈ charge for the month
+            const monthlyDep = toNumber(entry.monthlyDepreciation ?? entry.depreciationCharge ?? entry.newDepreciation);
+            const nbv = toNumber(entry.netBookValue ?? entry.totalValue ?? entry.bookValue);
             return {
                 month: String(entry.month ?? ""),
-                totalDepreciation: toNumber(entry.totalDepreciation ?? entry.depreciationCharge),
-                netBookValue: toNumber(entry.netBookValue ?? entry.bookValue),
-                newDepreciation: toNumber(entry.newDepreciation ?? entry.depreciationCharge),
+                totalDepreciation: toNumber(entry.totalDepreciation) || monthlyDep,
+                netBookValue: nbv,
+                newDepreciation: monthlyDep,
             };
         }),
     };

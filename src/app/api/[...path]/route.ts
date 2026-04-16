@@ -12,11 +12,11 @@ import { NextRequest } from "next/server";
  * the rewrite was removed — this is the single proxy entry-point.
  */
 
-const TARGET_BASE = (process.env.API_TARGET_BASE ?? "http://localhost:8085/api").replace(/\/+$/, "");
+const TARGET_BASE = (process.env.API_TARGET_BASE ?? "http://localhost:8080/api").replace(/\/+$/, "");
 
 if (!process.env.API_TARGET_BASE) {
     console.warn(
-        "[proxy] API_TARGET_BASE is not set — falling back to http://localhost:8085/api. " +
+        "[proxy] API_TARGET_BASE is not set — falling back to http://localhost:8080/api. " +
         "Set API_TARGET_BASE in your environment for production deployments."
     );
 }
