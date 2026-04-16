@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import type { Permission } from "@/contexts/AuthContext";
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -10,7 +11,7 @@ interface ProtectedRouteProps {
      * Optional permission(s) required to access this route.
      * If provided, authenticated users without the permission see <Forbidden />.
      */
-    require?: string | string[];
+    require?: Permission | Permission[];
     /** Whether ANY of the listed permissions satisfies the check (default: ALL). */
     requireAny?: boolean;
 }

@@ -8,6 +8,7 @@ import type { User } from "@/types";
 // ── Permission type ──────────────────────────────────────────────────────────
 // Auto-generated from the backend Permission enum (F-3).
 // Run `node Enterprise-Asset-Manager/scripts/generate-permissions.mjs` to refresh.
+import type { Permission } from "@/types/permissions";
 export type { Permission } from "@/types/permissions";
 
 // ── Context shape ────────────────────────────────────────────────────────────
@@ -51,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(profile);
             // Profile includes the user's live permissions from the backend cache
             const perms = Array.isArray((profile as any).permissions)
-                ? (profile as any).permissions as string[]
+                ? (profile as any).permissions as Permission[]
                 : [];
             setPermissions(new Set(perms));
         } catch {

@@ -169,7 +169,7 @@ export default function RolesPage() {
             data.permissions = selectedPermissions;
 
             if (editingRole) {
-                if (editingRole.isSystemRole) {
+                if (editingRole.systemRole) {
                     toast.error("Cannot save edits to a System Role.");
                     return;
                 }
@@ -286,11 +286,11 @@ export default function RolesPage() {
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                title={editingRole ? (editingRole.isSystemRole ? "View System Role Policy" : "Edit Custom Role") : "Create Custom Role"}
-                description={editingRole?.isSystemRole ? "System roles are hardcoded by the application and cannot be structurally altered." : "Define an access control envelope to assign to users."}
+                title={editingRole ? (editingRole.systemRole ? "View System Role Policy" : "Edit Custom Role") : "Create Custom Role"}
+                description={editingRole?.systemRole ? "System roles are hardcoded by the application and cannot be structurally altered." : "Define an access control envelope to assign to users."}
             >
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
-                    {editingRole?.isSystemRole && (
+                    {editingRole?.systemRole && (
                         <div className="bg-blue-50 text-blue-800 p-3 rounded-md text-sm mb-4 border border-blue-200 flex items-start gap-2">
                             <Lock className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
                             <p><strong>System Defined Profile.</strong> This role is locked. You are viewing it in Read-Only mode.</p>
@@ -303,7 +303,7 @@ export default function RolesPage() {
                             id="name"
                             placeholder="e.g. Finance Auditor"
                             {...register("name", { required: "Name is required" })}
-                            disabled={!!(editingRole?.isSystemRole)}
+                            disabled={!!(editingRole?.systemRole)}
                         />
                         {errors.name && <p className="text-sm text-red-500">{errors.name.message as string}</p>}
                     </div>
@@ -312,7 +312,7 @@ export default function RolesPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="description">Profile Description</Label>
-                        <Textarea id="description" placeholder="Read-only access to POs and Audits..." {...register("description")} disabled={!!(editingRole?.isSystemRole)} />
+                        <Textarea id="description" placeholder="Read-only access to POs and Audits..." {...register("description")} disabled={!!(editingRole?.systemRole)} />
                     </div>
 
                     <div className="space-y-3 border-t pt-4 border-b pb-4">
@@ -332,8 +332,8 @@ export default function RolesPage() {
                                                     id={`perm-${perm}`}
                                                     className="rounded border-gray-300 text-zinc-600 shadow-sm focus:border-zinc-300 focus:ring focus:ring-zinc-200 focus:ring-opacity-50"
                                                     checked={selectedPermissions.includes(perm)}
-                                                    onChange={() => !editingRole?.isSystemRole && togglePermission(perm)}
-                                                    disabled={!!(editingRole?.isSystemRole)}
+                                                    onChange={() => !editingRole?.systemRole && togglePermission(perm)}
+                                                    disabled={!!(editingRole?.systemRole)}
                                                 />
                                                 <Label htmlFor={`perm-${perm}`} className="text-xs font-mono cursor-pointer leading-tight">
                                                     {perm.replace(/_/g, ' ')}
@@ -351,9 +351,9 @@ export default function RolesPage() {
 
                     <div className="flex justify-end gap-2 pt-2">
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                            {editingRole?.isSystemRole ? "Close" : "Cancel"}
+                            {editingRole?.systemRole ? "Close" : "Cancel"}
                         </Button>
-                        {!editingRole?.isSystemRole && (
+                        {!editingRole?.systemRole && (
                             <Button type="submit" isLoading={isSubmitting} className="bg-zinc-800 hover:bg-zinc-900">
                                 {editingRole ? "Save Updates" : "Issue Custom Role"}
                             </Button>

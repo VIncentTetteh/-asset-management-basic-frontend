@@ -42,7 +42,8 @@ export const authService = {
     login: async (data: { email: string; password: string; organisationId?: string }): Promise<LoginResponse> => {
         const response = await api.post<LoginResponse>("/auth/login", data);
         // Store display-only metadata in sessionStorage (never the token itself)
-        if (typeof window !== "undefined" && response.data?.user) {
+        // Narrow to LoginSuccessResponse — MfaChallengeResponse has no `user` field
+        if (typeof window !== "undefined" && !("mfaRequired" in response.data) && response.data.user) {
             sessionStorage.setItem("user_meta", JSON.stringify(response.data.user));
         }
         return response.data;
