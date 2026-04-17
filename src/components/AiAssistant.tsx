@@ -277,7 +277,7 @@ export function AiAssistant() {
       {/* ── Chat Panel ─────────────────────────────────────────────────── */}
       {isOpen && (
         <div
-          className={`fixed bottom-24 right-5 z-50 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all duration-300 ease-out ${
+          className={`fixed bottom-[168px] right-6 z-50 flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all duration-300 ease-out ${
             isMinimized
               ? "h-14 w-80 overflow-hidden"
               : "h-[580px] w-[380px]"
@@ -414,7 +414,7 @@ export function AiAssistant() {
       <button
         onClick={toggleOpen}
         aria-label="Open AI Assistant"
-        className={`fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all duration-300 active:scale-95 ${
+        className={`fixed bottom-24 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all duration-300 active:scale-95 ${
           isOpen
             ? "bg-slate-700 hover:bg-slate-800 rotate-0"
             : "bg-teal-600 hover:bg-teal-700"
