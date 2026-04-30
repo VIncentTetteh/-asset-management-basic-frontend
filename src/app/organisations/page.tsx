@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Organisation, OrganisationDto, OrganisationStatus, SsoConfigDto } from "@/types";
 import { organisationService } from "@/services/organisationService";
-import { ssoConfigService } from "@/services/ssoConfigService";
+import { orgSsoService } from "@/services/orgSsoService";
 import { buildPatchPayload } from "@/lib/patch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -134,13 +134,30 @@ export default function OrganisationsPage() {
         setIsModalOpen(true);
     };
 
-    const handleOpenSSO = (org: Organisation) => {
+    const handleOpenSSO = async (org: Organisation) => {
         setEditingOrg(org);
         setSsoFormData({
             provider: "CUSTOM",
             enabled: false,
         });
         setIsSSOModalOpen(true);
+        try {
+            const config = await orgSsoService.get(org.id);
+            if (config) {
+                setSsoFormData({
+                    provider: config.provider || "CUSTOM",
+                    enabled: config.enabled,
+                    clientId: config.clientId || "",
+                    discoveryUrl: config.issuerUri || "",
+                    redirectUri: config.redirectUri || "",
+                    clientSecret: "",
+                });
+            }
+        } catch (error: any) {
+            toast.error(error?.response?.status === 403
+                ? "You need admin or security permission to manage SSO."
+                : "Failed to load SSO configuration");
+        }
     };
 
     const onSubmit = async (e: React.FormEvent) => {
@@ -180,14 +197,27 @@ export default function OrganisationsPage() {
     const onSubmitSSO = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!ssoFormData.clientId || !ssoFormData.clientSecret) {
-            toast.error("Client ID and Secret are required to enable SSO");
+        if (!editingOrg) {
+            toast.error("Choose an organisation before saving SSO");
+            return;
+        }
+
+        if (!ssoFormData.clientId || !ssoFormData.clientSecret || !ssoFormData.discoveryUrl) {
+            toast.error("Issuer URL, Client ID, and Client Secret are required to save OAuth2 SSO");
             return;
         }
 
         setIsSubmittingSSO(true);
         try {
-            await ssoConfigService.create(ssoFormData as SsoConfigDto);
+            await orgSsoService.configureOAuth2(editingOrg.id, {
+                provider: ssoFormData.provider || "CUSTOM",
+                clientId: ssoFormData.clientId,
+                clientSecret: ssoFormData.clientSecret,
+                issuerUri: ssoFormData.discoveryUrl,
+                scopes: ["openid", "email", "profile"],
+                redirectUri: ssoFormData.redirectUri || null,
+            });
+            await orgSsoService.toggle(editingOrg.id, { enabled: Boolean(ssoFormData.enabled) });
             toast.success("SSO configuration saved successfully");
             setIsSSOModalOpen(false);
         } catch (error: any) {

@@ -45,7 +45,7 @@ export default function PatchRecordsPage() {
                 patchRecordService.getAll({ size: 100 }),
                 assetService.getAll(),
             ]);
-            setItems(patchData.content ?? []);
+            setItems(patchData.items ?? patchData.content ?? []);
             setAssets(assetsData);
         } catch {
             toast.error("Failed to load patch records");

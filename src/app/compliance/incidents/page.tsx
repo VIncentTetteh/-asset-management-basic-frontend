@@ -53,7 +53,7 @@ export default function IncidentsPage() {
                 incidentService.getAll({ size: 100 }),
                 userService.getAll(),
             ]);
-            setItems(res.content ?? []);
+            setItems(res.items ?? res.content ?? []);
             setUsers(usersData);
         } catch {
             toast.error("Failed to load incidents");

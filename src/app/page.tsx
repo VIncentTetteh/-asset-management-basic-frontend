@@ -147,7 +147,7 @@ export default function LandingPage() {
                         <h2 className="text-3xl font-bold text-white md:text-5xl mb-8">Ready to transform your <br /><span className="text-gradient">asset management?</span></h2>
                         <div className="flex flex-col sm:flex-row justify-center gap-4">
                             <button className="h-14 px-10 rounded-xl bg-teal-600 hover:bg-teal-700 text-lg font-bold text-white transition-all shadow-xl shadow-teal-900/40 hover:scale-105 active:scale-95">
-                                Start Free Trial Today
+                                Start with Freemium
                             </button>
                             <button className="h-14 px-10 rounded-xl border border-slate-700 bg-slate-900/50 hover:bg-slate-800 text-lg font-bold text-white transition-all hover:scale-105 active:scale-95">
                                 Schedule a Demo

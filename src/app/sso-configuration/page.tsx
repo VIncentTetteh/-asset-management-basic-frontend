@@ -48,8 +48,10 @@ export default function SsoConfigurationPage() {
                     assertionConsumerServiceUrl: data.assertionConsumerServiceUrl || "",
                 });
             }
-        } catch {
-            toast.error("Failed to load SSO configuration");
+        } catch (error: any) {
+            toast.error(error?.response?.status === 403
+                ? "You need admin or security permission to manage SSO."
+                : "Failed to load SSO configuration");
         } finally {
             setIsLoading(false);
         }

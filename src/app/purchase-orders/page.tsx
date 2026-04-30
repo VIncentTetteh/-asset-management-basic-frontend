@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { PurchaseOrder, PurchaseOrderDto, Supplier, Department, POStatus } from "@/types";
 import { purchaseOrderService } from "@/services/purchaseOrderService";
 import { supplierService } from "@/services/supplierService";
+import { bulkOperationService } from "@/services/bulkOperationService";
 import { departmentService } from "@/services/departmentService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +17,7 @@ import { Select } from "@/components/ui/select";
 import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { Plus, Pencil, Trash2, ShoppingCart, Building2, CheckCircle2, XCircle, MoreHorizontal, Layers } from "lucide-react";
+import { Plus, Pencil, Trash2, ShoppingCart, Building2, CheckCircle2, XCircle, MoreHorizontal, Layers, Download } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
@@ -31,6 +32,7 @@ export default function PurchaseOrdersPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [actioningId, setActioningId] = useState<string | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
 
@@ -62,6 +64,19 @@ export default function PurchaseOrdersPage() {
     const supplierMap = useMemo(() => new Map(suppliers.map(s => [s.id, s.name])), [suppliers]);
     const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
     const { confirm, ConfirmDialog } = useConfirm();
+
+    const handleExport = async (format: "CSV" | "EXCEL") => {
+        setIsExporting(true);
+        try {
+            const filename = await bulkOperationService.exportPurchaseOrders({ format });
+            toast.success(`Downloaded ${filename}`);
+        } catch {
+            toast.error("Failed to download export");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const normalizePoStatus = (status?: string): string | undefined => {
         if (!status) return undefined;
         if (status === "PENDING") return POStatus.SUBMITTED;
@@ -251,9 +266,19 @@ export default function PurchaseOrdersPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Purchase Orders</h1>
                     <p className="text-slate-500">Manage procurements and track vendor orders.</p>
                 </div>
-                <Button onClick={handleOpenCreate} className="bg-sky-600 hover:bg-sky-700">
-                    <Plus className="mr-2 h-4 w-4" /> Create PO
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        isLoading={isExporting}
+                        onClick={() => handleExport("EXCEL")}
+                        className="gap-1.5 text-sm"
+                    >
+                        <Download className="h-4 w-4" /> Export
+                    </Button>
+                    <Button onClick={handleOpenCreate} className="bg-sky-600 hover:bg-sky-700">
+                        <Plus className="mr-2 h-4 w-4" /> Create PO
+                    </Button>
+                </div>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

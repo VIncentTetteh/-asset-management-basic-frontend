@@ -84,7 +84,16 @@ export default function VendorReviewsPage() {
 
     const handleOpenCreate = () => {
         setEditingReview(null);
-        reset({ supplierId: selectedSupplierId || "", reviewPeriod: "", rating: 0, qualityScore: 0, deliveryScore: 0, supportScore: 0, reviewDate: "" });
+        reset({
+            supplierId: selectedSupplierId || "",
+            rating: 0,
+            qualityScore: 0,
+            deliveryScore: 0,
+            supportScore: 0,
+            feedback: "",
+            periodStart: "",
+            periodEnd: "",
+        });
         setIsModalOpen(true);
     };
 
@@ -92,12 +101,13 @@ export default function VendorReviewsPage() {
         setEditingReview(review);
         reset({
             supplierId: review.supplierId,
-            reviewPeriod: "",
-            rating: review.rating,
+            rating: Number(review.rating),
             qualityScore: review.qualityScore ?? undefined,
             deliveryScore: review.deliveryScore ?? undefined,
             supportScore: review.supportScore ?? undefined,
-            reviewDate: "",
+            feedback: review.feedback ?? "",
+            periodStart: review.periodStart ?? "",
+            periodEnd: review.periodEnd ?? "",
         });
         setIsModalOpen(true);
     };
@@ -121,7 +131,9 @@ export default function VendorReviewsPage() {
             qualityScore: Number(data.qualityScore),
             deliveryScore: Number(data.deliveryScore),
             supportScore: Number(data.supportScore),
-            overallScore: Number(data.overallScore) || avg,
+            feedback: data.feedback?.trim() || undefined,
+            periodStart: data.periodStart || undefined,
+            periodEnd: data.periodEnd || undefined,
         };
         try {
             if (editingReview) {
@@ -170,16 +182,19 @@ export default function VendorReviewsPage() {
                         <p className="text-xs text-slate-500">{summary.totalReviews} review{summary.totalReviews !== 1 ? "s" : ""}</p>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-4 gap-4 text-center">
+                        <div className="grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
                             {[
-                                { label: "Quality", value: summary.avgQualityScore },
-                                { label: "Delivery", value: summary.avgDeliveryScore },
-                                { label: "Support", value: summary.avgSupportScore },
-                                { label: "Overall", value: summary.avgOverallScore },
+                                { label: "Average", value: summary.averageRating },
+                                { label: "Reviews", value: summary.totalReviews },
+                                { label: "Latest", value: reviews[0]?.rating ?? summary.averageRating },
                             ].map(item => (
                                 <div key={item.label}>
                                     <p className="text-xs text-slate-500 mb-1">{item.label}</p>
-                                    <ScoreBadge score={item.value} />
+                                    {item.label === "Reviews" ? (
+                                        <span className="text-sm font-bold text-slate-700">{item.value}</span>
+                                    ) : (
+                                        <ScoreBadge score={Number(item.value)} />
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -258,12 +273,12 @@ export default function VendorReviewsPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="reviewPeriod">Review Period <span className="text-red-500">*</span></Label>
-                            <Input id="reviewPeriod" placeholder="e.g. Q1-2025" {...register("reviewPeriod", { required: true })} />
+                            <Label htmlFor="periodStart">Period Start <span className="text-red-500">*</span></Label>
+                            <Input id="periodStart" type="date" {...register("periodStart", { required: true })} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="reviewDate">Review Date <span className="text-red-500">*</span></Label>
-                            <Input id="reviewDate" type="date" {...register("reviewDate", { required: true })} />
+                            <Label htmlFor="periodEnd">Period End <span className="text-red-500">*</span></Label>
+                            <Input id="periodEnd" type="date" {...register("periodEnd", { required: true })} />
                         </div>
                     </div>
 
@@ -288,18 +303,13 @@ export default function VendorReviewsPage() {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="overallScore">Overall Score <span className="text-xs text-slate-400">(auto-calculated)</span></Label>
-                        <Input id="overallScore" type="number" step="0.01" min="0" max="5" {...register("overallScore", { valueAsNumber: true })} />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="comments">Comments</Label>
+                        <Label htmlFor="feedback">Feedback</Label>
                         <textarea
-                            id="comments"
+                            id="feedback"
                             rows={3}
                             placeholder="Optional notes..."
                             className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            {...register("comments")}
+                            {...register("feedback")}
                         />
                     </div>
 

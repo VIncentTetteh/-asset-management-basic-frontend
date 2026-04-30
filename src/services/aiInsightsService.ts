@@ -11,12 +11,18 @@ const withOrgParams = (params?: Record<string, string | number | boolean | undef
 });
 
 export const aiInsightsService = {
-    /** POST /ai/insights/generate — re-analyze all assets & refresh insights */
-    generate: async (): Promise<{ message: string }> => {
-        const response = await api.post<{ message: string }>("/ai/insights/generate", {}, {
+    /** POST /ai/insights/generate — re-analyze all assets & refresh insights.
+     *  API spec: returns Array<PredictiveInsight>.
+     *  Legacy behaviour: may return { message: string } — handled gracefully. */
+    generate: async (): Promise<PredictiveInsight[]> => {
+        const response = await api.post("/ai/insights/generate", {}, {
             params: withOrgParams(),
         });
-        return response.data;
+        const data = response.data;
+        // Spec: Array<PredictiveInsight>
+        if (Array.isArray(data)) return data as PredictiveInsight[];
+        // Fallback: old { message } shape — return empty array so callers stay stable
+        return [];
     },
 
     /** GET /ai/insights?type=&severity=&unresolvedOnly=true */

@@ -125,7 +125,10 @@ export default function AiInsightsPage() {
         setIsGenerating(true);
         try {
             const res = await aiInsightsService.generate();
-            toast.success(res.message || "AI has re-analysed your asset portfolio");
+            const count = Array.isArray(res) ? res.length : 0;
+            toast.success(count > 0
+                ? `AI generated ${count} insight${count !== 1 ? "s" : ""} for your portfolio`
+                : "AI has re-analysed your asset portfolio");
             fetchAll();
         } catch {
             toast.error("Failed to generate insights");

@@ -32,17 +32,20 @@ const resolveUrl = (payload: SsoAuthorizeResponse | SamlInitiateResponse): strin
     return url;
 };
 
+const buildInitiateUrl = (params?: { organisationId?: string; provider?: string; exchangeRedirectUri?: string }): string => {
+    if (!params?.organisationId) {
+        throw new Error("Organisation is required to start SSO.");
+    }
+    const query = new URLSearchParams({ orgId: params.organisationId });
+    if (params.provider) query.set("provider", params.provider);
+    if (params.exchangeRedirectUri) query.set("exchangeRedirectUri", params.exchangeRedirectUri);
+    const base = api.defaults.baseURL || "/api/v1";
+    return `${base}/auth/sso/initiate?${query.toString()}`;
+};
+
 export const ssoAuthService = {
-    authorizeOAuth2: async (params?: { organisationId?: string; provider?: string; redirectUri?: string }): Promise<SsoAuthorizeResponse> => {
-        const response = await api.get<SsoAuthorizeResponse>("/auth/sso/oauth2/authorize", {
-            params: {
-                organisationId: params?.organisationId,
-                orgId: params?.organisationId,
-                provider: params?.provider,
-                redirectUri: params?.redirectUri,
-            },
-        });
-        return response.data;
+    authorizeOAuth2: async (params?: { organisationId?: string; provider?: string; redirectUri?: string; exchangeRedirectUri?: string }): Promise<SsoAuthorizeResponse> => {
+        return { authorizationUrl: buildInitiateUrl({ ...params, exchangeRedirectUri: params?.exchangeRedirectUri ?? params?.redirectUri }) };
     },
 
     getOauth2AuthorizeUrl: async (organisationId: string, provider?: string, redirectUri?: string): Promise<SsoAuthorizeResponse> => {
@@ -55,7 +58,10 @@ export const ssoAuthService = {
     },
 
     handleOAuth2Callback: async (params: { code?: string | null; state?: string | null; error?: string | null }): Promise<SsoCallbackResponse> => {
-        const response = await api.get<SsoCallbackResponse>("/auth/sso/oauth2/callback", { params });
+        if (params.error) {
+            throw new Error(params.error);
+        }
+        const response = await api.post<SsoCallbackResponse>("/auth/sso/exchange", { code: params.code });
         return response.data;
     },
 
@@ -70,15 +76,7 @@ export const ssoAuthService = {
     },
 
     initiateSaml: async (params?: { organisationId?: string; provider?: string; relayState?: string }): Promise<SamlInitiateResponse> => {
-        const response = await api.get<SamlInitiateResponse>("/auth/sso/saml/initiate", {
-            params: {
-                organisationId: params?.organisationId,
-                orgId: params?.organisationId,
-                provider: params?.provider,
-                relayState: params?.relayState,
-            },
-        });
-        return response.data;
+        return { redirectUrl: buildInitiateUrl({ organisationId: params?.organisationId, provider: params?.provider }) };
     },
 
     getSamlInitiateUrl: async (organisationId: string, provider?: string): Promise<SamlInitiateResponse> => {

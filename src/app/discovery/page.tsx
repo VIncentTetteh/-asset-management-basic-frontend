@@ -135,7 +135,7 @@ export default function DiscoveryPage() {
                 discoveryService.getSummary(),
             ]);
             if (devicesResult.status === "fulfilled") {
-                setDevices(devicesResult.value.content ?? []);
+                setDevices(devicesResult.value.items ?? devicesResult.value.content ?? []);
                 setTotalPages(devicesResult.value.totalPages ?? 0);
             }
             if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
@@ -165,7 +165,7 @@ export default function DiscoveryPage() {
             const res = await discoveryService.scan(payload);
             setIsScanModalOpen(false);
             setLastScanned(new Date());
-            toast.success(res.message || "Scan initiated — devices will appear as discovered.");
+            toast.success(`Scan completed: ${res.length} device${res.length === 1 ? "" : "s"} discovered.`);
             setTimeout(() => { setPage(0); fetchDevices(0); }, 2000);
         } catch {
             toast.error("Scan failed — check your network range and try again.");

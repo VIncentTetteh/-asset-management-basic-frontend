@@ -1,6 +1,8 @@
 import api from "@/lib/axios";
 import { BillingPlan, CheckoutInitRequest, CheckoutInitResponse, Subscription } from "@/types";
 import { extractList } from "@/services/responseUtils";
+import { filterAndOrderPlans } from "@/lib/plan-filter";
+import { invalidateRequestCache, withRequestCache } from "@/services/requestCache";
 
 const normalizeSubscription = (subscription: Subscription): Subscription => ({
     ...subscription,
@@ -9,8 +11,10 @@ const normalizeSubscription = (subscription: Subscription): Subscription => ({
 
 export const billingService = {
     getPlans: async (): Promise<BillingPlan[]> => {
-        const response = await api.get("/billing/plans");
-        return extractList<BillingPlan>(response.data);
+        return withRequestCache("billing:plans", async () => {
+            const response = await api.get("/billing/plans");
+            return filterAndOrderPlans(extractList<BillingPlan>(response.data));
+        }, 5 * 60_000);
     },
 
     getSubscription: async (): Promise<Subscription> => {
@@ -27,6 +31,7 @@ export const billingService = {
         const response = await api.post<Subscription>("/billing/checkout/verify", null, {
             params: { reference },
         });
+        invalidateRequestCache("billing:");
         return normalizeSubscription(response.data);
     },
 
@@ -35,6 +40,7 @@ export const billingService = {
             "/billing/subscription/auto-renew",
             { enabled }
         );
+        invalidateRequestCache("billing:");
         return response.data;
     },
 

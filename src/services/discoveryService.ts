@@ -1,6 +1,7 @@
 import api from "@/lib/axios";
 import { DiscoveredDevice, DiscoveryScanDto, DiscoverySummary, PaginatedResponse } from "@/types";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
+import { normalizePage } from "@/services/responseUtils";
 
 const getOrgId = (): string | undefined => getOrganisationIdFromStorage();
 
@@ -11,8 +12,8 @@ const withOrgParams = (params?: Record<string, string | number | boolean | undef
 
 export const discoveryService = {
     /** POST /discovery/scan */
-    scan: async (data: DiscoveryScanDto): Promise<{ message: string; jobId?: string }> => {
-        const response = await api.post<{ message: string; jobId?: string }>("/discovery/scan", data, {
+    scan: async (data: DiscoveryScanDto): Promise<DiscoveredDevice[]> => {
+        const response = await api.post<DiscoveredDevice[]>("/discovery/scan", data, {
             params: withOrgParams(),
         });
         return response.data;
@@ -23,7 +24,7 @@ export const discoveryService = {
         const response = await api.get<PaginatedResponse<DiscoveredDevice>>("/discovery/devices", {
             params: withOrgParams({ page: params?.page ?? 0, size: params?.size ?? 20 }),
         });
-        return response.data;
+        return normalizePage<DiscoveredDevice>(response.data) as PaginatedResponse<DiscoveredDevice>;
     },
 
     /** GET /discovery/devices/{id} */

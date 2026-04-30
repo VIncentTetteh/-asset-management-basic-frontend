@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, Cloud, DollarSign } from "lucide-react";
+import { Plus, Pencil, Trash2, Cloud, DollarSign, RefreshCw } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useConfirm } from "@/hooks/useConfirm";
 
@@ -48,6 +48,7 @@ export default function CloudAssetsPage() {
     const [isCostModalOpen, setIsCostModalOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<CloudAsset | null>(null);
     const [costAssetId, setCostAssetId] = useState("");
+    const [isSyncing, setIsSyncing] = useState(false);
 
     const assetForm = useForm<CloudAssetDto>();
     const costForm = useForm<CloudMonthlyCostDto>();
@@ -150,6 +151,19 @@ export default function CloudAssetsPage() {
         }
     };
 
+    const handleSyncAll = async () => {
+        setIsSyncing(true);
+        try {
+            const res = await cloudAssetService.syncAll();
+            toast.success(res.message || `Sync complete. ${res.assetsUpserted} assets updated.`);
+            fetchAll(page);
+        } catch {
+            toast.error("Failed to sync cloud assets");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -157,9 +171,14 @@ export default function CloudAssetsPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Cloud Assets</h1>
                     <p className="text-slate-500">Track and manage your cloud infrastructure resources.</p>
                 </div>
-                <Button onClick={handleOpenCreate} className="bg-purple-600 hover:bg-purple-700">
-                    <Plus className="mr-2 h-4 w-4" /> Add Cloud Asset
-                </Button>
+                <div className="flex gap-2">
+                    <Button onClick={handleSyncAll} variant="outline" isLoading={isSyncing}>
+                        <RefreshCw className="mr-2 h-4 w-4" /> Sync Hub
+                    </Button>
+                    <Button onClick={handleOpenCreate} className="bg-purple-600 hover:bg-purple-700">
+                        <Plus className="mr-2 h-4 w-4" /> Add Cloud Asset
+                    </Button>
+                </div>
             </div>
 
             {costSummary && (

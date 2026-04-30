@@ -36,6 +36,14 @@
 26. [IT Asset Discovery *(Phase 3)*](#26-it-asset-discovery-phase-3)
 27. [Cloud Assets *(Phase 3)*](#27-cloud-assets-phase-3)
 28. [AI / Predictive Intelligence *(Phase 3)*](#28-ai--predictive-intelligence-phase-3)
+29. [Categories](#29-categories)
+30. [System Config (Depts, Locs, Roles, Users, Orgs)](#30-system-config)
+31. [Asset Checkouts](#31-asset-checkouts)
+32. [Expenses](#32-expenses)
+33. [Lease Records](#33-lease-records)
+34. [Exchange Rates](#34-exchange-rates)
+35. [Data Privacy (DPA & DSAR)](#35-data-privacy)
+
 
 ---
 
@@ -192,7 +200,7 @@ GOOGLE | AZURE_AD | OKTA | GITHUB | SAML | CUSTOM_OAUTH2
 
 ### BillingPlanTier
 ```
-FREEMIUM | BASIC | PREMIUM
+FREEMIUM | BASIC | BUSINESS | ENTERPRISE
 ```
 
 ### BillingInterval
@@ -2672,6 +2680,101 @@ Dashboard summary of all unresolved insights.
 ```
 
 ---
+
+
+
+---
+
+## 29. Categories
+
+**Base Path:** `/api/v1/categories`
+
+All category endpoints follow the standard CRUD pattern:
+- `GET /` — list all categories
+- `POST /` — create category
+- `GET /{id}` — get category by ID
+- `PUT /{id}` / `PATCH /{id}` — update category
+- `DELETE /{id}` — soft-delete category
+- `GET /{parentId}/sub-categories` — get child categories
+
+---
+
+## 30. System Config
+
+**Required Role:** `ROLE_ADMIN` / `ROLE_ORG_ADMIN`
+
+The following base paths define and structure the tenant workspace and follow the standard CRUD patterns (`GET`, `POST`, `GET /{id}`, `PUT /{id}`, `PATCH /{id}`, `DELETE /{id}`):
+
+- **Departments:** `/api/v1/departments`
+- **Locations:** `/api/v1/locations` (plus `GET /{parentId}/sub-locations`)
+- **Roles:** `/api/v1/roles` (plus `GET /permissions`, `GET /by-name`)
+- **Users:** `/api/v1/users` (plus `GET /me`, `PUT /{id}/deactivate`, `PUT /{id}/role`)
+- **Organisations:** `/api/v1/organisations` (plus `PUT /{orgId}/storage-config`)
+
+---
+
+## 31. Asset Checkouts
+
+**Base Path:** `/api/v1/checkouts`
+
+For tracking physical chain-of-custody for assets assigned to users:
+- `GET /` — list all checkout events
+- `GET /{id}` — get by ID
+- `GET /assets/{assetId}` — get checkouts by asset
+- `GET /users/{userId}` — get checkouts by user
+- `GET /overdue` — list overdue returns
+- `POST /assets/{assetId}/users/{userId}` — execute a new checkout
+- `POST /{id}/checkin` — return the asset (checkin)
+
+---
+
+## 32. Expenses
+
+**Base Path:** `/api/v1/expenses`
+
+Tracking incidental costs, maintenance parts, or ad-hoc purchasing.
+- `GET /` — list expenses
+- `POST /` — submit expense
+- `GET /{id}` — get expense by ID
+- `DELETE /{id}` — cancel expense
+- `GET /pending` — list pending expenses
+- `GET /users/{userId}` — list expenses by user
+- `POST /{id}/approve` — approve expense
+- `POST /{id}/reject` — reject expense
+
+---
+
+## 33. Lease Records
+
+**Base Path:** `/api/v1/leases`
+
+For assets procured under Operational/Capital leases instead of direct purchase.
+- `GET /`, `POST /`, `GET /{id}`, `PUT /{id}`, `DELETE /{id}` — Standard CRUD
+- `GET /assets/{assetId}` — get lease for specific asset
+- `GET /expiring-soon` — get leases expiring within 90 days
+- `POST /{id}/terminate` — early termination of a lease
+
+---
+
+## 34. Exchange Rates
+
+**Base Path:** `/api/v1/exchange-rates`
+
+- `GET /`, `POST /`, `GET /{id}`, `DELETE /{id}` — Standard CRUD for rate pairs.
+- `GET /convert?from=USD&to=EUR&amount=100` — Convert a nominal value.
+
+---
+
+## 35. Data Privacy
+
+**Base Path:** `/api/v1/dpa`
+
+Consent and Subject Access Request (DSAR) compliance modules.
+- `GET /consent` / `POST /consent` — handle user privacy consent
+- `GET /consent/check` — verify active consent
+- `DELETE /consent/{purpose}` — withdraw consent
+- `GET /dsar`, `POST /dsar`, `GET /dsar/{id}` — Create and view subject requests
+- `PATCH /dsar/{id}/status` — Update processing status of a subject request
 
 ## Appendix — Common Headers
 

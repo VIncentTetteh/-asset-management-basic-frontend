@@ -2,6 +2,7 @@ import api from "@/lib/axios";
 import { Supplier, SupplierDto } from "@/types";
 import { extractList } from "@/services/responseUtils";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
+import { invalidateRequestCache, withRequestCache } from "@/services/requestCache";
 
 const getOrgId = (): string | undefined => {
     return getOrganisationIdFromStorage();
@@ -15,10 +16,12 @@ const withOrgParams = (params?: Record<string, string | number | boolean | undef
 export const supplierService = {
     /** GET /suppliers */
     getAll: async (): Promise<Supplier[]> => {
-        const response = await api.get("/suppliers", {
-            params: withOrgParams(),
-        });
-        return extractList<Supplier>(response.data);
+        return withRequestCache(`suppliers:${getOrgId() ?? "default"}:list`, async () => {
+            const response = await api.get("/suppliers", {
+                params: withOrgParams(),
+            });
+            return extractList<Supplier>(response.data);
+        }, 2 * 60_000);
     },
 
     /** GET /suppliers/{id} */
@@ -46,6 +49,7 @@ export const supplierService = {
         const response = await api.post<Supplier>("/suppliers", payload, {
             params: withOrgParams(),
         });
+        invalidateRequestCache("suppliers:");
         return response.data;
     },
 
@@ -58,6 +62,7 @@ export const supplierService = {
         const response = await api.patch<Supplier>(`/suppliers/${id}`, payload, {
             params: withOrgParams(),
         });
+        invalidateRequestCache("suppliers:");
         return response.data;
     },
 
@@ -66,6 +71,7 @@ export const supplierService = {
         await api.delete(`/suppliers/${id}`, {
             params: withOrgParams(),
         });
+        invalidateRequestCache("suppliers:");
     },
 
     /** PUT /suppliers/{id} */
@@ -77,6 +83,7 @@ export const supplierService = {
         const response = await api.put<Supplier>(`/suppliers/${id}`, payload, {
             params: withOrgParams(),
         });
+        invalidateRequestCache("suppliers:");
         return response.data;
     },
 };

@@ -22,6 +22,12 @@ export const auditService = {
         return response.data;
     },
 
+    /** GET /audits — convenience alias matching common service pattern */
+    getById: async (id: string): Promise<Audit> => {
+        const response = await api.get<Audit>(`/audits/${id}`);
+        return response.data;
+    },
+
     /** POST /audits */
     create: async (data: AssetAuditDto): Promise<Audit> => {
         const response = await api.post<Audit>("/audits", data);

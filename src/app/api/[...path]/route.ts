@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
  * All /api/* browser requests are forwarded to the Spring Boot backend.
  * Set API_TARGET_BASE in your environment to the backend base URL:
  *   API_TARGET_BASE=https://your-backend.railway.app/api   (production)
- *   API_TARGET_BASE=http://localhost:8085/api               (local dev default)
+ *   API_TARGET_BASE=http://localhost:8080/api               (local dev default)
  *
  * This route takes precedence over any next.config.ts rewrites, which is why
  * the rewrite was removed — this is the single proxy entry-point.

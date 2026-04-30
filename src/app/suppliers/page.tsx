@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Supplier, SupplierDto } from "@/types";
 import { supplierService } from "@/services/supplierService";
+import { bulkOperationService } from "@/services/bulkOperationService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
@@ -32,7 +33,20 @@ export default function SuppliersPage() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
     const { confirm, ConfirmDialog } = useConfirm();
+
+    const handleExport = async (format: "CSV" | "EXCEL") => {
+        setIsExporting(true);
+        try {
+            const filename = await bulkOperationService.exportSuppliers({ format });
+            toast.success(`Downloaded ${filename}`);
+        } catch {
+            toast.error("Failed to download supplier export");
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<SupplierDto>();
 
@@ -159,9 +173,19 @@ export default function SuppliersPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Suppliers</h1>
                     <p className="text-slate-500">Manage vendors and procurement sources.</p>
                 </div>
-                <Button onClick={handleOpenCreate} className="bg-purple-600 hover:bg-purple-700">
-                    <Plus className="mr-2 h-4 w-4" /> Add Supplier
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        isLoading={isExporting}
+                        onClick={() => handleExport("CSV")}
+                        className="gap-1.5 text-sm"
+                    >
+                        Export CSV
+                    </Button>
+                    <Button onClick={handleOpenCreate} className="bg-purple-600 hover:bg-purple-700">
+                        <Plus className="mr-2 h-4 w-4" /> Add Supplier
+                    </Button>
+                </div>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

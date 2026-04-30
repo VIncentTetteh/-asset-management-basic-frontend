@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { CardSkeleton } from "@/components/ui/skeleton";
@@ -35,7 +34,6 @@ export default function DepartmentsPage() {
         return departments.filter(d =>
             d.name.toLowerCase().includes(q) ||
             d.departmentCode?.toLowerCase().includes(q) ||
-            d.description?.toLowerCase().includes(q) ||
             d.costCenterCode?.toLowerCase().includes(q)
         );
     }, [departments, searchTerm]);
@@ -63,7 +61,6 @@ export default function DepartmentsPage() {
         setEditingDept(null);
         reset({
             name: "",
-            description: "",
             departmentCode: "",
             costCenterCode: "",
             budgetLimit: undefined,
@@ -76,7 +73,6 @@ export default function DepartmentsPage() {
         setEditingDept(dept);
         reset({
             name: dept.name,
-            description: dept.description || "",
             departmentCode: dept.departmentCode || "",
             costCenterCode: dept.costCenterCode || "",
             budgetLimit: dept.budgetLimit,
@@ -132,21 +128,21 @@ export default function DepartmentsPage() {
             return;
         }
 
+        const payload: DepartmentDto = { ...data };
+        delete payload.description;
+
         // Clean empty optional properties
-        if (!data.departmentCode) delete data.departmentCode;
-        if (!data.costCenterCode) delete data.costCenterCode;
-        if (data.budgetLimit) data.budgetLimit = Number(data.budgetLimit);
+        if (!payload.departmentCode) delete payload.departmentCode;
+        if (!payload.costCenterCode) delete payload.costCenterCode;
+        if (payload.budgetLimit) payload.budgetLimit = Number(payload.budgetLimit);
 
         try {
             if (editingDept) {
-                // Normalize description to "" so undefined/null and empty string compare as equal,
-                // and so that clearing a description is correctly detected as a change.
-                if (!data.description) data.description = "";
                 const prevForPatch: Partial<DepartmentDto> = {
                     ...(editingDept as unknown as Partial<DepartmentDto>),
-                    description: editingDept.description ?? "",
                 };
-                const patch = buildPatchPayload<DepartmentDto>(prevForPatch, data);
+                delete prevForPatch.description;
+                const patch = buildPatchPayload<DepartmentDto>(prevForPatch, payload);
                 if (Object.keys(patch).length === 0) {
                     toast("No changes to update");
                     return;
@@ -154,8 +150,7 @@ export default function DepartmentsPage() {
                 await departmentService.update(editingDept.id!, patch);
                 toast.success("Department updated");
             } else {
-                if (!data.description) delete data.description;
-                await departmentService.create(data);
+                await departmentService.create(payload);
                 toast.success("Department created");
             }
             setIsModalOpen(false);
@@ -240,14 +235,6 @@ export default function DepartmentsPage() {
                             </CardHeader>
                             <CardContent className="p-0 flex-1 flex flex-col">
                                 <div className="p-4 space-y-4 flex-1">
-                                    {dept.description ? (
-                                        <p className="text-sm text-slate-600 line-clamp-2" title={dept.description}>
-                                            {dept.description}
-                                        </p>
-                                    ) : (
-                                        <p className="text-xs text-slate-400 italic">No description provided.</p>
-                                    )}
-
                                     <div className="space-y-3 pt-3 border-t border-slate-100">
                                         {/* Hierarchy / Manager */}
                                         {(dept.parentDepartmentId || dept.managerId) && (
@@ -290,7 +277,7 @@ export default function DepartmentsPage() {
                                     </div>
 
                                     {/* Fallback Empty Details State */}
-                                    {!dept.parentDepartmentId && !dept.managerId && !dept.costCenterCode && dept.budgetLimit === undefined && !dept.description && (
+                                    {!dept.parentDepartmentId && !dept.managerId && !dept.costCenterCode && dept.budgetLimit === undefined && (
                                         <div className="flex flex-col items-center justify-center opacity-50 py-2">
                                             <AlertCircle className="h-5 w-5 text-slate-300 mb-1" />
                                             <span className="text-[10px] text-slate-400 font-medium">BASIC RECORD</span>
@@ -358,11 +345,6 @@ export default function DepartmentsPage() {
                             <Label htmlFor="departmentCode">Department Code</Label>
                             <Input id="departmentCode" placeholder="ENG-001" {...register("departmentCode")} />
                         </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea id="description" placeholder="Handles IT infrastructure" {...register("description")} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

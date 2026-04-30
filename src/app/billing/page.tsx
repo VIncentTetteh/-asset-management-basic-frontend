@@ -6,11 +6,32 @@ import { billingService } from "@/services/billingService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { Loader2, CreditCard, TrendingUp } from "lucide-react";
+import { CheckCircle2, CreditCard, Loader2, RefreshCw, TrendingDown, TrendingUp, Undo2 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { extractErrorMessage } from "@/lib/error";
 
 const formatMoneyMinor = (amountMinor: number, currency: string) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency }).format((amountMinor || 0) / 100);
+
+const isEnterprisePlan = (plan: BillingPlan) =>
+    plan.code === "ENTERPRISE" || plan.tier?.toUpperCase() === "ENTERPRISE";
+
+const isFreePlan = (plan: BillingPlan) =>
+    plan.code === "FREEMIUM" || ((plan.amountMinor ?? 0) <= 0 && !isEnterprisePlan(plan));
+
+const planRank = (plan?: BillingPlan | null) => {
+    const tier = plan?.tier?.toUpperCase();
+    if (tier === "FREEMIUM") return 0;
+    if (tier === "BASIC") return 1;
+    if (tier === "BUSINESS") return 2;
+    if (tier === "ENTERPRISE") return 3;
+    return plan?.amountMinor ?? 0;
+};
+
+const formatDate = (value?: string | null) => {
+    if (!value) return "Not scheduled";
+    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+};
 
 export default function BillingPage() {
     const [plans, setPlans] = useState<BillingPlan[]>([]);
@@ -57,7 +78,7 @@ export default function BillingPage() {
             const checkout = await billingService.initializeCheckout({ planCode, callbackUrl });
             window.location.href = checkout.authorizationUrl;
         } catch (error) {
-            toast.error("Failed to initialize checkout");
+            toast.error(extractErrorMessage(error, "Failed to initialize checkout"), { duration: 6000 });
             console.error(error);
         } finally {
             setCheckoutPlanCode("");
@@ -70,13 +91,26 @@ export default function BillingPage() {
             setSavingAutoRenew(true);
             const updated = await billingService.toggleAutoRenew(!subscription.autoRenew);
             setSubscription((prev) => (prev ? { ...prev, autoRenew: updated.autoRenew, status: updated.status } : prev));
-            toast.success("Auto-renew preference updated");
+            toast.success(
+                !subscription.autoRenew
+                    ? "Auto-renew enabled. Your subscription will renew automatically."
+                    : "Auto-renew disabled. Your plan will downgrade to Freemium at period end."
+            );
         } catch (error) {
-            toast.error("Failed to update auto-renew");
+            toast.error(extractErrorMessage(error, "Failed to update auto-renew"));
             console.error(error);
         } finally {
             setSavingAutoRenew(false);
         }
+    };
+
+    const onDowngradeToFree = async () => {
+        if (!subscription) return;
+        if (!subscription.autoRenew) {
+            toast.success("Downgrade to Freemium is already scheduled for the end of this period.");
+            return;
+        }
+        await onToggleAutoRenew();
     };
 
     if (loading) {
@@ -97,21 +131,47 @@ export default function BillingPage() {
                     <CardContent className="p-6 grid gap-4 md:grid-cols-3">
                         <div className="space-y-1">
                             <p className="text-xs uppercase tracking-wide text-slate-500">Plan</p>
-                            <p className="font-semibold text-slate-900">{subscription.plan.name} ({subscription.plan.code})</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-semibold text-slate-900">{subscription.plan.name} ({subscription.plan.code})</p>
+                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                    <CheckCircle2 className="h-3 w-3" /> Current package
+                                </span>
+                            </div>
                             <p className="text-sm text-slate-600">{formatMoneyMinor(subscription.plan.amountMinor, subscription.plan.currency)} / {subscription.plan.interval.toLowerCase()}</p>
+                            <p className="text-xs text-slate-500">Status: <span className="font-semibold">{subscription.status}</span></p>
                         </div>
                         <div className="space-y-2">
                             <p className="text-xs uppercase tracking-wide text-slate-500">Usage</p>
                             <p className="text-sm text-slate-700">Assets: {subscription.currentAssetCount} / {subscription.plan.maxAssets} ({assetUsage}%)</p>
                             <p className="text-sm text-slate-700">Employees: {subscription.currentEmployeeCount} / {subscription.plan.maxEmployees} ({employeeUsage}%)</p>
+                            <p className="text-xs text-slate-500">
+                                {subscription.autoRenew ? "Renews" : "Downgrades"} on {formatDate(subscription.currentPeriodEnd)}
+                            </p>
                         </div>
                         <div className="space-y-2">
                             <p className="text-xs uppercase tracking-wide text-slate-500">Subscription Controls</p>
                             <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                                <span className="text-sm text-slate-700">Auto-renew</span>
-                                <input type="checkbox" checked={subscription.autoRenew} onChange={onToggleAutoRenew} disabled={savingAutoRenew} />
+                                <span className="text-sm text-slate-700">
+                                    {subscription.autoRenew ? "Auto-renew enabled" : "Auto-renew disabled"}
+                                </span>
+                                <input aria-label="Toggle auto-renew" type="checkbox" checked={subscription.autoRenew} onChange={onToggleAutoRenew} disabled={savingAutoRenew} />
                             </div>
-                            <p className="text-xs text-slate-500">Status: <span className="font-semibold">{subscription.status}</span></p>
+                            <p className="text-xs text-slate-500">
+                                {subscription.autoRenew
+                                    ? `Next billing: ${formatDate(subscription.nextBillingAt ?? subscription.currentPeriodEnd)}`
+                                    : "Your paid package remains active until the period ends."}
+                            </p>
+                            {subscription.plan.amountMinor > 0 && (
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={onDowngradeToFree}
+                                    disabled={savingAutoRenew || !subscription.autoRenew}
+                                >
+                                    {savingAutoRenew ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Undo2 className="h-4 w-4 mr-2" />}
+                                    {subscription.autoRenew ? "Downgrade to Freemium" : "Downgrade scheduled"}
+                                </Button>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -120,16 +180,24 @@ export default function BillingPage() {
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {plans.map((plan) => {
                     const isCurrent = subscription?.plan?.code === plan.code;
+                    const isEnterprise = isEnterprisePlan(plan);
+                    const isFree = isFreePlan(plan);
+                    const action = subscription && planRank(plan) < planRank(subscription.plan) ? "Downgrade" : "Upgrade";
+                    const canCheckout = !isCurrent && !isEnterprise && !isFree;
                     return (
-                        <Card key={plan.code} className={`border ${isCurrent ? "border-emerald-300 bg-emerald-50/40" : "border-slate-200"}`}>
+                        <Card key={plan.code} className={`border ${isCurrent ? "border-emerald-300 bg-emerald-50/50 shadow-sm" : "border-slate-200"}`}>
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center justify-between text-base">
                                     <span>{plan.name}</span>
-                                    <span className="text-xs rounded-full border px-2 py-0.5">{plan.tier}</span>
+                                    <span className={`text-xs rounded-full border px-2 py-0.5 ${isCurrent ? "border-emerald-200 bg-white text-emerald-700" : ""}`}>
+                                        {isCurrent ? "Purchased" : plan.tier}
+                                    </span>
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                <p className="text-2xl font-bold text-slate-900">{formatMoneyMinor(plan.amountMinor, plan.currency)}</p>
+                                <p className="text-2xl font-bold text-slate-900">
+                                    {isEnterprise ? "Contact sales" : isFree ? "Free" : formatMoneyMinor(plan.amountMinor, plan.currency)}
+                                </p>
                                 <p className="text-xs text-slate-500 -mt-2">{plan.interval.toLowerCase()}</p>
                                 <div className="text-sm text-slate-700 space-y-1">
                                     <p>Max assets: {plan.maxAssets}</p>
@@ -137,14 +205,29 @@ export default function BillingPage() {
                                     <p>Analytics: {plan.analyticsEnabled ? "Included" : "Not included"}</p>
                                     <p>Audit retention: {plan.auditRetentionDays} days</p>
                                 </div>
-                                <Button
-                                    className="w-full"
-                                    disabled={isCurrent || checkoutPlanCode === plan.code}
-                                    onClick={() => onUpgrade(plan.code)}
-                                >
-                                    {checkoutPlanCode === plan.code ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <TrendingUp className="h-4 w-4 mr-2" />}
-                                    {isCurrent ? "Current Plan" : "Upgrade"}
-                                </Button>
+                                {isEnterprise && !isCurrent ? (
+                                    <Button asChild className="w-full" variant="secondary">
+                                        <a href="mailto:sales@assetiq.io?subject=Enterprise%20plan%20enquiry">Contact sales</a>
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="w-full"
+                                        variant={action === "Downgrade" ? "outline" : "default"}
+                                        disabled={!canCheckout || checkoutPlanCode === plan.code}
+                                        onClick={() => onUpgrade(plan.code)}
+                                    >
+                                        {checkoutPlanCode === plan.code ? (
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        ) : action === "Downgrade" ? (
+                                            <TrendingDown className="h-4 w-4 mr-2" />
+                                        ) : isFree ? (
+                                            <RefreshCw className="h-4 w-4 mr-2" />
+                                        ) : (
+                                            <TrendingUp className="h-4 w-4 mr-2" />
+                                        )}
+                                        {isCurrent ? "Current Package" : isFree ? "Included by default" : action}
+                                    </Button>
+                                )}
                             </CardContent>
                         </Card>
                     );
@@ -153,4 +236,3 @@ export default function BillingPage() {
         </div>
     );
 }
-

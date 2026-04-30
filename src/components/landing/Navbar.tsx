@@ -39,7 +39,7 @@ export function Navbar() {
                         Login
                     </Link>
                     <Button asChild className="bg-teal-600 hover:bg-teal-700 shadow-md shadow-teal-900/20">
-                        <Link href="/register-tenant">Start Free Trial</Link>
+                        <Link href="/register-tenant">Get Started</Link>
                     </Button>
                 </div>
 
@@ -61,7 +61,7 @@ export function Navbar() {
                     <div className="pt-3 flex flex-col gap-3 border-t border-white/10">
                         <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white py-1">Login</Link>
                         <Button asChild className="bg-teal-600 hover:bg-teal-700 w-full">
-                            <Link href="/register-tenant">Start Free Trial</Link>
+                            <Link href="/register-tenant">Get Started</Link>
                         </Button>
                     </div>
                 </div>

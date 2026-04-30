@@ -7,7 +7,7 @@ import type { NextConfig } from "next";
  * Set API_TARGET_BASE to the full base of your Spring Boot API, e.g.:
  *   API_TARGET_BASE=https://your-backend.railway.app/api
  *
- * Defaults to http://localhost:8085/api for local development.
+ * Defaults to http://localhost:8080/api for local development.
  *
  * NOTE: A next.config.ts rewrite for /api/v1/* was previously present here but
  * was dead code — Next.js App Router API routes always take precedence over

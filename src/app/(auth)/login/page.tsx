@@ -16,13 +16,14 @@ import { authService } from "@/services/authService";
 import { mfaService } from "@/services/mfaService";
 import api from "@/lib/axios";
 import { clearVerifiedOrganisationId, setStoredUser } from "@/lib/authContext";
-import { Smartphone } from "lucide-react";
+import { Eye, EyeOff, Smartphone } from "lucide-react";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     // MFA challenge state
     const [mfaChallengeToken, setMfaChallengeToken] = useState<string | null>(null);
@@ -178,12 +179,22 @@ export default function LoginPage() {
                                     Forgot password?
                                 </Link>
                             </div>
-                            <Input
-                                id="password"
-                                type="password"
-                                {...register("password", { required: "Password is required" })}
-                                className={errors.password ? "border-red-500" : ""}
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="password"
+                                    type={showPassword ? "text" : "password"}
+                                    {...register("password", { required: "Password is required" })}
+                                    className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
+                                />
+                                <button
+                                    type="button"
+                                    aria-label={showPassword ? "Mask password" : "Show password"}
+                                    onClick={() => setShowPassword((value) => !value)}
+                                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-slate-800"
+                                >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
                             {errors.password && (
                                 <p className="text-sm text-red-500">{errors.password.message as string}</p>
                             )}

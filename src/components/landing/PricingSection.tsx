@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useCurrency, SupportedCurrency } from "@/contexts/CurrencyContext";
 import { BillingPlan } from "@/types";
+import { filterAndOrderPlans } from "@/lib/plan-filter";
 
 // Fallback if the public plans endpoint is not available
 const FALLBACK_PLANS: BillingPlan[] = [
     {
-        code: "free",
-        name: "Free",
-        tier: "FREE",
+        code: "FREEMIUM",
+        name: "Freemium",
+        tier: "FREEMIUM",
         interval: "MONTHLY",
         amountMinor: 0,
         currency: "GHS",
@@ -22,31 +23,31 @@ const FALLBACK_PLANS: BillingPlan[] = [
         auditRetentionDays: 7,
     },
     {
-        code: "starter",
-        name: "Starter",
-        tier: "STARTER",
+        code: "BASIC",
+        name: "Basic",
+        tier: "BASIC",
         interval: "MONTHLY",
-        amountMinor: 29900,   // GHS 299 /mo
+        amountMinor: 9900,
         currency: "GHS",
-        maxAssets: 500,
-        maxEmployees: 50,
+        maxAssets: 250,
+        maxEmployees: 10,
         analyticsEnabled: false,
         auditRetentionDays: 30,
     },
     {
-        code: "professional",
-        name: "Professional",
-        tier: "PROFESSIONAL",
+        code: "BUSINESS",
+        name: "Business",
+        tier: "BUSINESS",
         interval: "MONTHLY",
-        amountMinor: 102900,  // GHS 1,029 /mo
+        amountMinor: 79900,
         currency: "GHS",
-        maxAssets: 2000,
-        maxEmployees: 200,
+        maxAssets: 10_000,
+        maxEmployees: 250,
         analyticsEnabled: true,
-        auditRetentionDays: 90,
+        auditRetentionDays: 1_825,
     },
     {
-        code: "enterprise",
+        code: "ENTERPRISE",
         name: "Enterprise",
         tier: "ENTERPRISE",
         interval: "MONTHLY",
@@ -72,7 +73,7 @@ function buildFeatures(plan: BillingPlan): string[] {
 
 function isHighlight(plan: BillingPlan, allPlans: BillingPlan[]): boolean {
     const t = plan.tier.toUpperCase();
-    if (t === "PROFESSIONAL" || t === "PRO") return true;
+    if (t === "BUSINESS") return true;
     // If no professional tier, highlight the middle paid plan
     const paid = allPlans.filter(p => p.amountMinor > 0 && p.tier.toUpperCase() !== "ENTERPRISE");
     if (paid.length > 0 && paid[Math.floor(paid.length / 2)]?.code === plan.code) return true;
@@ -103,7 +104,8 @@ export function PricingSection() {
                     : Array.isArray(data?.data)
                     ? data.data
                     : [];
-                setPlans(list.length > 0 ? list : FALLBACK_PLANS);
+                const cleaned = filterAndOrderPlans(list);
+                setPlans(cleaned.length > 0 ? cleaned : FALLBACK_PLANS);
             } catch {
                 setPlans(FALLBACK_PLANS);
             } finally {
@@ -250,7 +252,7 @@ export function PricingSection() {
                                         }`}
                                     >
                                         <Link href={enterprise ? "/#contact-info" : "/register-tenant"}>
-                                            {enterprise ? "Contact Sales" : plan.amountMinor === 0 ? "Get Started" : "Start Free Trial"}
+                                            {enterprise ? "Contact Sales" : plan.amountMinor === 0 ? "Get Started" : "Get Started"}
                                         </Link>
                                     </Button>
                                 </div>
@@ -260,7 +262,7 @@ export function PricingSection() {
                 )}
 
                 <p className="mt-10 text-center text-xs text-slate-500">
-                    All plans include a 14-day free trial. No credit card required.
+                    Freemium is available without a credit card. Enterprise packages are handled by our sales team.
                 </p>
             </div>
         </section>

@@ -631,11 +631,19 @@ export interface MfaChallengeVerifyResponse {
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 export interface PaginatedResponse<T> {
-    content: T[];
-    totalElements: number;
+    items: T[];
+    content?: T[];
+    total: number;
+    limit: number;
+    offset: number;
+    totalElements?: number;
     totalPages: number;
-    currentPage: number;
-    pageSize: number;
+    currentPage?: number;
+    pageSize?: number;
+    number?: number;
+    size?: number;
+    first?: boolean;
+    last?: boolean;
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -790,13 +798,14 @@ export interface ImportJobStatus {
 
 export interface ExportJobRequest {
     format: string;
-    filters: Record<string, unknown>;
-    columns: string[];
+    filters?: Record<string, unknown>;
+    columns?: string[];
 }
 
 export interface ExportJobResponse {
     jobId: string;
     status: string;
+    message?: string;
     format: string;
     downloadUrl: string;
     startedAt: string;
@@ -1414,11 +1423,17 @@ export interface RegulatoryFilingDto {
 }
 
 export interface PaginatedResponse<T> {
-    content: T[];
-    totalElements: number;
+    items: T[];
+    content?: T[];
+    total: number;
+    limit: number;
+    offset: number;
+    totalElements?: number;
     totalPages: number;
-    number: number;
-    size: number;
+    currentPage?: number;
+    pageSize?: number;
+    number?: number;
+    size?: number;
     first?: boolean;
     last?: boolean;
 }
@@ -1553,31 +1568,34 @@ export interface VendorReview {
     qualityScore?: number | null;
     deliveryScore?: number | null;
     supportScore?: number | null;
+    feedback?: string | null;
+    periodStart?: string | null;
+    periodEnd?: string | null;
     reviewedById?: string | null;
     reviewedByEmail?: string | null;
 }
 
 export interface VendorReviewDto {
     supplierId: string;
-    reviewPeriod: string;
     rating: number;
     qualityScore?: number | null;
     deliveryScore?: number | null;
     supportScore?: number | null;
-    overallScore?: number | null;
-    comments?: string | null;
+    feedback?: string | null;
     reviewedById?: string | null;
-    reviewDate: string;
+    periodStart?: string | null;
+    periodEnd?: string | null;
 }
 
 export interface VendorReviewSummary {
     supplierId: string;
     supplierName?: string | null;
     totalReviews: number;
-    avgQualityScore: number;
-    avgDeliveryScore: number;
-    avgSupportScore: number;
-    avgOverallScore: number;
+    averageRating: number;
+    avgQualityScore?: number;
+    avgDeliveryScore?: number;
+    avgSupportScore?: number;
+    avgOverallScore?: number;
 }
 
 // ─── MFA ──────────────────────────────────────────────────────────────────────

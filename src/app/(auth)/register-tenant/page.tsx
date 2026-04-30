@@ -13,10 +13,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { authService, TenantRegistrationDto } from "@/services/authService";
 import api from "@/lib/axios";
 import { setStoredUser, setVerifiedOrganisationId } from "@/lib/authContext";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function RegisterTenantPage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const { register, handleSubmit, formState: { errors } } = useForm<TenantRegistrationDto>();
 
     const onSubmit = async (data: TenantRegistrationDto) => {
@@ -136,16 +138,26 @@ export default function RegisterTenantPage() {
 
                             <div className="space-y-2">
                                 <Label htmlFor="password">Password</Label>
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    placeholder="Min 8 characters"
-                                    {...register("password", {
-                                        required: "Password is required",
-                                        minLength: { value: 8, message: "Must be at least 8 characters" }
-                                    })}
-                                    className={errors.password ? "border-red-500" : ""}
-                                />
+                                <div className="relative">
+                                    <Input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Min 8 characters"
+                                        {...register("password", {
+                                            required: "Password is required",
+                                            minLength: { value: 8, message: "Must be at least 8 characters" }
+                                        })}
+                                        className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
+                                    />
+                                    <button
+                                        type="button"
+                                        aria-label={showPassword ? "Mask password" : "Show password"}
+                                        onClick={() => setShowPassword((value) => !value)}
+                                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-slate-800"
+                                    >
+                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
                                 {errors.password && (
                                     <p className="text-sm text-red-500">{errors.password.message as string}</p>
                                 )}

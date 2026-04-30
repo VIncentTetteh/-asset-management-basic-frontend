@@ -17,6 +17,7 @@ import {
     RiskStatus,
     FilingStatus,
 } from "@/types";
+import { extractList, normalizePage } from "@/services/responseUtils";
 
 const BASE = "/compliance";
 
@@ -24,7 +25,7 @@ const BASE = "/compliance";
 export const complianceControlService = {
     getAll: async (params?: { framework?: string; status?: ControlStatus }): Promise<ComplianceControl[]> => {
         const res = await api.get<ComplianceControl[]>(`${BASE}/controls`, { params });
-        return Array.isArray(res.data) ? res.data : (res.data as any)?.content ?? [];
+        return extractList<ComplianceControl>(res.data);
     },
     get: async (id: string): Promise<ComplianceControl> => {
         const res = await api.get<ComplianceControl>(`${BASE}/controls/${id}`);
@@ -47,7 +48,7 @@ export const complianceControlService = {
 export const bogControlService = {
     getAll: async (params?: { status?: ControlStatus }): Promise<BOGControl[]> => {
         const res = await api.get<BOGControl[]>(`${BASE}/bog-controls`, { params });
-        return Array.isArray(res.data) ? res.data : (res.data as any)?.content ?? [];
+        return extractList<BOGControl>(res.data);
     },
     get: async (id: string): Promise<BOGControl> => {
         const res = await api.get<BOGControl>(`${BASE}/bog-controls/${id}`);
@@ -70,7 +71,7 @@ export const bogControlService = {
 export const riskService = {
     getAll: async (params?: { status?: RiskStatus; page?: number; size?: number }): Promise<PaginatedResponse<Risk>> => {
         const res = await api.get<PaginatedResponse<Risk>>(`${BASE}/risks`, { params });
-        return res.data;
+        return normalizePage<Risk>(res.data) as PaginatedResponse<Risk>;
     },
     get: async (id: string): Promise<Risk> => {
         const res = await api.get<Risk>(`${BASE}/risks/${id}`);
@@ -93,7 +94,7 @@ export const riskService = {
 export const incidentService = {
     getAll: async (params?: { page?: number; size?: number }): Promise<PaginatedResponse<SecurityIncident>> => {
         const res = await api.get<PaginatedResponse<SecurityIncident>>(`${BASE}/incidents`, { params });
-        return res.data;
+        return normalizePage<SecurityIncident>(res.data) as PaginatedResponse<SecurityIncident>;
     },
     get: async (id: string): Promise<SecurityIncident> => {
         const res = await api.get<SecurityIncident>(`${BASE}/incidents/${id}`);
@@ -116,7 +117,7 @@ export const incidentService = {
 export const policyService = {
     getAll: async (): Promise<SecurityPolicy[]> => {
         const res = await api.get<SecurityPolicy[]>(`${BASE}/policies`);
-        return Array.isArray(res.data) ? res.data : (res.data as any)?.content ?? [];
+        return extractList<SecurityPolicy>(res.data);
     },
     get: async (id: string): Promise<SecurityPolicy> => {
         const res = await api.get<SecurityPolicy>(`${BASE}/policies/${id}`);
@@ -139,7 +140,7 @@ export const policyService = {
 export const securityZoneService = {
     getAll: async (): Promise<SecurityZone[]> => {
         const res = await api.get<SecurityZone[]>(`${BASE}/security-zones`);
-        return Array.isArray(res.data) ? res.data : (res.data as any)?.content ?? [];
+        return extractList<SecurityZone>(res.data);
     },
     get: async (id: string): Promise<SecurityZone> => {
         const res = await api.get<SecurityZone>(`${BASE}/security-zones/${id}`);
@@ -162,7 +163,7 @@ export const securityZoneService = {
 export const icsAssetService = {
     getAll: async (): Promise<ICSAsset[]> => {
         const res = await api.get<ICSAsset[]>(`${BASE}/ics-assets`);
-        return Array.isArray(res.data) ? res.data : (res.data as any)?.content ?? [];
+        return extractList<ICSAsset>(res.data);
     },
     get: async (id: string): Promise<ICSAsset> => {
         const res = await api.get<ICSAsset>(`${BASE}/ics-assets/${id}`);
@@ -185,7 +186,7 @@ export const icsAssetService = {
 export const patchRecordService = {
     getAll: async (params?: { assetId?: string; page?: number; size?: number }): Promise<PaginatedResponse<PatchRecord>> => {
         const res = await api.get<PaginatedResponse<PatchRecord>>(`${BASE}/patch-records`, { params });
-        return res.data;
+        return normalizePage<PatchRecord>(res.data) as PaginatedResponse<PatchRecord>;
     },
     get: async (id: string): Promise<PatchRecord> => {
         const res = await api.get<PatchRecord>(`${BASE}/patch-records/${id}`);
@@ -208,7 +209,7 @@ export const patchRecordService = {
 export const pciSaqService = {
     getAll: async (): Promise<PCISAQRecord[]> => {
         const res = await api.get<PCISAQRecord[]>(`${BASE}/pci-saq`);
-        return Array.isArray(res.data) ? res.data : (res.data as any)?.content ?? [];
+        return extractList<PCISAQRecord>(res.data);
     },
     get: async (id: string): Promise<PCISAQRecord> => {
         const res = await api.get<PCISAQRecord>(`${BASE}/pci-saq/${id}`);
@@ -228,7 +229,7 @@ export const pciSaqService = {
 export const slaMetricService = {
     getAll: async (): Promise<SLAMetric[]> => {
         const res = await api.get<SLAMetric[]>(`${BASE}/sla-metrics`);
-        return Array.isArray(res.data) ? res.data : (res.data as any)?.content ?? [];
+        return extractList<SLAMetric>(res.data);
     },
     get: async (id: string): Promise<SLAMetric> => {
         const res = await api.get<SLAMetric>(`${BASE}/sla-metrics/${id}`);
@@ -248,7 +249,7 @@ export const slaMetricService = {
 export const vulnScanService = {
     getAll: async (params?: { page?: number; size?: number }): Promise<PaginatedResponse<VulnerabilityScan>> => {
         const res = await api.get<PaginatedResponse<VulnerabilityScan>>(`${BASE}/vulnerability-scans`, { params });
-        return res.data;
+        return normalizePage<VulnerabilityScan>(res.data) as PaginatedResponse<VulnerabilityScan>;
     },
     get: async (id: string): Promise<VulnerabilityScan> => {
         const res = await api.get<VulnerabilityScan>(`${BASE}/vulnerability-scans/${id}`);
@@ -271,7 +272,7 @@ export const vulnScanService = {
 export const regulatoryFilingService = {
     getAll: async (params?: { status?: FilingStatus }): Promise<RegulatoryFiling[]> => {
         const res = await api.get<RegulatoryFiling[]>(`${BASE}/regulatory-filings`, { params });
-        return Array.isArray(res.data) ? res.data : (res.data as any)?.content ?? [];
+        return extractList<RegulatoryFiling>(res.data);
     },
     get: async (id: string): Promise<RegulatoryFiling> => {
         const res = await api.get<RegulatoryFiling>(`${BASE}/regulatory-filings/${id}`);
@@ -287,5 +288,81 @@ export const regulatoryFilingService = {
     },
     delete: async (id: string): Promise<void> => {
         await api.delete(`${BASE}/regulatory-filings/${id}`);
+    },
+};
+
+// ─── BOG ICT Directive Report ─────────────────────────────────────────────────
+
+export interface BogReportSummary {
+    totalControls: number;
+    implemented: number;
+    partial: number;
+    notImplemented: number;
+    notApplicable: number;
+    compliancePercent: number;
+    overallStatus: string;
+}
+
+export interface BogReportDomain {
+    domain: string;
+    totalControls: number;
+    implemented: number;
+    partial: number;
+    notImplemented: number;
+    compliancePercent: number;
+}
+
+export interface BogReport {
+    reportType: string;
+    organisationId: string;
+    organisationName: string;
+    generatedAt: string;
+    summary: BogReportSummary;
+    domains: BogReportDomain[];
+    controls?: BOGControl[];
+}
+
+export const bogReportService = {
+    /** GET /compliance/bog/report — Full BOG ICT Directive compliance report (JSON) */
+    getReport: async (): Promise<BogReport> => {
+        const res = await api.get<BogReport>(`${BASE}/bog/report`);
+        return res.data;
+    },
+
+    /** GET /compliance/bog/report/pdf — Download BOG compliance report as PDF blob */
+    downloadPdf: async (): Promise<Blob> => {
+        const res = await api.get(`${BASE}/bog/report/pdf`, {
+            responseType: "blob",
+        });
+        return res.data as Blob;
+    },
+
+    /**
+     * POST /compliance/bog/controls — Create or upsert a BOG control by directiveRef.
+     * Request: { directiveRef, requirement, status, gapDescription?, remediationPlan?, targetDate?, evidenceUrl? }
+     * Response: { id, directiveRef, status }
+     */
+    upsertControl: async (data: BOGControlDto): Promise<{ id: string; directiveRef: string; status: string }> => {
+        const res = await api.post<{ id: string; directiveRef: string; status: string }>(
+            `${BASE}/bog/controls`,
+            data
+        );
+        return res.data;
+    },
+
+    /**
+     * PATCH /compliance/bog/controls/{id}/status — Update the status of a single BOG control.
+     * Request: { status: string }
+     * Response: { id, directiveRef, status }
+     */
+    updateControlStatus: async (
+        id: string,
+        status: string
+    ): Promise<{ id: string; directiveRef: string; status: string }> => {
+        const res = await api.patch<{ id: string; directiveRef: string; status: string }>(
+            `${BASE}/bog/controls/${id}/status`,
+            { status }
+        );
+        return res.data;
     },
 };
