@@ -292,6 +292,7 @@ export interface AssetImportResult {
 // ─── Category ─────────────────────────────────────────────────────────────────
 export interface Category extends BaseEntity {
     name: string;
+    description?: string;
     assetPrefixCode?: string;
     parentCategoryId?: string | null;
     depreciationPolicyId?: string;
@@ -302,6 +303,7 @@ export interface Category extends BaseEntity {
 export interface CategoryDto {
     id?: string;
     name: string;                         // required
+    description?: string;
     assetPrefixCode?: string;
     parentCategoryId?: string | null;
     depreciationPolicyId?: string;
@@ -1422,21 +1424,7 @@ export interface RegulatoryFilingDto {
     notes?: string | null;
 }
 
-export interface PaginatedResponse<T> {
-    items: T[];
-    content?: T[];
-    total: number;
-    limit: number;
-    offset: number;
-    totalElements?: number;
-    totalPages: number;
-    currentPage?: number;
-    pageSize?: number;
-    number?: number;
-    size?: number;
-    first?: boolean;
-    last?: boolean;
-}
+// PaginatedResponse is defined earlier in this file (near line 633). Duplicate removed.
 
 // ─── Software Licenses ───────────────────────────────────────────────────────
 

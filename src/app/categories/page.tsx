@@ -46,7 +46,7 @@ export default function CategoriesPage() {
 
     const handleOpenCreate = () => {
         setEditingCategory(null);
-        reset({ name: "", assetPrefixCode: "", parentCategoryId: "", defaultWarrantyPeriodMonths: undefined });
+        reset({ name: "", description: "", assetPrefixCode: "", parentCategoryId: "", defaultWarrantyPeriodMonths: undefined });
         setIsModalOpen(true);
     };
 
@@ -54,6 +54,7 @@ export default function CategoriesPage() {
         setEditingCategory(category);
         reset({
             name: category.name,
+            description: category.description || "",
             assetPrefixCode: category.assetPrefixCode || "",
             parentCategoryId: category.parentCategoryId || "",
             depreciationPolicyId: category.depreciationPolicyId || "",
@@ -88,6 +89,7 @@ export default function CategoriesPage() {
         }
 
         // Clean up payload
+        if (!data.description) delete data.description;
         if (!data.parentCategoryId) delete data.parentCategoryId;
         if (!data.depreciationPolicyId) delete data.depreciationPolicyId;
         if (!data.assetPrefixCode) delete data.assetPrefixCode;
@@ -170,6 +172,14 @@ export default function CategoriesPage() {
                                         </p>
                                     </div>
 
+                                    {category.description ? (
+                                        <p className="text-sm text-slate-600 line-clamp-2" title={category.description}>
+                                            {category.description}
+                                        </p>
+                                    ) : (
+                                        <p className="text-xs text-slate-400 italic">No description provided.</p>
+                                    )}
+
                                     {(category.defaultWarrantyPeriodMonths || category.depreciationPolicyId) && (
                                         <div className="pt-3 border-t border-slate-100 space-y-2">
                                             {category.defaultWarrantyPeriodMonths && (
@@ -221,7 +231,16 @@ export default function CategoriesPage() {
                         {errors.name && <p className="text-sm text-red-500">{errors.name.message as string}</p>}
                     </div>
 
-
+                    <div className="space-y-2">
+                        <Label htmlFor="description">Description</Label>
+                        <textarea
+                            id="description"
+                            rows={3}
+                            placeholder="All computers, servers, and peripherals"
+                            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                            {...register("description")}
+                        />
+                    </div>
 
                     <div className="space-y-2">
                         <Label htmlFor="assetPrefixCode">Asset Prefix Code</Label>
