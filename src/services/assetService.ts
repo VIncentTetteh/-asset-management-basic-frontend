@@ -3,19 +3,43 @@ import { Asset, AssetDto, AssetImportResult, AssetHistory } from "@/types";
 import { extractList } from "@/services/responseUtils";
 
 export interface AssetFilterParams {
-    /** Filter by AssetStatus enum value e.g. "IN_USE" */
+    search?: string;
     status?: string;
-    /** Filter by department UUID */
+    condition?: string;
+    assetType?: string;
     departmentId?: string;
-    /** Filter by category UUID */
     categoryId?: string;
+    locationId?: string;
+    assignedUserId?: string;
+    purchaseDateFrom?: string;      // ISO date yyyy-MM-dd
+    purchaseDateTo?: string;
+    warrantyExpiryBefore?: string;
+    page?: number;                  // 0-based, default 0
+    size?: number;                  // default 20, max 100
+    sort?: string;                  // "field,direction" e.g. "name,asc"
+}
+
+export interface PagedAssets {
+    total: number;
+    limit: number;
+    offset: number;
+    items: Asset[];
 }
 
 export const assetService = {
-    /** GET /assets — all assets in org (JWT-scoped) */
-    getAll: async (params?: AssetFilterParams): Promise<Asset[]> => {
-        const response = await api.get("/assets", { params });
-        return extractList<Asset>(response.data);
+    /** GET /assets — server-side filtered + paginated */
+    getPaged: async (params?: AssetFilterParams): Promise<PagedAssets> => {
+        const cleaned = Object.fromEntries(
+            Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== "")
+        );
+        const response = await api.get<PagedAssets>("/assets", { params: cleaned });
+        return response.data;
+    },
+
+    /** GET /assets — backward-compat shim for dashboard widgets, reports, import page */
+    getAll: async (params?: Pick<AssetFilterParams, "status" | "departmentId" | "categoryId">): Promise<Asset[]> => {
+        const response = await api.get<PagedAssets>("/assets", { params: { ...params, size: 1000 } });
+        return response.data.items ?? [];
     },
 
     /** GET /assets/{id} */
