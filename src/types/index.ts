@@ -1615,6 +1615,7 @@ export interface OrgSsoConfig {
     idpMetadataUrl?: string | null;
     spEntityId?: string | null;
     assertionConsumerServiceUrl?: string | null;
+    emailDomain?: string | null;
 }
 
 export interface SsoOAuth2Dto {
@@ -1624,6 +1625,7 @@ export interface SsoOAuth2Dto {
     issuerUri: string;
     scopes?: string[];
     redirectUri?: string | null;
+    emailDomain?: string | null;
 }
 
 export interface SsoSamlDto {
@@ -1631,10 +1633,17 @@ export interface SsoSamlDto {
     idpMetadataUrl: string;
     spEntityId: string;
     assertionConsumerServiceUrl: string;
+    emailDomain?: string | null;
 }
 
 export interface SsoToggleDto {
     enabled: boolean;
+}
+
+export interface SsoDiscoverResponse {
+    ssoEnabled: boolean;
+    organisationId?: string | null;
+    provider?: string | null;
 }
 
 // ─── Dashboard Additions ──────────────────────────────────────────────────────

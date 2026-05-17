@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/card";
 import { authService } from "@/services/authService";
 import { mfaService } from "@/services/mfaService";
-import api from "@/lib/axios";
+import { orgSsoService } from "@/services/orgSsoService";
+import { ssoAuthService } from "@/services/ssoAuthService";
 import { clearVerifiedOrganisationId, setStoredUser } from "@/lib/authContext";
 import { Eye, EyeOff, Smartphone } from "lucide-react";
 
@@ -25,12 +26,55 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
+    // SSO discovery state
+    const [ssoDiscovery, setSsoDiscovery] = useState<{
+        organisationId: string;
+        provider: string;
+    } | null>(null);
+    const [ssoDiscovering, setSsoDiscovering] = useState(false);
+    const [ssoLoading, setSsoLoading] = useState(false);
+
     // MFA challenge state
     const [mfaChallengeToken, setMfaChallengeToken] = useState<string | null>(null);
     const [mfaCode, setMfaCode] = useState("");
     const [isMfaSubmitting, setIsMfaSubmitting] = useState(false);
 
-    const { register, handleSubmit, formState: { errors } } = useForm();
+    const { register, handleSubmit, getValues, formState: { errors } } = useForm();
+
+    // ── SSO Discovery ─────────────────────────────────────────────────────────
+    const onEmailBlur = async () => {
+        const email = (getValues("email") ?? "").trim();
+        if (!email || !email.includes("@")) return;
+        setSsoDiscovering(true);
+        try {
+            const result = await orgSsoService.discoverByEmail(email);
+            if (result.ssoEnabled && result.organisationId && result.provider) {
+                setSsoDiscovery({ organisationId: result.organisationId, provider: result.provider });
+            } else {
+                setSsoDiscovery(null);
+            }
+        } finally {
+            setSsoDiscovering(false);
+        }
+    };
+
+    const startSso = async () => {
+        if (!ssoDiscovery) return;
+        setSsoLoading(true);
+        try {
+            const redirectUri = `${window.location.origin}/login/sso-callback`;
+            const authorizationUrl = await ssoAuthService.getOAuth2AuthorizeUrl({
+                organisationId: ssoDiscovery.organisationId,
+                redirectUri,
+            });
+            window.location.href = authorizationUrl;
+        } catch {
+            toast.error("Failed to start SSO. Please try again.");
+            setSsoLoading(false);
+        }
+    };
+
+    const providerLabel = ssoDiscovery?.provider.replace(/_/g, " ") ?? "";
 
     // ── Password Login ─────────────────────────────────────────────────────────
     const onSubmit = async (data: any) => {
@@ -49,9 +93,6 @@ export default function LoginPage() {
                 localStorage.setItem("token", response.token);
                 clearVerifiedOrganisationId();
                 setStoredUser(response.user);
-                api.defaults.headers.common["Authorization"] = `Bearer ${response.token}`;
-                // Notify PermissionContext (and any other auth-aware providers)
-                // so they refetch with the new token before we navigate.
                 window.dispatchEvent(new Event("auth-changed"));
                 toast.success(`Welcome back, ${response.user.firstName}!`);
                 router.push("/dashboard");
@@ -79,7 +120,6 @@ export default function LoginPage() {
                 localStorage.setItem("token", res.token);
                 clearVerifiedOrganisationId();
                 setStoredUser(res.user);
-                api.defaults.headers.common["Authorization"] = `Bearer ${res.token}`;
                 window.dispatchEvent(new Event("auth-changed"));
                 toast.success(`Welcome back, ${res.user.firstName}!`);
                 router.push("/dashboard");
@@ -159,71 +199,113 @@ export default function LoginPage() {
                 </CardHeader>
                 <form onSubmit={handleSubmit(onSubmit)}>
                     <CardContent className="space-y-4">
+                        {/* Email field */}
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
                             <Input
                                 id="email"
                                 type="email"
                                 placeholder="name@company.com"
-                                {...register("email", { required: "Email is required" })}
+                                {...register("email", {
+                                    required: "Email is required",
+                                    pattern: { value: /\S+@\S+\.\S+/, message: "Invalid email address" },
+                                    onChange: () => setSsoDiscovery(null),
+                                    onBlur: onEmailBlur,
+                                })}
                                 className={errors.email ? "border-red-500" : ""}
                             />
                             {errors.email && (
                                 <p className="text-sm text-red-500">{errors.email.message as string}</p>
                             )}
                         </div>
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="password">Password</Label>
-                                <Link href="/forgot-password" className="text-sm font-medium text-emerald-600 hover:underline">
-                                    Forgot password?
-                                </Link>
-                            </div>
-                            <div className="relative">
-                                <Input
-                                    id="password"
-                                    type={showPassword ? "text" : "password"}
-                                    {...register("password", { required: "Password is required" })}
-                                    className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
-                                />
+
+                        {/* SSO discovery feedback */}
+                        {ssoDiscovering && (
+                            <p className="text-xs text-center text-slate-400">Checking your organisation…</p>
+                        )}
+
+                        {/* SSO discovery banner */}
+                        {ssoDiscovery && (
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex flex-col gap-3">
+                                <p className="text-sm font-medium text-emerald-800 text-center">
+                                    Your organisation uses {providerLabel} SSO
+                                </p>
+                                <Button
+                                    type="button"
+                                    onClick={startSso}
+                                    disabled={ssoLoading}
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                >
+                                    {ssoLoading ? "Redirecting…" : `Continue with ${providerLabel}`}
+                                </Button>
                                 <button
                                     type="button"
-                                    aria-label={showPassword ? "Mask password" : "Show password"}
-                                    onClick={() => setShowPassword((value) => !value)}
-                                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-slate-800"
+                                    onClick={() => setSsoDiscovery(null)}
+                                    className="text-xs text-slate-400 hover:text-slate-600 text-center"
                                 >
-                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    Or, use password instead
                                 </button>
                             </div>
-                            {errors.password && (
-                                <p className="text-sm text-red-500">{errors.password.message as string}</p>
-                            )}
-                        </div>
-                    </CardContent>
-                    <CardFooter className="flex flex-col space-y-4">
-                        <Button
-                            type="submit"
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                            disabled={isLoading}
-                        >
-                            {isLoading ? "Signing in..." : "Sign in"}
-                        </Button>
+                        )}
 
-                        <div className="text-sm text-center text-gray-500 pt-4 border-t space-y-2">
-                            <div>
-                                Learn more about the platform{" "}
-                                <Link href="/" className="font-semibold text-emerald-600 hover:underline">
-                                    View product overview
-                                </Link>
+                        {/* Password section — hidden when SSO detected */}
+                        {!ssoDiscovery && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="password">Password</Label>
+                                    <Link href="/forgot-password" className="text-sm font-medium text-emerald-600 hover:underline">
+                                        Forgot password?
+                                    </Link>
+                                </div>
+                                <div className="relative">
+                                    <Input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        {...register("password", { required: "Password is required" })}
+                                        className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
+                                    />
+                                    <button
+                                        type="button"
+                                        aria-label={showPassword ? "Mask password" : "Show password"}
+                                        onClick={() => setShowPassword((value) => !value)}
+                                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-slate-800"
+                                    >
+                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
+                                {errors.password && (
+                                    <p className="text-sm text-red-500">{errors.password.message as string}</p>
+                                )}
                             </div>
-                            <div>
-                                Need to create a new workspace?{" "}
-                                <Link href="/register-tenant" className="font-semibold text-emerald-600 hover:underline">
-                                    Register Organization
-                                </Link>
+                        )}
+                    </CardContent>
+
+                    {!ssoDiscovery && (
+                        <CardFooter className="flex flex-col space-y-4">
+                            <Button
+                                type="submit"
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                disabled={isLoading}
+                            >
+                                {isLoading ? "Signing in..." : "Sign in"}
+                            </Button>
+
+                            <div className="text-sm text-center text-gray-500 pt-4 border-t space-y-2">
+                                <div>
+                                    Learn more about the platform{" "}
+                                    <Link href="/" className="font-semibold text-emerald-600 hover:underline">
+                                        View product overview
+                                    </Link>
+                                </div>
+                                <div>
+                                    Need to create a new workspace?{" "}
+                                    <Link href="/register-tenant" className="font-semibold text-emerald-600 hover:underline">
+                                        Register Organization
+                                    </Link>
+                                </div>
                             </div>
-                        </div>
-                    </CardFooter>
+                        </CardFooter>
+                    )}
                 </form>
             </Card>
         </div>

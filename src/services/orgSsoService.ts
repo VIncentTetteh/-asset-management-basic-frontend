@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { OrgSsoConfig, SsoOAuth2Dto, SsoSamlDto, SsoToggleDto } from "@/types";
+import { OrgSsoConfig, SsoDiscoverResponse, SsoOAuth2Dto, SsoSamlDto, SsoToggleDto } from "@/types";
 import { invalidateRequestCache, withRequestCache } from "@/services/requestCache";
 
 export const orgSsoService = {
@@ -15,6 +15,18 @@ export const orgSsoService = {
                 throw error;
             }
         }, 60_000);
+    },
+
+    /** GET /auth/sso/discover?email= — public, resolves org SSO by email domain */
+    discoverByEmail: async (email: string): Promise<SsoDiscoverResponse> => {
+        try {
+            const response = await api.get<SsoDiscoverResponse>("/auth/sso/discover", {
+                params: { email },
+            });
+            return response.data;
+        } catch {
+            return { ssoEnabled: false };
+        }
     },
 
     /** PUT /organisations/{orgId}/sso/oauth2 */

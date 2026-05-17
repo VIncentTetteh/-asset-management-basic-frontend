@@ -40,12 +40,14 @@ export default function SsoConfigurationPage() {
                     issuerUri: data.issuerUri || "",
                     scopes: data.scopes || [],
                     redirectUri: data.redirectUri || "",
+                    emailDomain: data.emailDomain || "",
                 });
                 samlForm.reset({
                     provider: "SAML",
                     idpMetadataUrl: data.idpMetadataUrl || "",
                     spEntityId: data.spEntityId || "",
                     assertionConsumerServiceUrl: data.assertionConsumerServiceUrl || "",
+                    emailDomain: data.emailDomain || "",
                 });
             }
         } catch (error: any) {
@@ -204,6 +206,14 @@ export default function SsoConfigurationPage() {
                                 <Input id="redirectUri" placeholder="https://yourapp.com/auth/callback" {...oauth2Form.register("redirectUri")} />
                             </div>
 
+                            <div className="space-y-2">
+                                <Label htmlFor="oauth2-emailDomain">Email Domain</Label>
+                                <Input id="oauth2-emailDomain" placeholder="company.com" {...oauth2Form.register("emailDomain")} />
+                                <p className="text-xs text-slate-500">
+                                    Users with this email domain will be automatically routed to your SSO provider at login.
+                                </p>
+                            </div>
+
                             <div className="flex justify-end pt-4 border-t">
                                 <Button type="submit" isLoading={oauth2Form.formState.isSubmitting} className="bg-purple-600 hover:bg-purple-700">
                                     Save OAuth2 Config
@@ -240,6 +250,14 @@ export default function SsoConfigurationPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="acsUrl">Assertion Consumer Service URL <span className="text-red-500">*</span></Label>
                                 <Input id="acsUrl" placeholder="https://yourapp.com/saml/acs" {...samlForm.register("assertionConsumerServiceUrl", { required: true })} />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="saml-emailDomain">Email Domain</Label>
+                                <Input id="saml-emailDomain" placeholder="company.com" {...samlForm.register("emailDomain")} />
+                                <p className="text-xs text-slate-500">
+                                    Users with this email domain will be automatically routed to your SSO provider at login.
+                                </p>
                             </div>
 
                             <div className="flex justify-end pt-4 border-t">
