@@ -18,7 +18,7 @@ import {
     DepreciationMethod, PurchaseOrder
 } from "@/types";
 
-import { assetService, PagedAssets } from "@/services/assetService";
+import { assetService, PagedAssets, AssetStats } from "@/services/assetService";
 import { importJobService, ImportJobResponse } from "@/services/importJobService";
 import { departmentService } from "@/services/departmentService";
 import { organisationService } from "@/services/organisationService";
@@ -42,8 +42,9 @@ import { useConfirm } from "@/hooks/useConfirm";
 
 
 export default function AssetsPage() {
-    // Paged result — replaces the flat assets array
+    // Paged result + org-wide stats
     const [pagedResult, setPagedResult] = useState<PagedAssets>({ total: 0, limit: 20, offset: 0, items: [] });
+    const [orgStats, setOrgStats] = useState<AssetStats | null>(null);
     const [users, setUsers] = useState<User[]>([]);
 
     // Master data (fetched once)
@@ -80,9 +81,14 @@ export default function AssetsPage() {
     const router = useRouter();
 
     // URL-driven filter state
-    const statusFilter = searchParams.get("status") ?? "ALL";
-    const currentPage  = Number(searchParams.get("page") ?? "0");
-    const sortParam    = searchParams.get("sort") ?? "name,asc";
+    const statusFilter    = searchParams.get("status")           ?? "ALL";
+    const deptFilter      = searchParams.get("departmentId")     ?? "";
+    const locFilter       = searchParams.get("locationId")       ?? "";
+    const dateFrom        = searchParams.get("purchaseDateFrom") ?? "";
+    const dateTo          = searchParams.get("purchaseDateTo")   ?? "";
+    const assignedFilter  = searchParams.get("assigned")         ?? "";   // "true" | "false" | ""
+    const currentPage     = Number(searchParams.get("page") ?? "0");
+    const sortParam       = searchParams.get("sort") ?? "name,asc";
 
     // Helper: update a URL param and reset page to 0
     const setParam = (key: string, value: string | null) => {
@@ -102,14 +108,15 @@ export default function AssetsPage() {
     const assets = pagedResult.items;
     const totalPages = Math.ceil(pagedResult.total / 20);
 
-    // Fetch master data once on mount (departments, categories, locations, etc.)
+    // Fetch master data + org-wide stats once on mount
     const fetchMasterData = async () => {
         const safeGet = <T,>(result: PromiseSettledResult<T[]>, name: string): T[] => {
             if (result.status === "fulfilled") return result.value;
             console.warn(`[Assets] Failed to load ${name}:`, (result as PromiseRejectedResult).reason);
             return [];
         };
-        const results = await Promise.allSettled([
+        const [statsResult, ...rest] = await Promise.allSettled([
+            assetService.getStats(),
             departmentService.getAll(),
             organisationService.getAll(),
             categoryService.getAll(),
@@ -118,27 +125,38 @@ export default function AssetsPage() {
             purchaseOrderService.getAll(),
             userService.getAll()
         ]);
-        setDepartments(safeGet(results[0] as PromiseSettledResult<Department[]>, "departments"));
-        setOrganisations(safeGet(results[1] as PromiseSettledResult<Organisation[]>, "organisations"));
-        setCategories(safeGet(results[2] as PromiseSettledResult<Category[]>, "categories"));
-        setLocations(safeGet(results[3] as PromiseSettledResult<Location[]>, "locations"));
-        setSuppliers(safeGet(results[4] as PromiseSettledResult<Supplier[]>, "suppliers"));
-        const posResult = safeGet(results[5] as PromiseSettledResult<PurchaseOrder[]>, "purchase orders");
+        if (statsResult.status === "fulfilled") setOrgStats(statsResult.value);
+        setDepartments(safeGet(rest[0] as PromiseSettledResult<Department[]>, "departments"));
+        setOrganisations(safeGet(rest[1] as PromiseSettledResult<Organisation[]>, "organisations"));
+        setCategories(safeGet(rest[2] as PromiseSettledResult<Category[]>, "categories"));
+        setLocations(safeGet(rest[3] as PromiseSettledResult<Location[]>, "locations"));
+        setSuppliers(safeGet(rest[4] as PromiseSettledResult<Supplier[]>, "suppliers"));
+        const posResult = safeGet(rest[5] as PromiseSettledResult<PurchaseOrder[]>, "purchase orders");
         setPurchaseOrders(Array.isArray(posResult) ? posResult : []);
-        setUsers(safeGet(results[6] as PromiseSettledResult<User[]>, "users"));
+        setUsers(safeGet(rest[6] as PromiseSettledResult<User[]>, "users"));
     };
+
+    const buildFilterParams = () => ({
+        search:           debouncedSearch || undefined,
+        status:           statusFilter !== "ALL" ? statusFilter : undefined,
+        departmentId:     deptFilter    || undefined,
+        locationId:       locFilter     || undefined,
+        purchaseDateFrom: dateFrom      || undefined,
+        purchaseDateTo:   dateTo        || undefined,
+        assigned:         assignedFilter === "true" ? true : assignedFilter === "false" ? false : undefined,
+        page:             currentPage,
+        size:             20,
+        sort:             sortParam,
+    });
 
     // Alias used by CRUD handlers (delete, assign, etc.) to re-fetch current page
     const fetchData = () => {
         setIsLoading(true);
-        assetService.getPaged({
-            search:       debouncedSearch || undefined,
-            status:       statusFilter !== "ALL" ? statusFilter : undefined,
-            page:         currentPage,
-            size:         20,
-            sort:         sortParam,
-        })
-        .then(r => setPagedResult(r))
+        Promise.all([
+            assetService.getPaged(buildFilterParams()),
+            assetService.getStats(),
+        ])
+        .then(([paged, stats]) => { setPagedResult(paged); setOrgStats(stats); })
         .catch(() => toast.error("Failed to load assets"))
         .finally(() => setIsLoading(false));
     };
@@ -148,17 +166,11 @@ export default function AssetsPage() {
     // Re-fetch assets whenever any filter/page/sort changes
     useEffect(() => {
         setIsLoading(true);
-        assetService.getPaged({
-            search:       debouncedSearch || undefined,
-            status:       statusFilter !== "ALL" ? statusFilter : undefined,
-            page:         currentPage,
-            size:         20,
-            sort:         sortParam,
-        })
+        assetService.getPaged(buildFilterParams())
         .then(r => setPagedResult(r))
         .catch(() => toast.error("Failed to load assets"))
         .finally(() => setIsLoading(false));
-    }, [debouncedSearch, statusFilter, currentPage, sortParam]);
+    }, [debouncedSearch, statusFilter, deptFilter, locFilter, dateFrom, dateTo, assignedFilter, currentPage, sortParam]);
 
     // Lookup Maps for Display
     const orgMap = useMemo(() => new Map(organisations.map(o => [o.id, o.name])), [organisations]);
@@ -169,10 +181,10 @@ export default function AssetsPage() {
 
     const { confirm, ConfirmDialog } = useConfirm();
 
-    const assetStats = useMemo(() => ({
-        total: pagedResult.total,
-        totalValue: assets.reduce((s, a) => s + (a.purchaseCost || 0), 0),
-    }), [pagedResult.total, assets]);
+    const totalValue = useMemo(
+        () => assets.reduce((s, a) => s + (a.purchaseCost || 0), 0),
+        [assets]
+    );
 
     const handleOpenCreate = () => {
         setEditingAsset(null);
@@ -406,11 +418,14 @@ export default function AssetsPage() {
     };
 
     const STATUS_TABS = [
-        { key: "ALL",         label: "All Assets",  count: statusFilter === "ALL" ? pagedResult.total : null },
-        { key: "IN_USE",      label: "In Use",       count: null },
-        { key: "IN_STOCK",    label: "In Stock",     count: null },
-        { key: "MAINTENANCE", label: "Maintenance",  count: null },
-        { key: "RETIRED",     label: "Retired",      count: null },
+        { key: "ALL",         label: "All",         count: orgStats?.total        ?? null },
+        { key: "IN_USE",      label: "In Use",      count: orgStats?.inUse        ?? null },
+        { key: "IN_STOCK",    label: "In Stock",    count: orgStats?.inStock      ?? null },
+        { key: "MAINTENANCE", label: "Maintenance", count: orgStats?.maintenance  ?? null },
+        { key: "RETIRED",     label: "Retired",     count: orgStats?.retired      ?? null },
+        { key: "DISPOSED",    label: "Disposed",    count: orgStats?.disposed     ?? null },
+        { key: "RESERVED",    label: "Reserved",    count: orgStats?.reserved     ?? null },
+        { key: "MISSING",     label: "Missing",     count: orgStats?.missing      ?? null },
     ];
 
     return (
@@ -439,29 +454,27 @@ export default function AssetsPage() {
             />
 
             {/* Summary Stats */}
-            {!isLoading && pagedResult.total > 0 && (
-                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
-                    {[
-                        { label: "Total Assets", value: assetStats.total, icon: <Package className="h-5 w-5" />, color: "bg-slate-100 text-slate-600" },
-                        { label: "In Use", value: "—", icon: <PackageCheck className="h-5 w-5" />, color: "bg-blue-100 text-blue-600" },
-                        { label: "In Stock", value: "—", icon: <CheckCircle2 className="h-5 w-5" />, color: "bg-emerald-100 text-emerald-600" },
-                        { label: "Maintenance", value: "—", icon: <Wrench className="h-5 w-5" />, color: "bg-amber-100 text-amber-600" },
-                        { label: "Total Value", value: format(assetStats.totalValue, "USD"), icon: <TrendingDown className="h-5 w-5" />, color: "bg-teal-100 text-teal-700" },
-                    ].map((s) => (
-                        <div key={s.label} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow">
-                            <div className={`p-2 rounded-lg shrink-0 ${s.color}`}>{s.icon}</div>
-                            <div className="min-w-0">
-                                <p className="text-xs text-slate-500 truncate">{s.label}</p>
-                                <p className="text-lg font-bold text-slate-900 tabular-nums">{s.value}</p>
-                            </div>
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
+                {[
+                    { label: "Total Assets", value: orgStats?.total        ?? "—", icon: <Package className="h-5 w-5" />, color: "bg-slate-100 text-slate-600" },
+                    { label: "In Use",       value: orgStats?.inUse        ?? "—", icon: <PackageCheck className="h-5 w-5" />, color: "bg-blue-100 text-blue-600" },
+                    { label: "In Stock",     value: orgStats?.inStock      ?? "—", icon: <CheckCircle2 className="h-5 w-5" />, color: "bg-emerald-100 text-emerald-600" },
+                    { label: "Maintenance",  value: orgStats?.maintenance  ?? "—", icon: <Wrench className="h-5 w-5" />, color: "bg-amber-100 text-amber-600" },
+                    { label: "Total Value",  value: format(totalValue, "USD"), icon: <TrendingDown className="h-5 w-5" />, color: "bg-teal-100 text-teal-700" },
+                ].map((s) => (
+                    <div key={s.label} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow">
+                        <div className={`p-2 rounded-lg shrink-0 ${s.color}`}>{s.icon}</div>
+                        <div className="min-w-0">
+                            <p className="text-xs text-slate-500 truncate">{s.label}</p>
+                            <p className="text-lg font-bold text-slate-900 tabular-nums">{s.value}</p>
                         </div>
-                    ))}
-                </div>
-            )}
+                    </div>
+                ))}
+            </div>
 
             {/* Status Filter Tabs */}
             <div className="flex items-center gap-1 flex-wrap">
-                <Filter className="h-4 w-4 text-slate-400 mr-1" />
+                <Filter className="h-4 w-4 text-slate-400 mr-1 shrink-0" />
                 {STATUS_TABS.map(tab => (
                     <button
                         key={tab.key}
@@ -479,6 +492,54 @@ export default function AssetsPage() {
                         )}
                     </button>
                 ))}
+            </div>
+
+            {/* Advanced Filters */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+                <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Department</label>
+                    <Select value={deptFilter} onChange={e => setParam("departmentId", e.target.value)} className="text-xs h-8">
+                        <option value="">All Departments</option>
+                        {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Location</label>
+                    <Select value={locFilter} onChange={e => setParam("locationId", e.target.value)} className="text-xs h-8">
+                        <option value="">All Locations</option>
+                        {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Date Added From</label>
+                    <Input type="date" value={dateFrom} onChange={e => setParam("purchaseDateFrom", e.target.value)} className="text-xs h-8" />
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Date Added To</label>
+                    <Input type="date" value={dateTo} onChange={e => setParam("purchaseDateTo", e.target.value)} className="text-xs h-8" />
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Assignment</label>
+                    <Select value={assignedFilter} onChange={e => setParam("assigned", e.target.value)} className="text-xs h-8">
+                        <option value="">All</option>
+                        <option value="true">Assigned</option>
+                        <option value="false">Unassigned</option>
+                    </Select>
+                </div>
+                <div className="flex flex-col gap-1 justify-end">
+                    {(deptFilter || locFilter || dateFrom || dateTo || assignedFilter) && (
+                        <button
+                            onClick={() => {
+                                const p = new URLSearchParams(searchParams.toString());
+                                ["departmentId","locationId","purchaseDateFrom","purchaseDateTo","assigned","page"].forEach(k => p.delete(k));
+                                router.push(`?${p.toString()}`);
+                            }}
+                            className="text-xs text-slate-500 hover:text-red-500 underline underline-offset-2 text-left"
+                        >
+                            Clear filters
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">

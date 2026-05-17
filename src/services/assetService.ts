@@ -11,12 +11,26 @@ export interface AssetFilterParams {
     categoryId?: string;
     locationId?: string;
     assignedUserId?: string;
+    assigned?: boolean;             // true = assigned only, false = unassigned only
     purchaseDateFrom?: string;      // ISO date yyyy-MM-dd
     purchaseDateTo?: string;
     warrantyExpiryBefore?: string;
     page?: number;                  // 0-based, default 0
     size?: number;                  // default 20, max 100
     sort?: string;                  // "field,direction" e.g. "name,asc"
+}
+
+export interface AssetStats {
+    total: number;
+    inUse: number;
+    inStock: number;
+    maintenance: number;
+    retired: number;
+    disposed: number;
+    reserved: number;
+    missing: number;
+    assigned: number;
+    unassigned: number;
 }
 
 export interface PagedAssets {
@@ -117,6 +131,12 @@ export const assetService = {
         const response = await api.post<AssetImportResult>("/assets/import", formData, {
             headers: { "Content-Type": "multipart/form-data" },
         });
+        return response.data;
+    },
+
+    /** GET /assets/stats — per-status counts + assigned/unassigned totals for current tenant */
+    getStats: async (): Promise<AssetStats> => {
+        const response = await api.get<AssetStats>("/assets/stats");
         return response.data;
     },
 
