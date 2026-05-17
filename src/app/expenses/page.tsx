@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import {
     Receipt, Plus, Trash2, CheckCircle2, XCircle, Clock, Loader2,
-    RefreshCw, Search, DollarSign, Filter, AlertTriangle, ThumbsUp, ThumbsDown,
+    RefreshCw, Search, DollarSign, ThumbsUp, ThumbsDown,
 } from "lucide-react";
 
-import { expenseService, ExpenseDto, ExpenseCategory, ExpenseStatus } from "@/services/expenseService";
+import { expenseService, ExpenseDto, ExpenseCategory, ExpenseStatus, PagedExpenses } from "@/services/expenseService";
 import { assetService } from "@/services/assetService";
 import { budgetService } from "@/services/budgetService";
-import { Asset, Budget } from "@/types";
+import { Asset, Budget, Expense } from "@/types";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,7 +53,8 @@ type FormData = Omit<ExpenseDto, "id" | "organisationId" | "status" | "approvedA
 
 export default function ExpensesPage() {
     const { format: fmtCurrency } = useCurrency();
-    const [expenses, setExpenses] = useState<ExpenseDto[]>([]);
+    const [pagedResult, setPagedResult] = useState<PagedExpenses>({ total: 0, limit: 20, offset: 0, items: [] });
+    const [currentPage, setCurrentPage] = useState(0);
     const [assets, setAssets] = useState<Asset[]>([]);
     const [budgets, setBudgets] = useState<Budget[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -61,59 +62,96 @@ export default function ExpensesPage() {
     const [statusFilter, setStatusFilter] = useState<ExpenseStatus | "">("");
     const [activeTab, setActiveTab] = useState<"all" | "pending">("all");
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [rejectTarget, setRejectTarget] = useState<ExpenseDto | null>(null);
+    const [rejectTarget, setRejectTarget] = useState<Expense | null>(null);
     const [rejectReason, setRejectReason] = useState("");
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>();
+    const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<FormData>();
     const { confirm, ConfirmDialog } = useConfirm();
 
-    const fetchAll = async () => {
-        try {
-            setIsLoading(true);
-            const [expRes, assetRes, budgetRes] = await Promise.allSettled([
-                activeTab === "pending" ? expenseService.listPending() : expenseService.listAll(),
-                assetService.getAll(),
-                budgetService.getAll(),
-            ]);
-            if (expRes.status === "fulfilled") setExpenses(expRes.value);
-            if (assetRes.status === "fulfilled") setAssets(assetRes.value);
-            if (budgetRes.status === "fulfilled") setBudgets(budgetRes.value);
-        } catch {
-            toast.error("Failed to load expenses");
-        } finally {
-            setIsLoading(false);
+    // Debounce ref for search
+    const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+
+    // Debounce search changes
+    useEffect(() => {
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(0);
+        }, 300);
+        return () => {
+            if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        };
+    }, [searchTerm]);
+
+    // Reset page when filter changes
+    useEffect(() => {
+        setCurrentPage(0);
+    }, [statusFilter, activeTab]);
+
+    // Fetch assets and budgets (static data — no need to re-fetch on every page change)
+    const fetchStaticData = async () => {
+        const [assetRes, budgetRes] = await Promise.allSettled([
+            assetService.getAll(),
+            budgetService.getAll(),
+        ]);
+        if (assetRes.status === "fulfilled") setAssets(assetRes.value);
+        if (budgetRes.status === "fulfilled") setBudgets(budgetRes.value);
+    };
+
+    // Fetch paginated expenses
+    const fetchExpenses = async () => {
+        setIsLoading(true);
+        if (activeTab === "pending") {
+            // Pending tab still uses the dedicated endpoint (returns all pending)
+            try {
+                const items = await expenseService.listPending();
+                setPagedResult({ total: items.length, limit: 20, offset: 0, items: items as unknown as Expense[] });
+            } catch {
+                toast.error("Failed to load expenses");
+            } finally {
+                setIsLoading(false);
+            }
+        } else {
+            expenseService.getPaged({
+                search: debouncedSearch || undefined,
+                status: statusFilter || undefined,
+                page: currentPage,
+                size: 20,
+            })
+                .then(r => setPagedResult(r))
+                .catch(() => toast.error("Failed to load expenses"))
+                .finally(() => setIsLoading(false));
         }
     };
 
-    useEffect(() => { fetchAll(); }, [activeTab]);
+    // Initial static data load
+    useEffect(() => { fetchStaticData(); }, []);
+
+    // Re-fetch expenses whenever page, filters, debounced search, or tab changes
+    useEffect(() => { fetchExpenses(); }, [currentPage, debouncedSearch, statusFilter, activeTab]);
 
     const assetMap = useMemo(() => new Map(assets.map(a => [a.id, a.name])), [assets]);
     const budgetMap = useMemo(() => new Map(budgets.map(b => [b.id, b.name])), [budgets]);
 
-    // Stats
+    const expenses = pagedResult.items;
+    const totalPages = Math.ceil(pagedResult.total / 20);
+
+    // Stats derived from current page items (approximate; full stats would require a separate summary endpoint)
     const totalAmount = expenses.reduce((s, e) => s + (e.amount || 0), 0);
     const approved = expenses.filter(e => e.status === "APPROVED").length;
     const pending = expenses.filter(e => e.status === "SUBMITTED").length;
     const rejected = expenses.filter(e => e.status === "REJECTED").length;
 
-    const filtered = useMemo(() => {
-        let list = [...expenses];
-        if (statusFilter) list = list.filter(e => e.status === statusFilter);
-        if (searchTerm) {
-            const q = searchTerm.toLowerCase();
-            list = list.filter(e =>
-                (e.title || "").toLowerCase().includes(q) ||
-                (e.submittedByName || "").toLowerCase().includes(q) ||
-                (e.category || "").toLowerCase().includes(q)
-            );
-        }
-        return list;
-    }, [expenses, statusFilter, searchTerm]);
+    // Budget remaining hint
+    const watchedBudgetId = watch("linkedBudgetId");
+    const selectedBudget = budgets.find(b => b.id === watchedBudgetId);
 
     const openCreate = () => {
         reset({
             title: "", description: "", amount: 0, currency: "USD",
             category: "OTHER", receiptUrl: "", linkedAssetId: "", linkedBudgetId: "",
+            expenseDate: new Date().toISOString().split("T")[0],
         });
         setIsModalOpen(true);
     };
@@ -129,7 +167,7 @@ export default function ExpensesPage() {
             });
             toast.success("Expense submitted for approval");
             setIsModalOpen(false);
-            fetchAll();
+            fetchExpenses();
         } catch {
             toast.error("Failed to submit expense");
         }
@@ -139,7 +177,7 @@ export default function ExpensesPage() {
         try {
             await expenseService.approve(id);
             toast.success("Expense approved");
-            fetchAll();
+            fetchExpenses();
         } catch {
             toast.error("Failed to approve expense");
         }
@@ -152,7 +190,7 @@ export default function ExpensesPage() {
             toast.success("Expense rejected");
             setRejectTarget(null);
             setRejectReason("");
-            fetchAll();
+            fetchExpenses();
         } catch {
             toast.error("Failed to reject expense");
         }
@@ -163,13 +201,13 @@ export default function ExpensesPage() {
         try {
             await expenseService.delete(id);
             toast.success("Expense deleted");
-            fetchAll();
+            fetchExpenses();
         } catch {
             toast.error("Failed to delete expense");
         }
     };
 
-    if (isLoading) return <PageSpinner />;
+    if (isLoading && expenses.length === 0) return <PageSpinner />;
 
     return (
         <div className="p-6 space-y-6">
@@ -260,7 +298,9 @@ export default function ExpensesPage() {
                             <option value="APPROVED">Approved</option>
                             <option value="REJECTED">Rejected</option>
                         </Select>
-                        <Button variant="outline" size="icon" onClick={fetchAll}><RefreshCw className="h-4 w-4" /></Button>
+                        <Button variant="outline" size="icon" onClick={fetchExpenses} disabled={isLoading}>
+                            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -270,11 +310,11 @@ export default function ExpensesPage() {
                 <CardHeader className="pb-3">
                     <CardTitle className="text-base font-semibold text-slate-900">
                         Expense Claims
-                        <span className="ml-2 text-sm font-normal text-slate-400">({filtered.length})</span>
+                        <span className="ml-2 text-sm font-normal text-slate-400">({pagedResult.total})</span>
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                    {filtered.length === 0 ? (
+                    {expenses.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2">
                             <Receipt className="h-10 w-10 opacity-30" />
                             <p className="text-sm">No expense records found</p>
@@ -294,7 +334,7 @@ export default function ExpensesPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {filtered.map(exp => (
+                                    {expenses.map(exp => (
                                         <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="py-3 px-4">
                                                 <p className="font-medium text-slate-900">{exp.title || "—"}</p>
@@ -310,7 +350,7 @@ export default function ExpensesPage() {
                                                 </span>
                                             </td>
                                             <td className="py-3 px-4 font-medium text-slate-900">{fmtCurrency(exp.amount)}</td>
-                                            <td className="py-3 px-4 text-slate-600">{fmt(exp.createdAt)}</td>
+                                            <td className="py-3 px-4 text-slate-600">{fmt(exp.expenseDate || exp.createdAt)}</td>
                                             <td className="py-3 px-4">
                                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[exp.status || "DRAFT"] || "bg-slate-100 text-slate-600"}`}>
                                                     {exp.status || "DRAFT"}
@@ -337,6 +377,21 @@ export default function ExpensesPage() {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    )}
+
+                    {/* Pagination controls */}
+                    {totalPages > 1 && (
+                        <div className="flex justify-between items-center pt-4 pb-4 px-4 border-t">
+                            <span className="text-sm text-slate-500">
+                                {pagedResult.offset + 1}–{Math.min(pagedResult.offset + pagedResult.limit, pagedResult.total)} of {pagedResult.total}
+                            </span>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" disabled={currentPage === 0}
+                                    onClick={() => setCurrentPage(p => p - 1)}>Previous</Button>
+                                <Button variant="outline" size="sm" disabled={currentPage >= totalPages - 1}
+                                    onClick={() => setCurrentPage(p => p + 1)}>Next</Button>
+                            </div>
                         </div>
                     )}
                 </CardContent>
@@ -379,6 +434,15 @@ export default function ExpensesPage() {
                         </Select>
                     </div>
                     <div>
+                        <Label htmlFor="e-date">Expense Date *</Label>
+                        <Input
+                            id="e-date"
+                            type="date"
+                            {...register("expenseDate", { required: "Expense date is required" })}
+                        />
+                        {errors.expenseDate && <p className="text-xs text-red-500 mt-1">{errors.expenseDate.message}</p>}
+                    </div>
+                    <div>
                         <Label htmlFor="e-asset">Linked Asset (optional)</Label>
                         <Select id="e-asset" {...register("linkedAssetId")}>
                             <option value="">None</option>
@@ -391,6 +455,19 @@ export default function ExpensesPage() {
                             <option value="">None</option>
                             {budgets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </Select>
+                        {selectedBudget && (
+                            <p className="text-xs text-slate-500 mt-1">
+                                Available:{" "}
+                                <span className={selectedBudget.availableAmount < 0 ? "text-red-500 font-medium" : "text-emerald-600 font-medium"}>
+                                    {fmtCurrency(selectedBudget.availableAmount)}
+                                </span>
+                                {selectedBudget.committedAmount > 0 && (
+                                    <span className="ml-2 text-amber-500">
+                                        ({fmtCurrency(selectedBudget.committedAmount)} committed)
+                                    </span>
+                                )}
+                            </p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="e-receipt">Receipt URL</Label>

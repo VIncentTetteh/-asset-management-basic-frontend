@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Budget, BudgetDto, Department } from "@/types";
+import { Budget, BudgetDto, BudgetSummary, Department, Expense } from "@/types";
 import { budgetService } from "@/services/budgetService";
 import { departmentService } from "@/services/departmentService";
 import { auditEventService } from "@/services/auditEventService";
@@ -33,7 +33,14 @@ export default function BudgetsPage() {
     const [spendingBudgetId, setSpendingBudgetId] = useState<string>("");
     const [spendAmount, setSpendAmount] = useState<string>("");
     const [isSpendSubmitting, setIsSpendSubmitting] = useState(false);
-    
+    const [spendNote, setSpendNote] = useState<string>("");
+    const [orgSummary, setOrgSummary] = useState<BudgetSummary | null>(null);
+
+    // Drill-down states
+    const [drillBudget, setDrillBudget] = useState<Budget | null>(null);
+    const [drillExpenses, setDrillExpenses] = useState<Expense[]>([]);
+    const [drillLoading, setDrillLoading] = useState(false);
+
     // History states
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [history, setHistory] = useState<AuditEvent[]>([]);
@@ -46,12 +53,14 @@ export default function BudgetsPage() {
     const fetchAll = async () => {
         try {
             setIsLoading(true);
-            const [budgetsData, depsData] = await Promise.allSettled([
+            const [budgetsData, depsData, summaryData] = await Promise.allSettled([
                 budgetService.getAll(),
                 departmentService.getAll(),
+                budgetService.getSummary(),
             ]);
             if (budgetsData.status === "fulfilled") setBudgets(budgetsData.value);
             if (depsData.status === "fulfilled") setDepartments(depsData.value);
+            if (summaryData.status === "fulfilled") setOrgSummary(summaryData.value);
         } catch {
             toast.error("Failed to load budgets");
         } finally {
@@ -89,6 +98,7 @@ export default function BudgetsPage() {
     const handleOpenSpend = (id: string) => {
         setSpendingBudgetId(id);
         setSpendAmount("");
+        setSpendNote("");
         setIsSpendModalOpen(true);
     };
 
@@ -110,17 +120,31 @@ export default function BudgetsPage() {
         }
     };
 
+    const openDrillDown = async (budget: Budget) => {
+        setDrillBudget(budget);
+        setDrillLoading(true);
+        try {
+            const result = await budgetService.getExpenses(budget.id);
+            setDrillExpenses(result.items);
+        } catch {
+            toast.error("Failed to load expenses");
+        } finally {
+            setDrillLoading(false);
+        }
+    };
+
     const handleRecordSpend = async () => {
         const amount = parseFloat(spendAmount);
         if (!amount || amount <= 0) { toast.error("Enter a valid amount"); return; }
+        if (!spendNote.trim()) { toast.error("Note is required"); return; }
         setIsSpendSubmitting(true);
         try {
-            await budgetService.recordSpend(spendingBudgetId, { amount });
-            toast.success("Spend recorded");
+            await budgetService.recordAdjustment(spendingBudgetId, { amount, note: spendNote.trim() });
+            toast.success("Adjustment recorded");
             setIsSpendModalOpen(false);
             fetchAll();
         } catch {
-            toast.error("Failed to record spend");
+            toast.error("Failed to record adjustment");
         } finally {
             setIsSpendSubmitting(false);
         }
@@ -199,52 +223,110 @@ export default function BudgetsPage() {
             </div>
 
             {/* Stat Cards */}
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                 {isLoading ? (
-                    Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
-                ) : ([
-                    {
-                        label: "Active Budgets",
-                        value: budgets.filter(b => b.status === "ACTIVE").length,
-                        icon: <Wallet className="h-5 w-5" />,
-                        iconBg: "bg-purple-100 text-purple-600",
-                        sub: `${budgets.length} total`,
-                    },
-                    {
-                        label: "Total Allocated",
-                        value: `${totalAllocated.toLocaleString()}`,
-                        icon: <DollarSign className="h-5 w-5" />,
-                        iconBg: "bg-blue-100 text-blue-600",
-                        sub: "across all budgets",
-                    },
-                    {
-                        label: "Total Spent",
-                        value: `${totalSpent.toLocaleString()}`,
-                        icon: <TrendingUp className="h-5 w-5" />,
-                        iconBg: "bg-amber-100 text-amber-600",
-                        sub: totalAllocated ? `${((totalSpent / totalAllocated) * 100).toFixed(0)}% utilized` : "—",
-                    },
-                    {
-                        label: "Remaining",
-                        value: `${totalRemaining.toLocaleString()}`,
-                        icon: <CheckCircle2 className="h-5 w-5" />,
-                        iconBg: "bg-emerald-100 text-emerald-600",
-                        sub: totalAllocated ? `${((totalRemaining / totalAllocated) * 100).toFixed(0)}% available` : "—",
-                    },
-                ] as const).map((s) => (
-                    <Card key={s.label} className="border-slate-200 hover:shadow-md transition-shadow">
-                        <CardContent className="p-5">
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-slate-500 mb-1">{s.label}</p>
-                                    <p className="text-2xl font-bold text-slate-900 tabular-nums truncate">{s.value}</p>
-                                    <p className="text-[11px] text-slate-400 mt-1">{s.sub}</p>
+                    Array.from({ length: 5 }).map((_, i) => <StatCardSkeleton key={i} />)
+                ) : (
+                    <>
+                        {/* Card 1: Active Budgets */}
+                        <Card className="border-slate-200 hover:shadow-md transition-shadow">
+                            <CardContent className="p-5">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-slate-500 mb-1">Active Budgets</p>
+                                        <p className="text-2xl font-bold text-slate-900 tabular-nums truncate">
+                                            {budgets.filter(b => b.status === "ACTIVE").length}
+                                        </p>
+                                        <p className="text-[11px] text-slate-400 mt-1">{budgets.length} total</p>
+                                    </div>
+                                    <div className="p-2.5 rounded-xl shrink-0 bg-purple-100 text-purple-600">
+                                        <Wallet className="h-5 w-5" />
+                                    </div>
                                 </div>
-                                <div className={`p-2.5 rounded-xl shrink-0 ${s.iconBg}`}>{s.icon}</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
+                            </CardContent>
+                        </Card>
+                        {/* Card 2: Total Allocated */}
+                        <Card className="border-slate-200 hover:shadow-md transition-shadow">
+                            <CardContent className="p-5">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-slate-500 mb-1">Total Allocated</p>
+                                        <p className="text-2xl font-bold text-slate-900 tabular-nums truncate">
+                                            {(orgSummary?.totalAllocated ?? 0).toLocaleString()}
+                                        </p>
+                                        <p className="text-[11px] text-slate-400 mt-1">across all budgets</p>
+                                    </div>
+                                    <div className="p-2.5 rounded-xl shrink-0 bg-blue-100 text-blue-600">
+                                        <DollarSign className="h-5 w-5" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        {/* Card 3: Total Spent */}
+                        <Card className="border-slate-200 hover:shadow-md transition-shadow">
+                            <CardContent className="p-5">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-slate-500 mb-1">Total Spent</p>
+                                        <p className="text-2xl font-bold text-slate-900 tabular-nums truncate">
+                                            {(orgSummary?.totalSpent ?? 0).toLocaleString()}
+                                        </p>
+                                        <p className="text-[11px] text-slate-400 mt-1">
+                                            {orgSummary?.totalAllocated
+                                                ? `${((orgSummary.totalSpent / orgSummary.totalAllocated) * 100).toFixed(0)}% utilized`
+                                                : "—"}
+                                        </p>
+                                    </div>
+                                    <div className="p-2.5 rounded-xl shrink-0 bg-amber-100 text-amber-600">
+                                        <TrendingUp className="h-5 w-5" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        {/* Card 4: Committed (amber) */}
+                        <Card className="border-slate-200 hover:shadow-md transition-shadow">
+                            <CardContent className="p-5">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                            Committed
+                                            <span
+                                                className="cursor-default"
+                                                title="Submitted expenses awaiting approval"
+                                            >
+                                                <AlertTriangle className="h-3 w-3 text-amber-400 inline" />
+                                            </span>
+                                        </p>
+                                        <p className="text-2xl font-bold text-amber-600 tabular-nums truncate">
+                                            {(orgSummary?.totalCommitted ?? 0).toLocaleString()}
+                                        </p>
+                                        <p className="text-[11px] text-slate-400 mt-1">awaiting approval</p>
+                                    </div>
+                                    <div className="p-2.5 rounded-xl shrink-0 bg-amber-100 text-amber-600">
+                                        <PieChart className="h-5 w-5" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        {/* Card 5: Available (green) */}
+                        <Card className="border-slate-200 hover:shadow-md transition-shadow">
+                            <CardContent className="p-5">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-slate-500 mb-1">Available</p>
+                                        <p className="text-2xl font-bold text-emerald-600 tabular-nums truncate">
+                                            {(orgSummary?.totalAvailable ?? 0).toLocaleString()}
+                                        </p>
+                                        <p className="text-[11px] text-slate-400 mt-1">unencumbered funds</p>
+                                    </div>
+                                    <div className="p-2.5 rounded-xl shrink-0 bg-emerald-100 text-emerald-600">
+                                        <CheckCircle2 className="h-5 w-5" />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
             </div>
 
             {/* Overall utilization bar */}
@@ -356,11 +438,20 @@ export default function BudgetsPage() {
                                                     <span className={`px-2.5 py-1 text-xs font-bold rounded-full border ${getStatusStyles(b.status)}`}>
                                                         {b.status}
                                                     </span>
+                                                    {b.totalAmount > 0 &&
+                                                     (b.spentAmount / b.totalAmount) * 100 >= (b.alertThresholdPct ?? 80) && (
+                                                        <span className="ml-1 text-amber-500 text-xs font-medium" title="Approaching budget limit">
+                                                            ⚠ {((b.spentAmount / b.totalAmount) * 100).toFixed(0)}%
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="py-3.5 px-4">
                                                     <div className="flex justify-end gap-1">
                                                         <Button variant="outline" size="sm" onClick={() => handleOpenSpend(b.id)} className="h-7 px-2.5 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50 font-semibold">
                                                             + Spend
+                                                        </Button>
+                                                        <Button variant="outline" size="sm" onClick={() => openDrillDown(b)} className="h-7 px-2.5 text-xs text-blue-700 border-blue-200 hover:bg-blue-50 font-semibold">
+                                                            Expenses
                                                         </Button>
                                                         <Button variant="outline" size="sm" title="Expenditure History" onClick={() => handleOpenHistory(b)} className="h-7 px-2 text-slate-500 hover:bg-slate-50">
                                                             <History className="h-3.5 w-3.5" />
@@ -383,12 +474,12 @@ export default function BudgetsPage() {
                 </CardContent>
             </Card>
 
-            {/* Record Spend Modal */}
+            {/* Add Adjustment Modal */}
             <Modal
                 isOpen={isSpendModalOpen}
                 onClose={() => setIsSpendModalOpen(false)}
-                title="Record Expenditure"
-                description="Record an expenditure against this budget."
+                title="Add Adjustment"
+                description="For direct charges outside the expense workflow."
             >
                 <div className="space-y-4">
                     <div className="space-y-2">
@@ -403,10 +494,20 @@ export default function BudgetsPage() {
                             onChange={e => setSpendAmount(e.target.value)}
                         />
                     </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="spendNote">Note <span className="text-red-500">*</span></Label>
+                        <Input
+                            id="spendNote"
+                            type="text"
+                            placeholder="e.g. Direct vendor invoice #INV-001"
+                            value={spendNote}
+                            onChange={e => setSpendNote(e.target.value)}
+                        />
+                    </div>
                     <div className="flex justify-end gap-2 pt-2 border-t">
                         <Button variant="outline" onClick={() => setIsSpendModalOpen(false)}>Cancel</Button>
                         <Button isLoading={isSpendSubmitting} onClick={handleRecordSpend} className="bg-emerald-600 hover:bg-emerald-700">
-                            Record Spend
+                            Save Adjustment
                         </Button>
                     </div>
                 </div>
@@ -518,8 +619,67 @@ export default function BudgetsPage() {
                         <Button variant="outline" onClick={() => setIsHistoryModalOpen(false)}>Close Activity Log</Button>
                     </div>
                 </div>
-        {ConfirmDialog}
             </Modal>
+            {/* Expense Drill-Down Modal */}
+            <Modal
+                isOpen={drillBudget !== null}
+                onClose={() => setDrillBudget(null)}
+                title={drillBudget ? `Expenses — ${drillBudget.name}` : "Expenses"}
+                description={drillBudget ? `Linked expenses for budget "${drillBudget.name}"` : undefined}
+            >
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                    {drillLoading ? (
+                        <div className="py-12 flex justify-center"><Spinner size="lg" className="text-purple-600" /></div>
+                    ) : drillExpenses.length === 0 ? (
+                        <div className="py-12 text-center text-slate-500 italic">No expenses linked to this budget.</div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-slate-100 bg-slate-50/60">
+                                        <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+                                        <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Title</th>
+                                        <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                                        <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Category</th>
+                                        <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                        <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Submitted By</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {drillExpenses.map((exp) => (
+                                        <tr key={exp.id} className="border-b border-slate-100 hover:bg-slate-50/70 transition-colors">
+                                            <td className="py-2.5 px-3 text-slate-500 text-xs whitespace-nowrap">
+                                                {exp.expenseDate ? new Date(exp.expenseDate).toLocaleDateString() : exp.createdAt ? new Date(exp.createdAt).toLocaleDateString() : "—"}
+                                            </td>
+                                            <td className="py-2.5 px-3 text-slate-900 font-medium">{exp.title || "—"}</td>
+                                            <td className="py-2.5 px-3 text-slate-700 tabular-nums">
+                                                <span className="text-xs text-slate-400 mr-1">{exp.currency || "USD"}</span>
+                                                {(exp.amount ?? 0).toLocaleString()}
+                                            </td>
+                                            <td className="py-2.5 px-3 text-slate-600 text-xs">{exp.category || "—"}</td>
+                                            <td className="py-2.5 px-3">
+                                                <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${
+                                                    exp.status === "APPROVED" ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
+                                                    exp.status === "REJECTED" ? "bg-red-100 text-red-700 border-red-200" :
+                                                    exp.status === "SUBMITTED" ? "bg-sky-100 text-sky-700 border-sky-200" :
+                                                    "bg-slate-100 text-slate-500 border-slate-200"
+                                                }`}>
+                                                    {exp.status || "—"}
+                                                </span>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-slate-600 text-xs">{exp.submittedByName || "—"}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    <div className="flex justify-end pt-4 border-t sticky bottom-0 bg-white">
+                        <Button variant="outline" onClick={() => setDrillBudget(null)}>Close</Button>
+                    </div>
+                </div>
+            </Modal>
+            {ConfirmDialog}
         </div>
     );
 }

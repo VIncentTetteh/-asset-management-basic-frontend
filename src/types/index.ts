@@ -1509,6 +1509,42 @@ export interface ContractDto {
     terms?: string | null;
 }
 
+// ─── Expenses ─────────────────────────────────────────────────────────────────
+
+export type ExpenseCategory =
+    | "MAINTENANCE"
+    | "TRAVEL"
+    | "SUPPLIES"
+    | "SOFTWARE"
+    | "HARDWARE"
+    | "INSURANCE"
+    | "OTHER";
+
+export type ExpenseStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+
+export interface Expense {
+    id?: string;
+    title?: string;
+    description?: string;
+    amount?: number;
+    currency?: string;
+    category?: ExpenseCategory;
+    status?: ExpenseStatus;
+    receiptUrl?: string;
+    rejectionReason?: string;
+    approvedAt?: string;
+    createdAt?: string;
+    organisationId?: string;
+    submittedById?: string;
+    submittedByName?: string;
+    approvedById?: string;
+    linkedAssetId?: string;
+    linkedBudgetId?: string;
+    departmentId?: string;
+    expenseDate?:      string;   // ISO date yyyy-MM-dd
+    linkedBudgetName?: string;
+}
+
 // ─── Budgets ──────────────────────────────────────────────────────────────────
 
 export type BudgetStatus = "DRAFT" | "ACTIVE" | "EXCEEDED" | "CLOSED";
@@ -1520,6 +1556,10 @@ export interface Budget {
     totalAmount: number;
     spentAmount: number;
     remainingAmount: number;
+    committedAmount:   number;
+    availableAmount:   number;
+    alertThresholdPct: number;
+    forecastedSpend?:  number;
     currency?: string | null;
     fiscalYear?: number | null;
     departmentId?: string | null;
@@ -1529,6 +1569,23 @@ export interface Budget {
     organisationId?: string | null;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface BudgetDepartmentSummary {
+    departmentId:   string | null;
+    departmentName: string;
+    allocated:      number;
+    spent:          number;
+    committed:      number;
+    available:      number;
+}
+
+export interface BudgetSummary {
+    totalAllocated:  number;
+    totalSpent:      number;
+    totalCommitted:  number;
+    totalAvailable:  number;
+    byDepartment:    BudgetDepartmentSummary[];
 }
 
 export interface BudgetDto {

@@ -1,4 +1,5 @@
 import api from "@/lib/axios";
+import { Expense } from "@/types";
 
 export type ExpenseCategory =
   | "MAINTENANCE"
@@ -30,6 +31,28 @@ export interface ExpenseDto {
   linkedAssetId?: string;
   linkedBudgetId?: string;
   departmentId?: string;
+  expenseDate?: string;   // ISO date yyyy-MM-dd
+}
+
+export interface ExpenseFilterParams {
+    search?: string;
+    status?: string;
+    category?: string;
+    linkedBudgetId?: string;
+    linkedAssetId?: string;
+    submittedUserId?: string;
+    departmentId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    size?: number;
+}
+
+export interface PagedExpenses {
+    total: number;
+    limit: number;
+    offset: number;
+    items: Expense[];
 }
 
 export const expenseService = {
@@ -80,5 +103,14 @@ export const expenseService = {
   /** DELETE /expenses/{id} */
   delete: async (id: string): Promise<void> => {
     await api.delete(`/expenses/${id}`);
+  },
+
+  /** GET /expenses — Paginated and filtered list of expenses. */
+  getPaged: async (params?: ExpenseFilterParams): Promise<PagedExpenses> => {
+    const cleaned = Object.fromEntries(
+      Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== "")
+    );
+    const response = await api.get<PagedExpenses>("/expenses", { params: cleaned });
+    return response.data;
   },
 };
