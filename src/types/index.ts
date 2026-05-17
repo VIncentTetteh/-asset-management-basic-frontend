@@ -1856,6 +1856,30 @@ export interface CloudMonthlyCostDto {
     serviceName?: string | null;
 }
 
+// ─── Document Attachments ─────────────────────────────────────────────────────
+
+export type AttachmentEntityType =
+    | 'EXPENSE'
+    | 'COMPLIANCE_CONTROL'
+    | 'BOG_CONTROL'
+    | 'SECURITY_POLICY'
+    | 'PCI_SAQ'
+    | 'CONTRACT'
+    | 'DISPOSAL_RECORD'
+    | 'VULNERABILITY_SCAN';
+
+export interface DocumentAttachment {
+    id:             string;
+    entityType:     AttachmentEntityType;
+    entityId:       string;
+    originalName:   string;
+    contentType:    string;
+    fileSize:       number;
+    uploadedByName?: string;
+    createdAt:      string;
+    downloadUrl?:   string;
+}
+
 // ─── AI / Predictive Intelligence ────────────────────────────────────────────
 
 export type InsightType =

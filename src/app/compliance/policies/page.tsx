@@ -15,6 +15,7 @@ import { Plus, Pencil, Trash2, FileText, Search, ExternalLink, User as UserIcon,
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
+import DocumentAttachments from "@/components/DocumentAttachments";
 
 
 const STATUSES: PolicyStatus[] = ["DRAFT", "UNDER_REVIEW", "APPROVED", "RETIRED"];
@@ -270,10 +271,20 @@ export default function PoliciesPage() {
                             </Select>
                         </div>
                     </div>
-                    <div className="space-y-1.5">
-                        <Label>Document URL</Label>
-                        <Input {...register("documentUrl")} placeholder="https://drive.example.com/..." />
-                    </div>
+                    {editing && (
+                        <div className="space-y-1.5">
+                            <Label>Policy Documents</Label>
+                            {editing.documentUrl && (
+                                <p className="text-xs text-slate-500 mb-1">
+                                    Legacy link:{" "}
+                                    <a href={editing.documentUrl} target="_blank" rel="noreferrer" className="text-teal-600 hover:underline">
+                                        {editing.documentUrl}
+                                    </a>
+                                </p>
+                            )}
+                            <DocumentAttachments entityType="SECURITY_POLICY" entityId={editing.id} />
+                        </div>
+                    )}
                     <div className="space-y-1.5">
                         <Label>Policy Owner</Label>
                         <Select {...register("ownerId")}>

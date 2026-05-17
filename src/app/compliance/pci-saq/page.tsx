@@ -11,9 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, CreditCard, ExternalLink, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, ExternalLink, Search } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { useConfirm } from "@/hooks/useConfirm";
+import DocumentAttachments from "@/components/DocumentAttachments";
 
 const ANSWERS: ComplianceAnswer[] = ["YES", "NO", "NOT_APPLICABLE", "COMPENSATING_CONTROL"];
 
@@ -34,6 +36,7 @@ export default function PCISAQPage() {
 
     const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<PCISAQDto>();
     const complianceStatus = watch("complianceStatus");
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const fetchData = async () => {
         try {
@@ -65,6 +68,17 @@ export default function PCISAQPage() {
             (i.notes ?? "").toLowerCase().includes(q)
         );
     }, [items, search, answerFilter]);
+
+    const handleDelete = async (id: string) => {
+        if (!await confirm({ message: "Delete this PCI SAQ record?", variant: "danger" })) return;
+        try {
+            await pciSaqService.delete(id);
+            toast.success("Deleted");
+            fetchData();
+        } catch {
+            toast.error("Failed to delete");
+        }
+    };
 
     const handleOpenCreate = () => {
         setEditing(null);
@@ -203,6 +217,7 @@ export default function PCISAQPage() {
                             </div>
                             <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Button variant="outline" size="sm" onClick={() => handleOpenEdit(item)} className="h-7 w-7 p-0"><Pencil className="h-3.5 w-3.5" /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleDelete(item.id)} className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></Button>
                             </div>
                         </CardContent>
                     </Card>
@@ -236,10 +251,20 @@ export default function PCISAQPage() {
                             <Textarea {...register("compensatingControl")} placeholder="Describe the compensating control..." />
                         </div>
                     )}
-                    <div className="space-y-1.5">
-                        <Label>Evidence URL</Label>
-                        <Input {...register("evidenceUrl")} placeholder="https://..." />
-                    </div>
+                    {editing && (
+                        <div className="space-y-1.5">
+                            <Label>Evidence Documents</Label>
+                            {editing.evidenceUrl && (
+                                <p className="text-xs text-slate-500 mb-1">
+                                    Legacy link:{" "}
+                                    <a href={editing.evidenceUrl} target="_blank" rel="noreferrer" className="text-teal-600 hover:underline">
+                                        {editing.evidenceUrl}
+                                    </a>
+                                </p>
+                            )}
+                            <DocumentAttachments entityType="PCI_SAQ" entityId={editing.id} />
+                        </div>
+                    )}
                     <div className="space-y-1.5">
                         <Label>Target Date</Label>
                         <Input type="date" {...register("targetDate")} />
@@ -256,6 +281,7 @@ export default function PCISAQPage() {
                     </div>
                 </form>
             </Modal>
+        {ConfirmDialog}
         </div>
     );
 }

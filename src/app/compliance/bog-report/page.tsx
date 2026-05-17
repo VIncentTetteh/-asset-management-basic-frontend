@@ -26,6 +26,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSpinner } from "@/components/ui/spinner";
+import DocumentAttachments from "@/components/DocumentAttachments";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -434,16 +435,24 @@ export default function BogReportPage() {
                         <Label htmlFor="b-plan">Remediation Plan</Label>
                         <Textarea id="b-plan" rows={2} placeholder="Steps to achieve compliance…" {...register("remediationPlan")} />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <Label htmlFor="b-date">Target Date</Label>
-                            <Input id="b-date" type="date" {...register("targetDate")} />
-                        </div>
-                        <div>
-                            <Label htmlFor="b-evidence">Evidence URL</Label>
-                            <Input id="b-evidence" placeholder="https://…" {...register("evidenceUrl")} />
-                        </div>
+                    <div>
+                        <Label htmlFor="b-date">Target Date</Label>
+                        <Input id="b-date" type="date" {...register("targetDate")} />
                     </div>
+                    {editControl && (
+                        <div className="space-y-1.5">
+                            <Label>Evidence Documents</Label>
+                            {editControl.evidenceUrl && (
+                                <p className="text-xs text-slate-500 mb-1">
+                                    Legacy link:{" "}
+                                    <a href={editControl.evidenceUrl} target="_blank" rel="noreferrer" className="text-teal-600 hover:underline">
+                                        {editControl.evidenceUrl}
+                                    </a>
+                                </p>
+                            )}
+                            <DocumentAttachments entityType="BOG_CONTROL" entityId={editControl.id} />
+                        </div>
+                    )}
                     <div className="flex gap-3 pt-2">
                         <Button type="submit" disabled={isSubmitting} className="flex-1 gap-2">
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}

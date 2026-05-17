@@ -16,6 +16,7 @@ import { Plus, Pencil, Trash2, ShieldCheck, Search, ExternalLink, User as UserIc
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
+import DocumentAttachments from "@/components/DocumentAttachments";
 
 
 const FRAMEWORKS: ComplianceFramework[] = ["ISO_27001", "SOC2", "PCI_DSS", "ICS", "BOG"];
@@ -314,10 +315,20 @@ export default function ComplianceControlsPage() {
                         <Label>Justification</Label>
                         <Textarea {...register("justification")} placeholder="Justification for current status..." />
                     </div>
-                    <div className="space-y-1.5">
-                        <Label>Evidence URL</Label>
-                        <Input {...register("evidenceUrl")} placeholder="https://drive.example.com/..." />
-                    </div>
+                    {editing && (
+                        <div className="space-y-1.5">
+                            <Label>Evidence Documents</Label>
+                            {editing.evidenceUrl && (
+                                <p className="text-xs text-slate-500 mb-1">
+                                    Legacy link:{" "}
+                                    <a href={editing.evidenceUrl} target="_blank" rel="noreferrer" className="text-teal-600 hover:underline">
+                                        {editing.evidenceUrl}
+                                    </a>
+                                </p>
+                            )}
+                            <DocumentAttachments entityType="COMPLIANCE_CONTROL" entityId={editing.id} />
+                        </div>
+                    )}
                     <div className="space-y-1.5">
                         <Label>Gap Description</Label>
                         <Textarea {...register("gapDescription")} placeholder="Describe any gaps in implementation..." />

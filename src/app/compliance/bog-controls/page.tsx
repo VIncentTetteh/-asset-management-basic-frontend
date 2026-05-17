@@ -16,6 +16,7 @@ import { Plus, Pencil, Trash2, Building2, Search, ExternalLink, User as UserIcon
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
+import DocumentAttachments from "@/components/DocumentAttachments";
 
 
 const STATUSES: ControlStatus[] = ["NOT_IMPLEMENTED", "PARTIAL", "IMPLEMENTED", "NOT_APPLICABLE"];
@@ -274,16 +275,24 @@ export default function BOGControlsPage() {
                         <Label>Remediation Plan</Label>
                         <Textarea {...register("remediationPlan")} placeholder="Remediation steps..." />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label>Target Date</Label>
-                            <Input type="date" {...register("targetDate")} />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label>Evidence URL</Label>
-                            <Input {...register("evidenceUrl")} placeholder="https://..." />
-                        </div>
+                    <div className="space-y-1.5">
+                        <Label>Target Date</Label>
+                        <Input type="date" {...register("targetDate")} />
                     </div>
+                    {editing && (
+                        <div className="space-y-1.5">
+                            <Label>Evidence Documents</Label>
+                            {editing.evidenceUrl && (
+                                <p className="text-xs text-slate-500 mb-1">
+                                    Legacy link:{" "}
+                                    <a href={editing.evidenceUrl} target="_blank" rel="noreferrer" className="text-teal-600 hover:underline">
+                                        {editing.evidenceUrl}
+                                    </a>
+                                </p>
+                            )}
+                            <DocumentAttachments entityType="BOG_CONTROL" entityId={editing.id} />
+                        </div>
+                    )}
                     <div className="flex justify-end gap-2 pt-4 border-t">
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
                         <Button type="submit" isLoading={isSubmitting} className="bg-teal-600 hover:bg-teal-700">

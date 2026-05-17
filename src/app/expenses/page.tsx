@@ -12,6 +12,7 @@ import { expenseService, ExpenseDto, ExpenseCategory, ExpenseStatus, PagedExpens
 import { assetService } from "@/services/assetService";
 import { budgetService } from "@/services/budgetService";
 import { Asset, Budget, Expense } from "@/types";
+import DocumentAttachments from "@/components/DocumentAttachments";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -147,10 +148,12 @@ export default function ExpensesPage() {
     const watchedBudgetId = watch("linkedBudgetId");
     const selectedBudget = budgets.find(b => b.id === watchedBudgetId);
 
+    const [viewExpense, setViewExpense] = useState<Expense | null>(null);
+
     const openCreate = () => {
         reset({
             title: "", description: "", amount: 0, currency: "USD",
-            category: "OTHER", receiptUrl: "", linkedAssetId: "", linkedBudgetId: "",
+            category: "OTHER", linkedAssetId: "", linkedBudgetId: "",
             expenseDate: new Date().toISOString().split("T")[0],
         });
         setIsModalOpen(true);
@@ -358,6 +361,9 @@ export default function ExpensesPage() {
                                             </td>
                                             <td className="py-3 px-4">
                                                 <div className="flex gap-1">
+                                                    <Button size="sm" variant="ghost" className="h-8 px-2 text-blue-600 hover:text-blue-700 gap-1" onClick={() => setViewExpense(exp)}>
+                                                        View
+                                                    </Button>
                                                     {exp.status === "SUBMITTED" && (
                                                         <>
                                                             <Button size="sm" variant="ghost" className="h-8 px-2 text-emerald-600 hover:text-emerald-700 gap-1" onClick={() => handleApprove(exp.id || "")}>
@@ -469,10 +475,6 @@ export default function ExpensesPage() {
                             </p>
                         )}
                     </div>
-                    <div>
-                        <Label htmlFor="e-receipt">Receipt URL</Label>
-                        <Input id="e-receipt" placeholder="https://…" {...register("receiptUrl")} />
-                    </div>
                     <div className="flex gap-3 pt-2">
                         <Button type="submit" disabled={isSubmitting} className="flex-1 gap-2">
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
@@ -481,6 +483,55 @@ export default function ExpensesPage() {
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="flex-1">Cancel</Button>
                     </div>
                 </form>
+            </Modal>
+
+            {/* View Expense Modal — shows DocumentAttachments for an existing expense */}
+            <Modal isOpen={!!viewExpense} onClose={() => setViewExpense(null)} title="Expense Details" description={viewExpense?.title ?? ""}>
+                {viewExpense && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <p className="text-xs text-slate-500">Amount</p>
+                                <p className="font-medium text-slate-900">{fmtCurrency(viewExpense.amount)}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500">Status</p>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[viewExpense.status || "DRAFT"] || "bg-slate-100 text-slate-600"}`}>
+                                    {viewExpense.status || "DRAFT"}
+                                </span>
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500">Category</p>
+                                <p className="font-medium text-slate-900">{CATEGORY_LABELS[viewExpense.category || ""] || viewExpense.category || "—"}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-500">Date</p>
+                                <p className="font-medium text-slate-900">{fmt(viewExpense.expenseDate || viewExpense.createdAt)}</p>
+                            </div>
+                        </div>
+                        {viewExpense.description && (
+                            <div>
+                                <p className="text-xs text-slate-500 mb-1">Description</p>
+                                <p className="text-sm text-slate-700">{viewExpense.description}</p>
+                            </div>
+                        )}
+                        {viewExpense.rejectionReason && (
+                            <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2">
+                                <p className="text-xs text-red-600 font-medium">Rejection reason: {viewExpense.rejectionReason}</p>
+                            </div>
+                        )}
+                        {/* Legacy receipt URL — kept for records that pre-date file attachments */}
+                        {viewExpense.receiptUrl && (
+                            <p className="text-xs text-slate-500">
+                                Legacy link:{" "}
+                                <a href={viewExpense.receiptUrl} target="_blank" rel="noreferrer" className="text-teal-600 hover:underline">
+                                    {viewExpense.receiptUrl}
+                                </a>
+                            </p>
+                        )}
+                        <DocumentAttachments entityType="EXPENSE" entityId={viewExpense.id || ""} />
+                    </div>
+                )}
             </Modal>
 
             {/* Reject Modal */}
