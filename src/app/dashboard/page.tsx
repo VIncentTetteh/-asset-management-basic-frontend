@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { toast } from "react-hot-toast";
 import {
     AlertTriangle,
     ArrowRight,
@@ -404,9 +405,13 @@ export default function DashboardPage() {
     const [depreciationSummary, setDepreciationSummary] = useState<DepreciationSummary | null>(null);
     const [maintenanceAlerts, setMaintenanceAlerts] = useState<DashboardMaintenanceAlerts | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
 
     useEffect(() => {
         let isActive = true;
+        setIsLoading(true);
+        setLoadError(false);
 
         const load = async () => {
             try {
@@ -545,6 +550,10 @@ export default function DashboardPage() {
                 setStats(nextStats);
             } catch (err) {
                 console.error("Dashboard load failed:", err);
+                if (isActive) {
+                    setLoadError(true);
+                    toast.error("Failed to load dashboard data. Please refresh.");
+                }
             } finally {
                 if (isActive) setIsLoading(false);
             }
@@ -552,9 +561,22 @@ export default function DashboardPage() {
 
         load();
         return () => { isActive = false; };
-    }, []);
+    }, [retryCount]);
 
     // ── Derived values ────────────────────────────────────────────────────────
+
+    if (loadError) {
+        return (
+            <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+                <AlertTriangle className="h-10 w-10 text-rose-400" />
+                <h2 className="text-xl font-semibold text-slate-700">Dashboard failed to load</h2>
+                <p className="text-sm text-slate-500">An error occurred while fetching dashboard data.</p>
+                <Button onClick={() => setRetryCount(c => c + 1)}>
+                    Retry
+                </Button>
+            </div>
+        );
+    }
 
     if (isLoading) {
         return (
@@ -686,7 +708,7 @@ export default function DashboardPage() {
                             <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
                                 <Link href="/assets" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Portfolio Value</p>
-                                    <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-xl font-black leading-tight text-white sm:text-2xl">
+                                    <p className="mt-2 break-all text-2xl font-black leading-tight text-white sm:text-3xl lg:text-4xl">
                                         {formatCompactCurrency(stats.totalAssetValue, currency)}
                                     </p>
                                     <p className="mt-2 text-xs text-slate-300">
@@ -695,7 +717,7 @@ export default function DashboardPage() {
                                 </Link>
                                 <Link href="/assets" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">In Service</p>
-                                    <p className="mt-2 text-xl font-black leading-tight text-white sm:text-2xl">
+                                    <p className="mt-2 text-2xl font-black leading-tight text-white sm:text-3xl lg:text-4xl">
                                         {assetUtilization}%
                                     </p>
                                     <p className="mt-2 text-xs text-slate-300">
@@ -704,7 +726,7 @@ export default function DashboardPage() {
                                 </Link>
                                 <Link href="/maintenance" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Maintenance Due</p>
-                                    <p className={`mt-2 text-xl font-black leading-tight sm:text-2xl ${stats.overdueMaintenanceCount > 0 ? "text-rose-400" : "text-white"}`}>
+                                    <p className={`mt-2 text-2xl font-black leading-tight sm:text-3xl lg:text-4xl ${stats.overdueMaintenanceCount > 0 ? "text-rose-400" : "text-white"}`}>
                                         {maintenanceLoad.toLocaleString()}
                                     </p>
                                     <p className="mt-2 text-xs text-slate-300">
@@ -713,7 +735,7 @@ export default function DashboardPage() {
                                 </Link>
                                 <Link href="/purchase-orders" className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">PO Approvals</p>
-                                    <p className="mt-2 text-xl font-black leading-tight text-white sm:text-2xl">
+                                    <p className="mt-2 text-2xl font-black leading-tight text-white sm:text-3xl lg:text-4xl">
                                         {stats.openPurchaseOrders.toLocaleString()}
                                     </p>
                                     <p className="mt-2 text-xs text-slate-300">
@@ -836,7 +858,7 @@ export default function DashboardPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold text-slate-900 sm:text-xl">{format(stats.totalAssetValue)}</div>
+                            <div className="break-all text-2xl font-black text-slate-900 sm:text-3xl">{format(stats.totalAssetValue)}</div>
                             <p className="mt-1 text-xs text-slate-500">
                                 Net book value: {format(depreciationSummary?.netBookValue ?? 0)}
                             </p>
