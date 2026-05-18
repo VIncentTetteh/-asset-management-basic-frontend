@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { documentService } from "@/services/documentService";
 import { DocumentAttachment, AttachmentEntityType } from "@/types";
+import api from "@/lib/axios";
 import {
     File,
     FileText,
@@ -124,13 +125,34 @@ export function DocumentAttachments({
         }
     };
 
-    // ── View handler — fetches presigned URL and opens in new tab ─────────────
-    const handleView = async (id: string, originalName: string) => {
+    // ── View handler — fetches URL, then opens directly (S3) or via blob (streaming) ─
+    const handleView = async (attachment: DocumentAttachment) => {
         try {
-            const url = await documentService.getDownloadUrl(id);
-            window.open(url, "_blank", "noopener,noreferrer");
+            const url = await documentService.getDownloadUrl(attachment.id);
+
+            // Presigned S3 URLs are external — no auth header needed, already signed.
+            // Backend streaming URLs contain both the API path segment and the /download
+            // suffix, so we detect them by both markers to avoid false-positives.
+            const isExternal = !(url.includes("/api/v1/documents/") && url.includes("/download"));
+
+            if (isExternal) {
+                // S3 presigned URL — open directly (no auth needed, already signed)
+                window.open(url, "_blank", "noopener,noreferrer");
+            } else {
+                // Backend streaming URL — must fetch with auth headers, then create blob URL
+                const response = await api.get(url, { responseType: "blob" });
+                const blobUrl = window.URL.createObjectURL(response.data);
+                const a = document.createElement("a");
+                a.href = blobUrl;
+                a.target = "_blank";
+                a.download = attachment.originalName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);
+            }
         } catch {
-            toast.error(`Failed to get download link for "${originalName}"`);
+            toast.error("Failed to open document");
         }
     };
 
@@ -277,7 +299,7 @@ export function DocumentAttachments({
                                                     variant="ghost"
                                                     className="h-7 px-2 text-xs text-teal-700 hover:text-teal-800 hover:bg-teal-50"
                                                     onClick={() =>
-                                                        handleView(attachment.id, attachment.originalName)
+                                                        handleView(attachment)
                                                     }
                                                 >
                                                     <ExternalLink className="h-3.5 w-3.5 mr-1" />
