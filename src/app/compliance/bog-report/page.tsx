@@ -439,7 +439,7 @@ export default function BogReportPage() {
                         <Label htmlFor="b-date">Target Date</Label>
                         <Input id="b-date" type="date" {...register("targetDate")} />
                     </div>
-                    {editControl && (
+                    {editControl?.id && (
                         <div className="space-y-1.5">
                             <Label>Evidence Documents</Label>
                             {editControl.evidenceUrl && (

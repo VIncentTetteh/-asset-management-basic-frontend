@@ -279,7 +279,7 @@ export default function BOGControlsPage() {
                         <Label>Target Date</Label>
                         <Input type="date" {...register("targetDate")} />
                     </div>
-                    {editing && (
+                    {editing?.id && (
                         <div className="space-y-1.5">
                             <Label>Evidence Documents</Label>
                             {editing.evidenceUrl && (

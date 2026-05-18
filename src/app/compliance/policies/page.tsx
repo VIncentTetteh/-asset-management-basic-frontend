@@ -271,7 +271,7 @@ export default function PoliciesPage() {
                             </Select>
                         </div>
                     </div>
-                    {editing && (
+                    {editing?.id && (
                         <div className="space-y-1.5">
                             <Label>Policy Documents</Label>
                             {editing.documentUrl && (

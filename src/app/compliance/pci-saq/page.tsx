@@ -251,7 +251,7 @@ export default function PCISAQPage() {
                             <Textarea {...register("compensatingControl")} placeholder="Describe the compensating control..." />
                         </div>
                     )}
-                    {editing && (
+                    {editing?.id && (
                         <div className="space-y-1.5">
                             <Label>Evidence Documents</Label>
                             {editing.evidenceUrl && (

@@ -487,8 +487,8 @@ export default function ExpensesPage() {
 
             {/* View Expense Modal — shows DocumentAttachments for an existing expense */}
             <Modal isOpen={!!viewExpense} onClose={() => setViewExpense(null)} title="Expense Details" description={viewExpense?.title ?? ""}>
-                {viewExpense && (
-                    <div className="space-y-4">
+                {viewExpense?.id && (
+                    <div className="space-y-4 overflow-y-auto max-h-[80vh]">
                         <div className="grid grid-cols-2 gap-3 text-sm">
                             <div>
                                 <p className="text-xs text-slate-500">Amount</p>
@@ -529,7 +529,7 @@ export default function ExpensesPage() {
                                 </a>
                             </p>
                         )}
-                        <DocumentAttachments entityType="EXPENSE" entityId={viewExpense.id || ""} />
+                        <DocumentAttachments entityType="EXPENSE" entityId={viewExpense.id ?? ""} />
                     </div>
                 )}
             </Modal>

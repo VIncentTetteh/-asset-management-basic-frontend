@@ -315,7 +315,7 @@ export default function ComplianceControlsPage() {
                         <Label>Justification</Label>
                         <Textarea {...register("justification")} placeholder="Justification for current status..." />
                     </div>
-                    {editing && (
+                    {editing?.id && (
                         <div className="space-y-1.5">
                             <Label>Evidence Documents</Label>
                             {editing.evidenceUrl && (
