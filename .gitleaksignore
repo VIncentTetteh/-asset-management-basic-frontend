@@ -1,0 +1,5 @@
+# Historical findings: dev JWTs in docs/logs from old commits.
+# All were invalidated by the 2026-07-13 APP_JWT_SECRET rotation (see docs/SECRETS.md in the backend repo).
+# New findings must NEVER be added here without a security review.
+4e563811d4921d023ff5f33ea7a92f98c0feb5cf:API_DOCUMENTATION.md:generic-api-key:311
+4e563811d4921d023ff5f33ea7a92f98c0feb5cf:API_DOCUMENTATION.md:generic-api-key:333

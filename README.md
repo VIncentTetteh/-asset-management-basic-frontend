@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AssetIQ — Web App
 
-## Getting Started
+The web client for **AssetIQ**, an enterprise asset management platform (assets, checkouts, transfers, maintenance, procurement & finance, compliance, DPA, AI insights) with multi-tenant SaaS and self-hosted (standalone) modes.
 
-First, run the development server:
+Part of the AssetIQ platform:
+
+| Surface | Repo |
+|---|---|
+| Backend API (Spring Boot) | `Enterprise-Asset-Manager` |
+| **Web app (this repo)** | `Enterprise-Asset-manager-Frontend` |
+| Desktop app (Electron) | `Enterprise-Asset-manager-desktop-app` |
+| Mobile app (Expo) | `Enterprise-Asset-Mobile` |
+
+## Stack
+
+- Next.js (App Router) + React 19 + TypeScript (strict)
+- Tailwind CSS v4, Radix-based UI kit in `src/components/ui/`
+- Axios with HttpOnly-cookie auth; all browser `/api/*` calls are forwarded by the server-side proxy at `src/app/api/[...path]/route.ts`
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci
+cp .env.example .env.local   # set API_TARGET_BASE to your backend, e.g. http://localhost:8085/api
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The backend must be running (see the backend repo's README). Auth uses an HttpOnly `access_token` cookie set by the backend — no tokens in localStorage.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Scope | Purpose |
+|---|---|---|
+| `API_TARGET_BASE` | server-only | Backend base URL the proxy forwards to (must end in `/api`) |
+| `NEXT_PUBLIC_APP_MODE` | public | `cloud` (SaaS) or `standalone` (self-hosted, license gating active) |
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run dev        # dev server
+npm run build      # production build
+npm run lint       # eslint
+npm run typecheck  # tsc --noEmit
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `src/app/` — ~63 routes (assets, checkouts, transfers, maintenance, finance, 13 compliance pages, DPA, admin, billing, AI)
+- `src/services/` — one API service module per backend domain
+- `src/contexts/` — Auth, Permission, Currency, License contexts
+- `src/components/` — UI kit, layout, RBAC gates (`Can`, `PermissionGate`, `ProtectedRoute`)
+- `docs/` — UI/UX blueprint and design tokens
