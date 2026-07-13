@@ -70,7 +70,10 @@ export type Permission =
   | "MANAGE_CLOUD_ASSETS"
   | "VIEW_DEPRECIATION"
   | "MANAGE_DEPRECIATION"
-  | "VIEW_VENDOR_REVIEWS";
+  | "VIEW_VENDOR_REVIEWS"
+  | "MANAGE_VENDOR_REVIEWS"
+  | "VIEW_EMPLOYEES"
+  | "MANAGE_EMPLOYEES";
 
 /**
  * Compile-time exhaustive array of all permissions.
@@ -138,4 +141,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "VIEW_DEPRECIATION",
   "MANAGE_DEPRECIATION",
   "VIEW_VENDOR_REVIEWS",
+  "MANAGE_VENDOR_REVIEWS",
+  "VIEW_EMPLOYEES",
+  "MANAGE_EMPLOYEES",
 ];
