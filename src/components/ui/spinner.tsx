@@ -22,7 +22,7 @@ export function Spinner({ className, size = "default", color }: SpinnerProps) {
             className={cn(
                 "animate-spin",
                 sizeMap[size],
-                color ?? "text-teal-600",
+                color ?? "text-brand",
                 className
             )}
         />
@@ -32,8 +32,8 @@ export function Spinner({ className, size = "default", color }: SpinnerProps) {
 export function PageSpinner({ label }: { label?: string }) {
     return (
         <div className="flex flex-col items-center justify-center h-64 gap-3">
-            <Spinner size="lg" className="text-teal-600" />
-            {label && <p className="text-sm text-slate-500 animate-pulse">{label}</p>}
+            <Spinner size="lg" className="text-brand" />
+            {label && <p className="text-sm text-muted-fg animate-pulse">{label}</p>}
         </div>
     );
 }

@@ -47,3 +47,4 @@ next-env.d.ts
 
 # planning docs (keep out of repo)
 *.docx
+.gstack/

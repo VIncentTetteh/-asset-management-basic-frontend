@@ -14,13 +14,13 @@ export function Modal({ isOpen, onClose, title, description, children }: ModalPr
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-lg shadow-lg w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-surface text-foreground rounded-panel shadow-lg w-full max-w-lg overflow-hidden border border-edge animate-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-edge-subtle">
                     <div>
-                        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+                        <h3 className="text-lg font-bold text-foreground">{title}</h3>
                         {description && (
-                            <p className="text-sm text-slate-500 mt-1">{description}</p>
+                            <p className="text-sm text-muted-fg mt-1">{description}</p>
                         )}
                     </div>
                     <Button variant="ghost" size="icon" onClick={onClose}>

@@ -6,7 +6,7 @@ export function Skeleton({ className }: { className?: string }) {
     return (
         <div
             className={cn(
-                "animate-pulse rounded-md bg-slate-200/80",
+                "animate-pulse rounded-md bg-surface-sunken",
                 className
             )}
         />
@@ -15,8 +15,8 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function CardSkeleton() {
     return (
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-            <div className="p-4 border-b bg-slate-50/50">
+        <div className="rounded-card border border-edge bg-surface overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-edge-subtle bg-surface-muted">
                 <div className="flex justify-between items-start">
                     <div className="flex-1">
                         <Skeleton className="h-5 w-2/3 mb-2" />
@@ -36,7 +36,7 @@ export function CardSkeleton() {
                         <Skeleton className="h-5 w-20" />
                     </div>
                 </div>
-                <div className="pt-2 border-t border-slate-100 space-y-2">
+                <div className="pt-2 border-t border-edge-subtle space-y-2">
                     <Skeleton className="h-4 w-3/4" />
                     <Skeleton className="h-4 w-2/3" />
                     <Skeleton className="h-4 w-1/2" />
@@ -48,7 +48,7 @@ export function CardSkeleton() {
 
 export function TableRowSkeleton({ cols = 6 }: { cols?: number }) {
     return (
-        <tr className="border-b border-slate-100">
+        <tr className="border-b border-edge-subtle">
             {Array.from({ length: cols }).map((_, i) => (
                 <td key={i} className="py-3 px-4">
                     <Skeleton className="h-4 w-full" />
@@ -60,7 +60,7 @@ export function TableRowSkeleton({ cols = 6 }: { cols?: number }) {
 
 export function StatCardSkeleton() {
     return (
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="rounded-card border border-edge bg-surface p-5">
             <div className="flex items-center gap-3">
                 <Skeleton className="h-10 w-10 rounded-lg" />
                 <div className="flex-1">

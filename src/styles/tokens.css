@@ -1,0 +1,130 @@
+/**
+ * AssetIQ design tokens — single source of truth for web + desktop.
+ *
+ * Direction: "Ledger" — precision light UI with green-biased neutrals,
+ * mono-type asset tags, lifecycle trails, and gold audit seals.
+ * Dark mode derives from the same token names (palette informed by the
+ * operational dark scheme) and is switched via [data-theme="dark"] on <html>.
+ *
+ * The desktop repo copies this file verbatim (npm run sync-tokens there);
+ * mobile maps the same palette into its NativeWind config. Change values
+ * here first — never fork per surface.
+ */
+
+:root {
+  /* ── Ground ── */
+  --bg: #f4f7f5;
+  --surface: #ffffff;
+  --surface-muted: #fafcfb;
+  --surface-sunken: #eef3f0;
+  --border: #dee6e1;
+  --border-subtle: #ecf1ee;
+
+  /* ── Ink ── */
+  --foreground: #17231d;
+  --text-muted: #5f6f66;
+  --text-faint: #8ba095;
+
+  /* ── Brand ── */
+  --primary: #0e6e5c;
+  --primary-strong: #0a5748;      /* hover / active */
+  --primary-soft: #eaf3ef;        /* selected chips, active nav */
+  --primary-contrast: #ffffff;    /* text on primary */
+
+  /* ── Audit gold (verification seals only — never a general accent) ── */
+  --gold: #b08a1d;
+  --gold-soft: #f7f1de;
+
+  /* ── Semantic ── */
+  --success: #15803d;
+  --success-soft: #e9f5ee;
+  --info: #2f5fd0;
+  --info-soft: #ebf0fb;
+  --warning: #a25a09;
+  --warning-soft: #f9f1e6;
+  --danger: #b42323;
+  --danger-soft: #f9eaea;
+
+  /* ── Asset lifecycle states (keyed to backend AssetStatus) ── */
+  --status-in-use: #0e6e5c;
+  --status-in-stock: #2f5fd0;
+  --status-reserved: #6d5bd0;
+  --status-maintenance: #a25a09;
+  --status-flagged: #b42323;
+  --status-disposed: #6b7280;
+  --status-retired: #8ba095;
+
+  /* ── Type ── */
+  --font-heading: var(--font-manrope, "Manrope"), "Segoe UI", sans-serif;
+  --font-body: var(--font-plex, "IBM Plex Sans"), "Segoe UI", sans-serif;
+  --font-mono: var(--font-plex-mono, "IBM Plex Mono"), "SF Mono", Menlo, monospace;
+
+  /* ── Shape ── */
+  --radius-control: 6px;   /* buttons, inputs, chips */
+  --radius-card: 8px;      /* cards, table frames */
+  --radius-panel: 12px;    /* modals, drawers */
+
+  /* ── Elevation ── */
+  --shadow-sm: 0 1px 2px rgb(23 35 29 / 0.05);
+  --shadow-md: 0 4px 10px -2px rgb(23 35 29 / 0.08), 0 2px 4px -2px rgb(23 35 29 / 0.05);
+  --shadow-lg: 0 12px 28px -6px rgb(23 35 29 / 0.14), 0 4px 8px -4px rgb(23 35 29 / 0.06);
+
+  /* ── Focus ── */
+  --ring: #0e6e5c;
+  --ring-soft: rgb(14 110 92 / 0.22);
+
+  /* ── Density (enterprise-compact) ── */
+  --row-height: 40px;
+  --control-height: 34px;
+
+  /* Legacy aliases (pre-redesign code paths; migrate off, do not add uses) */
+  --background: var(--bg);
+  --surface-muted-legacy: var(--surface-muted);
+  --primary-strong-legacy: var(--primary-strong);
+  --text-muted-legacy: var(--text-muted);
+}
+
+[data-theme="dark"] {
+  --bg: #0b1020;
+  --surface: #11182b;
+  --surface-muted: #141c31;
+  --surface-sunken: #0d1326;
+  --border: #26314e;
+  --border-subtle: #1c2540;
+
+  --foreground: #e6ebf5;
+  --text-muted: #92a0bf;
+  --text-faint: #5d6c8f;
+
+  --primary: #14b789;
+  --primary-strong: #3ecfa4;
+  --primary-soft: rgb(20 183 137 / 0.13);
+  --primary-contrast: #06281c;
+
+  --gold: #d9b64a;
+  --gold-soft: rgb(217 182 74 / 0.13);
+
+  --success: #34d399;
+  --success-soft: rgb(52 211 153 / 0.12);
+  --info: #6d9bf5;
+  --info-soft: rgb(109 155 245 / 0.13);
+  --warning: #f5a94b;
+  --warning-soft: rgb(245 169 75 / 0.13);
+  --danger: #f37272;
+  --danger-soft: rgb(243 114 114 / 0.13);
+
+  --status-in-use: #14b789;
+  --status-in-stock: #6d9bf5;
+  --status-reserved: #a394f0;
+  --status-maintenance: #f5a94b;
+  --status-flagged: #f37272;
+  --status-disposed: #7d8aa5;
+  --status-retired: #5d6c8f;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 10px -2px rgb(0 0 0 / 0.45), 0 2px 4px -2px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.55), 0 4px 8px -4px rgb(0 0 0 / 0.4);
+
+  --ring: #14b789;
+  --ring-soft: rgb(20 183 137 / 0.28);
+}

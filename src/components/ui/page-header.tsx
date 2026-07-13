@@ -12,8 +12,8 @@ export function PageHeader({ title, subtitle, actions, className }: PageHeaderPr
     return (
         <div className={cn("flex flex-col gap-4 md:flex-row md:items-center md:justify-between", className)}>
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900">{title}</h1>
-                {subtitle ? <p className="text-sm text-slate-500 mt-1">{subtitle}</p> : null}
+                <h1 className="text-[22px] font-extrabold tracking-tight text-foreground">{title}</h1>
+                {subtitle ? <p className="text-[13px] text-muted-fg mt-1">{subtitle}</p> : null}
             </div>
             {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
         </div>

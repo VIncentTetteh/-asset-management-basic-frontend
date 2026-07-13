@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope, IBM_Plex_Sans } from "next/font/google";
+import { Manrope, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { AppLayoutClient } from "@/components/AppLayoutClient";
@@ -7,13 +7,19 @@ import { AuthProvider } from "@/contexts/AuthContext";
 
 const manrope = Manrope({
   subsets: ["latin"],
-  variable: "--font-heading",
+  variable: "--font-manrope",
   weight: ["600", "700", "800"],
 });
 
 const ibmPlexSans = IBM_Plex_Sans({
   subsets: ["latin"],
-  variable: "--font-body",
+  variable: "--font-plex",
+  weight: ["400", "500", "600"],
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  variable: "--font-plex-mono",
   weight: ["400", "500", "600"],
 });
 
@@ -22,17 +28,31 @@ export const metadata: Metadata = {
   description: "AssetIQ is the enterprise asset management platform for tracking, depreciation, maintenance, and compliance across your entire organisation.",
 };
 
+/**
+ * Applies the persisted theme before first paint so a dark-mode user never
+ * sees a light flash. Kept as an inline script (not a component effect)
+ * deliberately — effects run after hydration, which is too late.
+ */
+const themeBootScript = `
+try {
+  var t = localStorage.getItem("assetiq-theme");
+  if (t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+    document.documentElement.dataset.theme = "dark";
+  }
+} catch (e) {}
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Simple check for auth routes to not show sidebar
-  // (In a real app, middleware or a separate layout group for (auth) would be better)
-
   return (
-    <html lang="en">
-      <body className={`${manrope.variable} ${ibmPlexSans.variable}`}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
+      <body className={`${manrope.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}>
         {/* AuthProvider wraps the entire app — provides useAuth() and <Can> everywhere */}
         <AuthProvider>
           <AppLayoutClient>

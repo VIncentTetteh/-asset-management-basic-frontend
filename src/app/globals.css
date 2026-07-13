@@ -1,54 +1,67 @@
 @import "tailwindcss";
+@import "../styles/tokens.css";
 
-:root {
-  --background: #f4f7fb;
-  --foreground: #0f172a;
-  --surface: #ffffff;
-  --surface-muted: #f8fafc;
-  --border: #dbe4f0;
-  --text-muted: #5b6475;
-  --primary: #0f766e;
-  --primary-strong: #0d9488;
-  --danger: #dc2626;
-  --warning: #d97706;
-  --success: #16a34a;
-  --ring: #0ea5e9;
-  --radius: 0.75rem;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.06);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
-}
-
+/*
+ * Tailwind v4 theme mapping — utilities like bg-surface, text-muted-fg,
+ * border-edge, text-brand resolve to the design tokens and therefore adapt
+ * to dark mode automatically. New code MUST use these; raw slate/teal-*
+ * utilities are the legacy path being migrated away from (Phase 4).
+ */
 @theme inline {
-  --color-background: var(--background);
+  --color-background: var(--bg);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-edge: var(--border);
+  --color-edge-subtle: var(--border-subtle);
+  --color-muted-fg: var(--text-muted);
+  --color-faint-fg: var(--text-faint);
+  --color-brand: var(--primary);
+  --color-brand-strong: var(--primary-strong);
+  --color-brand-soft: var(--primary-soft);
+  --color-brand-contrast: var(--primary-contrast);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-ok: var(--success);
+  --color-ok-soft: var(--success-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-warn: var(--warning);
+  --color-warn-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
   --font-sans: var(--font-body);
+  --font-heading: var(--font-heading);
+  --font-mono: var(--font-mono);
+  --radius-control: var(--radius-control);
+  --radius-card: var(--radius-card);
+  --radius-panel: var(--radius-panel);
 }
+
+/* dark: utilities follow the explicit user toggle, not the OS */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 body {
-  background: var(--background);
+  background: var(--bg);
   color: var(--foreground);
   font-family: var(--font-body), "Segoe UI", sans-serif;
   text-rendering: optimizeLegibility;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading), "Segoe UI", sans-serif;
 }
 
-.ea-shell-gradient {
-  background-image: radial-gradient(circle at 20% 20%, rgba(15, 118, 110, 0.08), transparent 35%),
-    radial-gradient(circle at 80% 0%, rgba(2, 132, 199, 0.08), transparent 32%);
+/* Data the eye scans for — tags, serials, money — is always monospaced. */
+.data-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .ea-focus:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--ring), 0 0 0 4px rgba(14, 165, 233, 0.2);
+  box-shadow: 0 0 0 2px var(--ring), 0 0 0 4px var(--ring-soft);
 }
 
 .ea-table th {
@@ -66,54 +79,20 @@ h6 {
   font-weight: 700;
 }
 
-/* Landing Page Animations & Utilities */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
+/* ── Legacy utilities (pre-redesign pages; removed as Phase 4 batches land) ── */
 
-  to {
-    opacity: 1;
-  }
+.ea-shell-gradient {
+  background-image: radial-gradient(circle at 20% 20%, rgb(14 110 92 / 0.07), transparent 35%),
+    radial-gradient(circle at 80% 0%, rgb(47 95 208 / 0.06), transparent 32%);
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes float { 0% { transform: translateY(0); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0); } }
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes float {
-  0% {
-    transform: translateY(0px);
-  }
-
-  50% {
-    transform: translateY(-10px);
-  }
-
-  100% {
-    transform: translateY(0px);
-  }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.8s ease-out forwards;
-}
-
-.animate-slide-up {
-  animation: slideUp 0.8s ease-out forwards;
-}
-
-.animate-float {
-  animation: float 4s ease-in-out infinite;
-}
+.animate-fade-in { animation: fadeIn 0.8s ease-out forwards; }
+.animate-slide-up { animation: slideUp 0.8s ease-out forwards; }
+.animate-float { animation: float 4s ease-in-out infinite; }
 
 .glass {
   background: rgba(255, 255, 255, 0.05);
@@ -136,19 +115,17 @@ h6 {
   -webkit-text-fill-color: transparent;
 }
 
-/* Modern skeleton shimmer */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
 .skeleton-shimmer {
-  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background: linear-gradient(90deg, var(--surface-sunken) 25%, var(--surface-muted) 50%, var(--surface-sunken) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
-/* Card hover lift effect */
 .card-lift {
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
@@ -157,67 +134,49 @@ h6 {
   transform: translateY(-1px);
 }
 
-/* Smooth page transitions */
 @keyframes pageFadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.page-enter {
-  animation: pageFadeIn 0.3s ease-out forwards;
-}
+.page-enter { animation: pageFadeIn 0.3s ease-out forwards; }
 
-/* Status indicator pulse */
 @keyframes statusPulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
 
-.status-active {
-  animation: statusPulse 2s ease-in-out infinite;
+.status-active { animation: statusPulse 2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in, .animate-slide-up, .animate-float, .skeleton-shimmer,
+  .page-enter, .status-active { animation: none; }
+  .card-lift, .card-lift:hover { transition: none; transform: none; }
 }
 
-/* Focus ring improvement */
-.ea-focus:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--ring), 0 0 0 4px rgba(14, 165, 233, 0.2);
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
 
-/* Modern scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* Stat card gradient backgrounds */
+/* Stat card gradients (legacy dashboard; replaced by StatCard in Phase 4) */
 .stat-emerald { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); }
 .stat-blue { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); }
 .stat-purple { background: linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%); }
 .stat-amber { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); }
 .stat-teal { background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%); }
 
-/* Gradient progress bars */
 .progress-bar {
   height: 6px;
   border-radius: 9999px;
   overflow: hidden;
-  background: #e2e8f0;
+  background: var(--surface-sunken);
 }
 .progress-bar-fill {
   height: 100%;
   border-radius: 9999px;
   transition: width 0.7s ease;
-  background: linear-gradient(90deg, #10b981, #14b8a6);
+  background: linear-gradient(90deg, var(--primary), var(--primary-strong));
 }
-.progress-bar-fill.warning { background: linear-gradient(90deg, #f59e0b, #d97706); }
-.progress-bar-fill.danger { background: #ef4444; }
+.progress-bar-fill.warning { background: var(--warning); }
+.progress-bar-fill.danger { background: var(--danger); }

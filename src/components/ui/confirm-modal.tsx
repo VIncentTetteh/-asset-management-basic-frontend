@@ -26,21 +26,21 @@ export function ConfirmModal({
     if (!isOpen) return null;
 
     const iconMap = {
-        danger: <Trash2 className="h-6 w-6 text-red-500" />,
-        warning: <AlertTriangle className="h-6 w-6 text-amber-500" />,
-        info: <Info className="h-6 w-6 text-blue-500" />,
+        danger: <Trash2 className="h-6 w-6 text-danger" />,
+        warning: <AlertTriangle className="h-6 w-6 text-warn" />,
+        info: <Info className="h-6 w-6 text-info" />,
     };
 
     const confirmButtonClass = {
-        danger: "bg-red-600 hover:bg-red-700 text-white",
-        warning: "bg-amber-500 hover:bg-amber-600 text-white",
-        info: "bg-blue-600 hover:bg-blue-700 text-white",
+        danger: "bg-danger hover:opacity-90 text-white",
+        warning: "bg-warn hover:opacity-90 text-white",
+        info: "bg-info hover:opacity-90 text-white",
     };
 
     const iconBgClass = {
-        danger: "bg-red-50",
-        warning: "bg-amber-50",
-        info: "bg-blue-50",
+        danger: "bg-danger-soft",
+        warning: "bg-warn-soft",
+        info: "bg-info-soft",
     };
 
     const defaultTitle = {
@@ -51,15 +51,15 @@ export function ConfirmModal({
 
     return (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-surface text-foreground border border-edge rounded-panel shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="p-6">
                     <div className={`w-12 h-12 rounded-full ${iconBgClass[variant]} flex items-center justify-center mx-auto mb-4`}>
                         {iconMap[variant]}
                     </div>
-                    <h3 className="text-base font-semibold text-slate-900 text-center mb-2">
+                    <h3 className="text-base font-bold text-foreground text-center mb-2">
                         {title || defaultTitle[variant]}
                     </h3>
-                    <p className="text-sm text-slate-500 text-center leading-relaxed">
+                    <p className="text-sm text-muted-fg text-center leading-relaxed">
                         {message}
                     </p>
                 </div>

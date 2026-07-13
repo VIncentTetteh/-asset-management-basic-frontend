@@ -6,6 +6,8 @@ import { Sidebar } from "@/components/Sidebar";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { QueryProvider } from "@/components/QueryProvider";
 import { Modal } from "@/components/ui/modal";
 import { billingService } from "@/services/billingService";
 import { authService } from "@/services/authService";
@@ -25,6 +27,7 @@ import { LicenseBanner } from "@/components/LicenseBanner";
 import { ConfirmDialogHost } from "@/hooks/useConfirm";
 import { AiAssistant } from "@/components/AiAssistant";
 import { LicenseSetupWizard } from "@/components/LicenseSetupWizard";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Routes that require a specific permission — mirrors Sidebar route map.
 // Any path that starts with a pattern AND the user lacks the permission triggers
@@ -76,15 +79,16 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
 
     const { currency, setCurrency } = useCurrency();
     const { loading: permLoading, hasPermission } = usePermissions();
+    const { isAuthenticated, isReady } = useAuth();
 
-    const publicPaths = ["/", "/login", "/register", "/register-tenant", "/forgot-password", "/reset-password"];
+    const publicPaths = ["/", "/login", "/register", "/register-tenant", "/forgot-password", "/reset-password", "/design"];
     const isPublicPage = publicPaths.includes(pathname);
     const breadcrumb = pathname.split("/").filter(Boolean).join(" / ") || "home";
     const requiresOrgBootstrap =
         typeof window !== "undefined"
         && isMounted
         && !isPublicPage
-        && Boolean(localStorage.getItem("token"))
+        && isAuthenticated
         && !getOrganisationIdFromStorage();
 
     useEffect(() => {
@@ -171,17 +175,16 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
-        if (!isMounted) return;
-        const token = localStorage.getItem("token");
-        if (!token && !isPublicPage) {
+        if (!isMounted || !isReady) return;
+        if (!isAuthenticated && !isPublicPage) {
             setIsAuthorized(false);
             setIsBootstrappingAuth(false);
             router.push("/login");
         } else {
-            setIsAuthorized(Boolean(token));
-            setIsBootstrappingAuth(Boolean(token) && !isPublicPage && !getOrganisationIdFromStorage());
+            setIsAuthorized(isAuthenticated);
+            setIsBootstrappingAuth(isAuthenticated && !isPublicPage && !getOrganisationIdFromStorage());
         }
-    }, [pathname, router, isPublicPage, isMounted]);
+    }, [pathname, router, isPublicPage, isMounted, isReady, isAuthenticated]);
 
     useEffect(() => {
         const onPlanLimit = (event: Event) => {
@@ -212,9 +215,9 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     // sidebar items or search results before permission data arrives.
     if (permLoading || isBootstrappingAuth || requiresOrgBootstrap) {
         return (
-            <div className="flex h-screen items-center justify-center bg-slate-50">
-                <div className="flex flex-col items-center gap-3 text-slate-500">
-                    <div className="h-7 w-7 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+            <div className="flex h-screen items-center justify-center bg-background">
+                <div className="flex flex-col items-center gap-3 text-muted-fg">
+                    <div className="h-7 w-7 animate-spin rounded-full border-2 border-brand border-t-transparent" />
                     <span className="text-xs font-medium tracking-wide">Loading workspace…</span>
                 </div>
             </div>
@@ -230,25 +233,25 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const showUsageWarning = Math.max(assetUsagePercent, employeeUsagePercent) >= 80;
 
     return (
-        <div className="ea-shell-gradient flex h-screen overflow-hidden bg-slate-50">
+        <div className="ea-shell-gradient flex h-screen overflow-hidden bg-background">
             <div className="hidden md:block">
                 <Sidebar />
             </div>
 
             <div className="flex-1 flex flex-col overflow-hidden">
-                <header className="h-16 border-b border-slate-200 bg-white/90 backdrop-blur flex items-center justify-between px-4 md:px-6 shadow-sm">
+                <header className="flex h-14 items-center justify-between border-b border-edge bg-surface px-4 md:px-6">
                     <div className="flex items-center gap-3 min-w-0">
-                        <span className="md:hidden font-bold text-lg text-teal-700 truncate">{orgName}</span>
+                        <span className="md:hidden font-bold text-lg text-brand truncate">{orgName}</span>
                         <div className="hidden md:block">
-                            <p className="text-xs uppercase tracking-wider text-slate-500">Workspace</p>
-                            <p className="text-sm font-semibold text-slate-800 truncate">{breadcrumb}</p>
+                            <p className="text-[10px] uppercase tracking-[0.1em] text-faint-fg">Workspace</p>
+                            <p className="text-sm font-semibold text-foreground truncate">{breadcrumb}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2 md:gap-3">
                         <GlobalSearch />
 
                         {/* Currency switcher */}
-                        <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                        <div className="flex items-center rounded-control border border-edge bg-surface-muted p-0.5">
                             {(["USD", "GHS"] as const).map(c => (
                                 <button
                                     key={c}
@@ -256,8 +259,8 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                                     title={c === "USD" ? "US Dollar" : "Ghana Cedi"}
                                     className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
                                         currency === c
-                                            ? "bg-teal-600 text-white shadow-sm"
-                                            : "text-slate-500 hover:text-slate-700"
+                                            ? "bg-brand text-brand-contrast shadow-sm"
+                                            : "text-muted-fg hover:text-foreground"
                                     }`}
                                 >
                                     {c === "USD" ? "$ USD" : "₵ GHS"}
@@ -265,19 +268,20 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                             ))}
                         </div>
 
+                        <ThemeToggle />
                         <Button variant="outline" size="icon" aria-label="Notifications">
                             <Bell className="h-4 w-4" />
                         </Button>
-                        <div className="hidden md:flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                            <span className="text-xs font-semibold text-slate-700 truncate max-w-[170px]">{orgName}</span>
-                            <span className="text-[10px] uppercase tracking-wide text-slate-500">{userRole.replace("ROLE_", "")}</span>
+                        <div className="hidden md:flex items-center gap-2 rounded-control border border-edge bg-surface-muted px-3 py-1.5">
+                            <span className="h-2 w-2 rounded-full bg-brand" />
+                            <span className="text-xs font-semibold text-foreground truncate max-w-[170px]">{orgName}</span>
+                            <span className="text-[10px] uppercase tracking-wide text-muted-fg">{userRole.replace("ROLE_", "")}</span>
                         </div>
                     </div>
                 </header>
-                <main className="flex-1 overflow-auto p-4 md:p-8">
+                <main className="flex-1 overflow-auto p-4 md:p-6">
                     {showUsageWarning && pathname !== "/billing" ? (
-                        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <div className="mb-4 rounded-card border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-foreground">
                             Plan usage warning: assets {subscription?.currentAssetCount}/{subscription?.plan?.maxAssets} ({assetUsagePercent}%), employees {subscription?.currentEmployeeCount}/{subscription?.plan?.maxEmployees} ({employeeUsagePercent}%).
                             <button
                                 type="button"
@@ -299,13 +303,14 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                 description="Your current subscription limits this action."
             >
                 <div className="space-y-4">
-                    <p className="text-sm text-slate-700">{planLimitMessage || "Upgrade your plan to continue this operation."}</p>
+                    <p className="text-sm text-muted-fg">{planLimitMessage || "Upgrade your plan to continue this operation."}</p>
                     <div className="flex justify-end gap-2">
                         <Button variant="outline" onClick={() => setIsPlanLimitOpen(false)}>Close</Button>
                         <Button onClick={() => { setIsPlanLimitOpen(false); router.push("/billing"); }}>Upgrade Plan</Button>
                     </div>
                 </div>
             </Modal>
+            <AiAssistant />
         </div>
     );
 }
@@ -316,6 +321,7 @@ export function AppLayoutClient({ children }: { children: React.ReactNode }) {
         // LicenseProvider wraps everything but is a no-op in cloud mode —
         // it makes zero API calls and adds zero overhead when
         // NEXT_PUBLIC_APP_MODE=cloud (the default).
+        <QueryProvider>
         <LicenseProvider>
             {/* Banner is a no-op in cloud mode — renders null */}
             <LicenseBanner />
@@ -323,12 +329,12 @@ export function AppLayoutClient({ children }: { children: React.ReactNode }) {
                 <PermissionProvider>
                     <AppLayoutInner>{children}</AppLayoutInner>
                     <ConfirmDialogHost />
-                    <AiAssistant />
                     {/* First-run wizard: shown in standalone mode when no key is active.
                         No-op (renders null) in cloud mode and after key activation. */}
                     <LicenseSetupWizard />
                 </PermissionProvider>
             </CurrencyProvider>
         </LicenseProvider>
+        </QueryProvider>
     );
 }

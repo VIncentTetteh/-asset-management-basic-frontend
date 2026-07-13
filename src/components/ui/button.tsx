@@ -7,25 +7,25 @@ import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
 const buttonVariants = cva(
-    "ea-focus inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors disabled:pointer-events-none disabled:opacity-50",
+    "ea-focus inline-flex items-center justify-center whitespace-nowrap rounded-control text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50",
     {
         variants: {
             variant: {
-                default: "bg-slate-900 text-white hover:bg-slate-800",
+                default: "bg-brand text-brand-contrast hover:bg-brand-strong",
                 destructive:
-                    "bg-red-500 text-white hover:bg-red-600",
+                    "bg-danger text-white hover:opacity-90",
                 outline:
-                    "border border-slate-300 bg-white hover:bg-slate-100 hover:text-slate-900",
+                    "border border-edge bg-surface text-foreground hover:bg-surface-sunken",
                 secondary:
-                    "bg-slate-200 text-slate-900 hover:bg-slate-300",
-                ghost: "hover:bg-slate-100 hover:text-slate-900",
-                link: "text-teal-700 underline-offset-4 hover:underline",
+                    "bg-surface-sunken text-foreground hover:bg-edge-subtle",
+                ghost: "text-muted-fg hover:bg-surface-sunken hover:text-foreground",
+                link: "text-brand underline-offset-4 hover:underline",
             },
             size: {
-                default: "h-10 px-4 py-2",
-                sm: "h-9 rounded-md px-3",
-                lg: "h-11 rounded-md px-8",
-                icon: "h-10 w-10",
+                default: "h-9 px-4",
+                sm: "h-8 px-3 text-[13px]",
+                lg: "h-10 px-6",
+                icon: "h-9 w-9",
             },
         },
         defaultVariants: {
