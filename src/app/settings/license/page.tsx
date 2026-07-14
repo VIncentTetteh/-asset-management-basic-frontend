@@ -1,18 +1,11 @@
 "use client";
 
-/**
- * License Management Page — standalone mode only
- * Route: /settings/license
- *
- * Shows: current plan, expiry, usage vs limits, and key re-entry field.
- * In cloud mode this page redirects to /settings (not applicable).
- */
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLicenseStatus } from "@/contexts/LicenseContext";
 import { Shield, Key, RefreshCw, CheckCircle, AlertTriangle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import api from "@/lib/axios";
 import toast from "react-hot-toast";
 
@@ -60,12 +53,12 @@ export default function LicensePage() {
     };
 
     const statusColor = {
-        valid:        "text-emerald-600 bg-emerald-50 border-emerald-200",
-        grace_period: "text-amber-600  bg-amber-50  border-amber-200",
-        expired:      "text-red-600    bg-red-50    border-red-200",
-        revoked:      "text-red-600    bg-red-50    border-red-200",
-        error:        "text-gray-600   bg-gray-50   border-gray-200",
-    }[status.status ?? "error"] ?? "text-gray-600 bg-gray-50 border-gray-200";
+        valid:        "text-ok bg-ok-soft border-ok/40",
+        grace_period: "text-warn bg-warn-soft border-warn/40",
+        expired:      "text-danger bg-danger-soft border-danger/40",
+        revoked:      "text-danger bg-danger-soft border-danger/40",
+        error:        "text-muted-fg bg-surface-muted border-edge-subtle",
+    }[status.status ?? "error"] ?? "text-muted-fg bg-surface-muted border-edge-subtle";
 
     const StatusIcon = {
         valid:        CheckCircle,
@@ -76,46 +69,39 @@ export default function LicensePage() {
     }[status.status ?? "error"] ?? AlertTriangle;
 
     return (
-        <div className="max-w-3xl mx-auto px-6 py-8 space-y-8">
-            {/* Header */}
+        <div className="mx-auto max-w-3xl space-y-8 px-6 py-8">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Shield className="h-6 w-6 text-teal-600" />
-                    <div>
-                        <h1 className="text-xl font-bold text-slate-900">License Management</h1>
-                        <p className="text-sm text-slate-500">Manage your AssetIQ standalone license key</p>
-                    </div>
+                    <Shield className="h-6 w-6 text-brand" />
+                    <PageHeader title="License Management" subtitle="Manage your AssetIQ standalone license key" />
                 </div>
                 <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-                    <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+                    <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                     Refresh
                 </Button>
             </div>
 
-            {/* Status card */}
-            <div className={`rounded-xl border px-6 py-5 flex items-start gap-4 ${statusColor}`}>
-                <StatusIcon className="h-5 w-5 mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold capitalize">
-                            {(status.status ?? "unknown").replace("_", " ")}
-                        </span>
+            <div className={`flex items-start gap-4 rounded-panel border px-6 py-5 ${statusColor}`}>
+                <StatusIcon className="mt-0.5 h-5 w-5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold capitalize">{(status.status ?? "unknown").replace("_", " ")}</span>
                         {status.plan && (
-                            <span className="text-xs font-bold uppercase tracking-wide bg-white/60 border border-current/20 rounded-full px-2 py-0.5">
+                            <span className="rounded-full border border-current/20 bg-surface/60 px-2 py-0.5 text-xs font-bold uppercase tracking-wide">
                                 {status.plan}
                             </span>
                         )}
                     </div>
-                    <p className="text-sm mt-1 opacity-80">
-                        {status.message || (status.status === "valid"
-                            ? `License valid — ${status.daysRemaining} day${status.daysRemaining === 1 ? "" : "s"} remaining`
-                            : "")}
+                    <p className="mt-1 text-sm opacity-80">
+                        {status.message ||
+                            (status.status === "valid"
+                                ? `License valid — ${status.daysRemaining} day${status.daysRemaining === 1 ? "" : "s"} remaining`
+                                : "")}
                     </p>
                     {status.expiresAt && (
-                        <p className="text-xs mt-1 opacity-60">
-                            Expires: {new Date(status.expiresAt).toLocaleDateString("en-GB", {
-                                day: "numeric", month: "long", year: "numeric"
-                            })}
+                        <p className="mt-1 text-xs opacity-60">
+                            Expires:{" "}
+                            {new Date(status.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
                         </p>
                     )}
                 </div>
@@ -131,15 +117,14 @@ export default function LicensePage() {
                 )}
             </div>
 
-            {/* Plan limits */}
             {status.limits && Object.keys(status.limits).length > 0 && (
                 <div>
-                    <h2 className="text-sm font-semibold text-slate-700 mb-3">Plan Limits</h2>
+                    <h2 className="mb-3 text-sm font-semibold text-foreground">Plan Limits</h2>
                     <div className="grid grid-cols-3 gap-4">
                         {Object.entries(status.limits).map(([key, val]) => (
-                            <div key={key} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                                <p className="text-xs text-slate-500 capitalize">{key}</p>
-                                <p className="text-2xl font-bold text-slate-800 mt-1">
+                            <div key={key} className="rounded-card border border-edge-subtle bg-surface px-4 py-3">
+                                <p className="text-xs capitalize text-faint-fg">{key}</p>
+                                <p className="data-mono mt-1 text-2xl font-bold text-foreground">
                                     {val === -1 ? "∞" : val?.toLocaleString()}
                                 </p>
                             </div>
@@ -148,15 +133,14 @@ export default function LicensePage() {
                 </div>
             )}
 
-            {/* Features */}
             {status.features && Object.keys(status.features).length > 0 && (
                 <div>
-                    <h2 className="text-sm font-semibold text-slate-700 mb-3">Plan Features</h2>
+                    <h2 className="mb-3 text-sm font-semibold text-foreground">Plan Features</h2>
                     <div className="grid grid-cols-2 gap-2">
                         {Object.entries(status.features).map(([key, val]) => (
                             <div key={key} className="flex items-center gap-2 text-sm">
-                                <CheckCircle className={`h-4 w-4 ${val ? "text-emerald-500" : "text-slate-300"}`} />
-                                <span className={`capitalize ${val ? "text-slate-700" : "text-slate-400 line-through"}`}>
+                                <CheckCircle className={`h-4 w-4 ${val ? "text-ok" : "text-faint-fg"}`} />
+                                <span className={val ? "capitalize text-muted-fg" : "capitalize text-faint-fg line-through"}>
                                     {key.replace(/([A-Z])/g, " $1").trim()}
                                     {typeof val === "string" ? `: ${val}` : ""}
                                     {typeof val === "number" && val > 0 ? `: ${val} days` : ""}
@@ -167,44 +151,35 @@ export default function LicensePage() {
                 </div>
             )}
 
-            {/* Key re-entry */}
             <div>
-                <h2 className="text-sm font-semibold text-slate-700 mb-1">Activate New Key</h2>
-                <p className="text-xs text-slate-500 mb-3">
+                <h2 className="mb-1 text-sm font-semibold text-foreground">Activate New Key</h2>
+                <p className="mb-3 text-xs text-muted-fg">
                     After renewing at{" "}
-                    <a href="https://portal.assetiq.io" target="_blank" rel="noopener noreferrer"
-                       className="text-teal-600 underline underline-offset-2">
+                    <a href="https://portal.assetiq.io" target="_blank" rel="noopener noreferrer" className="text-brand underline underline-offset-2">
                         portal.assetiq.io
                     </a>
                     , paste your new license key below.
                 </p>
                 <div className="flex gap-2">
                     <div className="relative flex-1">
-                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Key className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint-fg" />
                         <input
                             type="text"
                             value={newKey}
                             onChange={(e) => setNewKey(e.target.value)}
                             placeholder="ASIQ-XXXX-XXXX-XXXX-XXXX-XXXX"
-                            className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-lg
-                                       font-mono focus:outline-none focus:ring-2 focus:ring-teal-500"
+                            className="ea-focus data-mono w-full rounded-control border border-edge bg-surface py-2.5 pl-9 pr-4 text-sm text-foreground"
                         />
                     </div>
-                    <Button
-                        onClick={handleActivate}
-                        disabled={activating || !newKey.trim()}
-                        className="bg-teal-600 hover:bg-teal-700 text-white"
-                    >
-                        {activating ? "Activating…" : "Activate"}
+                    <Button onClick={handleActivate} disabled={activating || !newKey.trim()} isLoading={activating}>
+                        Activate
                     </Button>
                 </div>
             </div>
 
-            {/* Last validation info */}
             {status.lastRemoteValidationAt && (
-                <p className="text-xs text-slate-400">
-                    Last verified with license server:{" "}
-                    {new Date(status.lastRemoteValidationAt).toLocaleString()}
+                <p className="text-xs text-faint-fg">
+                    Last verified with license server: {new Date(status.lastRemoteValidationAt).toLocaleString()}
                 </p>
             )}
         </div>

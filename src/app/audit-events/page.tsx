@@ -141,7 +141,7 @@ export default function AuditEventsPage() {
                 title="Audit Events"
                 subtitle="Compliance-grade API event stream with actor and request tracing."
                 actions={<>
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                    <div className="rounded-control border border-ok/40 bg-ok-soft px-3 py-2 text-sm text-ok">
                         Success Rate: <span className="font-semibold">{successRate}%</span>
                     </div>
                     <Button variant="outline" onClick={() => fetchEvents(filters)} className="gap-2">
@@ -150,10 +150,10 @@ export default function AuditEventsPage() {
                 </>}
             />
 
-            <Card className="border-slate-200">
+            <Card>
                 <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <Filter className="h-4 w-4 text-slate-500" /> Filter Events
+                    <CardTitle className="flex items-center gap-2 text-base">
+                        <Filter className="h-4 w-4 text-faint-fg" /> Filter Events
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-5">
@@ -194,33 +194,33 @@ export default function AuditEventsPage() {
                         <Label>End (UTC)</Label>
                         <Input type="datetime-local" value={filters.end || ""} onChange={(e) => setFilters((prev) => ({ ...prev, end: e.target.value || undefined }))} />
                     </div>
-                    <div className="md:col-span-5 flex justify-end gap-2">
+                    <div className="flex justify-end gap-2 md:col-span-5">
                         <Button variant="outline" onClick={onResetFilters}>Reset</Button>
-                        <Button onClick={onApplyFilters} className="bg-slate-900 hover:bg-black">Apply Filters</Button>
+                        <Button onClick={onApplyFilters}>Apply Filters</Button>
                     </div>
                 </CardContent>
             </Card>
 
-            <Card className="border-slate-200">
+            <Card>
                 <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <Activity className="h-4 w-4 text-slate-500" /> Event Timeline
+                    <CardTitle className="flex items-center gap-2 text-base">
+                        <Activity className="h-4 w-4 text-faint-fg" /> Event Timeline
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                     {isLoading ? (
-                        <div className="h-40 flex items-center justify-center text-slate-500">Loading events...</div>
+                        <div className="flex h-40 items-center justify-center text-muted-fg">Loading events...</div>
                     ) : events.length === 0 ? (
-                        <div className="h-40 flex flex-col items-center justify-center text-center px-6">
-                            <ShieldCheck className="h-8 w-8 text-slate-300 mb-2" />
-                            <p className="font-medium text-slate-900">No events match your filter</p>
-                            <p className="text-sm text-slate-500">Try broadening your criteria.</p>
+                        <div className="flex h-40 flex-col items-center justify-center px-6 text-center">
+                            <ShieldCheck className="mb-2 h-8 w-8 text-faint-fg" />
+                            <p className="font-medium text-foreground">No events match your filter</p>
+                            <p className="text-sm text-muted-fg">Try broadening your criteria.</p>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
-                                <thead className="bg-slate-50 border-y border-slate-200">
-                                    <tr className="text-left text-slate-600 font-medium">
+                                <thead className="border-y border-edge-subtle bg-surface-muted">
+                                    <tr className="text-left font-medium text-muted-fg">
                                         <th className="p-3">Event</th>
                                         <th className="p-3">Actor</th>
                                         <th className="p-3">Time</th>
@@ -230,26 +230,26 @@ export default function AuditEventsPage() {
                                 </thead>
                                 <tbody>
                                     {events.map((event) => (
-                                        <tr key={event.id} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors cursor-pointer group" onClick={() => openDetails(event.id)}>
+                                        <tr key={event.id} className="group cursor-pointer border-b border-edge-subtle transition-colors hover:bg-surface-muted/60" onClick={() => openDetails(event.id)}>
                                             <td className="p-3">
-                                                <div className="font-semibold text-slate-900">{getFriendlyAuditAction(event)}</div>
-                                                <div className="text-[10px] font-mono text-slate-400 mt-0.5">{event.method} {event.path}</div>
+                                                <div className="font-semibold text-foreground">{getFriendlyAuditAction(event)}</div>
+                                                <div className="data-mono mt-0.5 text-[10px] text-faint-fg">{event.method} {event.path}</div>
                                             </td>
                                             <td className="p-3">
-                                                <div className="text-slate-700">{event.actorEmail || "System"}</div>
-                                                <div className="text-[10px] text-slate-400">{event.clientIp || "Internal"}</div>
+                                                <div className="text-muted-fg">{event.actorEmail || "System"}</div>
+                                                <div className="text-[10px] text-faint-fg">{event.clientIp || "Internal"}</div>
                                             </td>
                                             <td className="p-3">
-                                                <div className="text-slate-600 whitespace-nowrap">{formatRelativeTime(event.createdAt)}</div>
-                                                <div className="text-[10px] text-slate-400">{new Date(event.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                <div className="whitespace-nowrap text-muted-fg">{formatRelativeTime(event.createdAt)}</div>
+                                                <div className="text-[10px] text-faint-fg">{new Date(event.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                             </td>
                                             <td className="p-3">
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${event.success ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-red-50 text-red-700 border-red-100"}`}>
+                                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${event.success ? "border-ok/30 bg-ok-soft text-ok" : "border-danger/30 bg-danger-soft text-danger"}`}>
                                                     {event.responseStatus}
                                                 </span>
                                             </td>
                                             <td className="p-3 text-right">
-                                                <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button variant="ghost" size="sm" className="opacity-0 transition-opacity group-hover:opacity-100">
                                                     Details
                                                 </Button>
                                             </td>
@@ -270,10 +270,10 @@ export default function AuditEventsPage() {
             >
                 {selectedEvent && (
                     <div className="space-y-4">
-                        <div className="bg-slate-900 text-white rounded-xl p-4 shadow-sm border border-slate-800">
-                            <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Activity</div>
+                        <div className="rounded-panel border border-slate-800 bg-slate-900 p-4 text-white shadow-sm">
+                            <div className="mb-1 text-xs font-medium uppercase tracking-wider text-slate-400">Activity</div>
                             <div className="text-lg font-bold">{getFriendlyAuditAction(selectedEvent)}</div>
-                            <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
+                            <div className="mt-2 flex items-center gap-3 text-xs text-slate-400">
                                 <span className={selectedEvent.success ? "text-emerald-400" : "text-red-400"}>
                                     Status: {selectedEvent.responseStatus}
                                 </span>
@@ -284,36 +284,36 @@ export default function AuditEventsPage() {
 
                         <div className="grid grid-cols-2 gap-4 text-sm">
                             <div className="space-y-1">
-                                <span className="text-xs font-medium text-slate-500 uppercase">Actor Info</span>
-                                <p className="text-slate-900 font-medium">{selectedEvent.actorEmail || "System"}</p>
-                                <p className="text-xs text-slate-500">IP: {selectedEvent.clientIp || "N/A"}</p>
+                                <span className="text-xs font-medium uppercase text-faint-fg">Actor Info</span>
+                                <p className="font-medium text-foreground">{selectedEvent.actorEmail || "System"}</p>
+                                <p className="text-xs text-faint-fg">IP: {selectedEvent.clientIp || "N/A"}</p>
                             </div>
                             <div className="space-y-1">
-                                <span className="text-xs font-medium text-slate-500 uppercase">Technical Context</span>
-                                <p className="text-slate-900 font-medium">{selectedEvent.handler || "N/A"}</p>
-                                <p className="text-xs text-slate-500">Method: {selectedEvent.method}</p>
+                                <span className="text-xs font-medium uppercase text-faint-fg">Technical Context</span>
+                                <p className="font-medium text-foreground">{selectedEvent.handler || "N/A"}</p>
+                                <p className="text-xs text-faint-fg">Method: {selectedEvent.method}</p>
                             </div>
                         </div>
 
-                        <div className="space-y-2 pt-2 border-t border-slate-100">
-                            <Label className="text-xs font-medium text-slate-500 uppercase">API Path</Label>
-                            <div className="rounded-lg border bg-slate-50 p-2 font-mono text-[10px] break-all text-slate-600">
+                        <div className="space-y-2 border-t border-edge-subtle pt-2">
+                            <Label className="text-xs font-medium uppercase text-faint-fg">API Path</Label>
+                            <div className="data-mono break-all rounded-card border border-edge-subtle bg-surface-muted p-2 text-[10px] text-muted-fg">
                                 {selectedEvent.path}
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                        <div className="grid grid-cols-2 gap-4 border-t border-edge-subtle pt-2">
                             <div className="space-y-1">
-                                <span className="text-xs font-medium text-slate-500">Request ID</span>
-                                <p className="font-mono text-[10px] break-all text-slate-500">{selectedEvent.requestId || "N/A"}</p>
+                                <span className="text-xs font-medium text-faint-fg">Request ID</span>
+                                <p className="data-mono break-all text-[10px] text-faint-fg">{selectedEvent.requestId || "N/A"}</p>
                             </div>
                             <div className="space-y-1">
-                                <span className="text-xs font-medium text-slate-500">Event ID</span>
-                                <p className="font-mono text-[10px] break-all text-slate-500">{selectedEvent.id}</p>
+                                <span className="text-xs font-medium text-faint-fg">Event ID</span>
+                                <p className="data-mono break-all text-[10px] text-faint-fg">{selectedEvent.id}</p>
                             </div>
                         </div>
 
-                        <div className="pt-2 flex justify-end">
+                        <div className="flex justify-end pt-2">
                             <Button variant="outline" onClick={() => setSelectedEvent(null)} className="w-full sm:w-auto">Close</Button>
                         </div>
                     </div>

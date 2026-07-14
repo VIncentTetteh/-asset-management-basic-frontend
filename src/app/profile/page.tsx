@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
+import { PageHeader } from "@/components/ui/page-header";
 import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { useForm } from "react-hook-form";
@@ -170,7 +171,7 @@ export default function ProfilePage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex h-full items-center justify-center">
                 <PageSpinner />
             </div>
         );
@@ -178,92 +179,85 @@ export default function ProfilePage() {
 
     if (!user) {
         return (
-            <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-                <UserCircle className="h-16 w-16 text-slate-300" />
-                <h2 className="text-xl font-semibold text-slate-700">Profile Not Found</h2>
-                <p className="text-slate-500">Please ensure you are logged in correctly.</p>
+            <div className="flex h-full flex-col items-center justify-center space-y-4 text-center">
+                <UserCircle className="h-16 w-16 text-faint-fg" />
+                <h2 className="text-xl font-semibold text-foreground">Profile Not Found</h2>
+                <p className="text-muted-fg">Please ensure you are logged in correctly.</p>
             </div>
         );
     }
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">My Profile</h1>
-                    <p className="text-slate-500">Manage your personal information and account preferences.</p>
-                </div>
-            </div>
+        <div className="mx-auto max-w-4xl space-y-6">
+            <PageHeader title="My Profile" subtitle="Manage your personal information and account preferences." />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Profile Overview Card */}
-                <Card className="md:col-span-1 h-fit shadow-sm border-slate-200">
-                    <CardHeader className="text-center pb-2">
-                        <div className="mx-auto bg-gradient-to-tr from-indigo-500 to-purple-400 w-24 h-24 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-md ring-4 ring-white mb-4">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                <Card className="h-fit shadow-sm md:col-span-1">
+                    <CardHeader className="pb-2 text-center">
+                        <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-tr from-brand to-purple-400 text-3xl font-bold text-white shadow-md ring-4 ring-[var(--surface)]">
                             {user.firstName[0]}{user.lastName[0]}
                         </div>
                         <CardTitle className="text-xl">{user.firstName} {user.lastName}</CardTitle>
-                        <CardDescription className="text-indigo-600 font-medium">{user.jobTitle || "Employee"}</CardDescription>
+                        <CardDescription className="font-medium text-brand">{user.jobTitle || "Employee"}</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4 pt-4 border-t border-slate-100">
-                        <div className="flex items-center gap-3 text-sm text-slate-600">
-                            <Mail className="h-4 w-4 text-slate-400 shrink-0" />
+                    <CardContent className="space-y-4 border-t border-edge-subtle pt-4">
+                        <div className="flex items-center gap-3 text-sm text-muted-fg">
+                            <Mail className="h-4 w-4 shrink-0 text-faint-fg" />
                             <span className="truncate">{user.email}</span>
                         </div>
                         {user.phone && (
-                            <div className="flex items-center gap-3 text-sm text-slate-600">
-                                <Phone className="h-4 w-4 text-slate-400 shrink-0" />
+                            <div className="flex items-center gap-3 text-sm text-muted-fg">
+                                <Phone className="h-4 w-4 shrink-0 text-faint-fg" />
                                 <span>{user.phone}</span>
                             </div>
                         )}
-                        <div className="flex items-center gap-3 text-sm text-slate-600">
-                            <Building className="h-4 w-4 text-slate-400 shrink-0" />
+                        <div className="flex items-center gap-3 text-sm text-muted-fg">
+                            <Building className="h-4 w-4 shrink-0 text-faint-fg" />
                             <span>{organisatonName}</span>
                         </div>
                         {(departmentName || user.departmentId) && (
-                            <div className="flex items-center gap-3 text-sm text-slate-600">
-                                <Briefcase className="h-4 w-4 text-slate-400 shrink-0" />
+                            <div className="flex items-center gap-3 text-sm text-muted-fg">
+                                <Briefcase className="h-4 w-4 shrink-0 text-faint-fg" />
                                 <span>{departmentName || "Department not found"}</span>
                             </div>
                         )}
-                        <div className="flex items-center gap-3 text-sm text-indigo-700 bg-indigo-50 p-2 rounded-md font-medium border border-indigo-100 mt-2">
-                            <Shield className="h-4 w-4 text-indigo-500 shrink-0" />
+                        <div className="mt-2 flex items-center gap-3 rounded-control border border-brand/20 bg-brand-soft p-2 text-sm font-medium text-brand">
+                            <Shield className="h-4 w-4 shrink-0" />
                             <span>{roleName || "No role assigned"}</span>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Edit Form Card */}
-                <Card className="md:col-span-2 shadow-sm border-slate-200">
+                <Card className="shadow-sm md:col-span-2">
                     <CardHeader>
                         <CardTitle>Personal Information</CardTitle>
                         <CardDescription>Update your contact details and job title.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="firstName">First Name <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="firstName">First Name <span className="text-danger">*</span></Label>
                                     <Input
                                         id="firstName"
                                         {...register("firstName", { required: "First name is required" })}
-                                        className={errors.firstName ? "border-red-500 ring-red-500" : ""}
+                                        className={errors.firstName ? "border-danger ring-danger" : ""}
                                     />
-                                    {errors.firstName && <p className="text-sm text-red-500">{errors.firstName.message as string}</p>}
+                                    {errors.firstName && <p className="text-sm text-danger">{errors.firstName.message as string}</p>}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="lastName">Last Name <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="lastName">Last Name <span className="text-danger">*</span></Label>
                                     <Input
                                         id="lastName"
                                         {...register("lastName", { required: "Last name is required" })}
-                                        className={errors.lastName ? "border-red-500 ring-red-500" : ""}
+                                        className={errors.lastName ? "border-danger ring-danger" : ""}
                                     />
-                                    {errors.lastName && <p className="text-sm text-red-500">{errors.lastName.message as string}</p>}
+                                    {errors.lastName && <p className="text-sm text-danger">{errors.lastName.message as string}</p>}
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="email">Email Address <span className="text-red-500">*</span></Label>
+                                <Label htmlFor="email">Email Address <span className="text-danger">*</span></Label>
                                 <Input
                                     id="email"
                                     type="email"
@@ -271,12 +265,12 @@ export default function ProfilePage() {
                                         required: "Email is required",
                                         pattern: { value: /^\S+@\S+$/i, message: "Invalid email format" }
                                     })}
-                                    className={errors.email ? "border-red-500 ring-red-500" : ""}
+                                    className={errors.email ? "border-danger ring-danger" : ""}
                                 />
-                                {errors.email && <p className="text-sm text-red-500">{errors.email.message as string}</p>}
+                                {errors.email && <p className="text-sm text-danger">{errors.email.message as string}</p>}
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label htmlFor="phone">Phone Number</Label>
                                     <Input
@@ -296,16 +290,16 @@ export default function ProfilePage() {
                                 </div>
                             </div>
 
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm text-slate-600">
-                                <h4 className="font-semibold text-slate-800 mb-1 flex items-center gap-2">
+                            <div className="rounded-card border border-edge-subtle bg-surface-muted p-4 text-sm text-muted-fg">
+                                <h4 className="mb-1 flex items-center gap-2 font-semibold text-foreground">
                                     <Shield className="h-4 w-4" /> Security & Access
                                 </h4>
                                 <p>To modify your organisation, department, or role permissions, please contact your system administrator. These fields are locked for security purposes.</p>
                             </div>
 
-                            <div className="flex justify-end pt-4 border-t border-slate-100">
-                                <Button type="submit" isLoading={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[140px]">
-                                    <Save className="h-4 w-4 mr-2" />
+                            <div className="flex justify-end border-t border-edge-subtle pt-4">
+                                <Button type="submit" isLoading={isSubmitting} className="min-w-[140px]">
+                                    <Save className="mr-2 h-4 w-4" />
                                     {isSubmitting ? "Saving..." : "Save Changes"}
                                 </Button>
                             </div>
@@ -314,11 +308,10 @@ export default function ProfilePage() {
                 </Card>
             </div>
 
-            {/* MFA Card */}
-            <Card className="shadow-sm border-slate-200">
+            <Card className="shadow-sm">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <ShieldCheck className="h-5 w-5 text-indigo-500" />
+                        <ShieldCheck className="h-5 w-5 text-brand" />
                         Two-Factor Authentication
                     </CardTitle>
                     <CardDescription>
@@ -327,44 +320,40 @@ export default function ProfilePage() {
                 </CardHeader>
                 <CardContent>
                     {mfaEnabled ? (
-                        <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                        <div className="flex items-center justify-between rounded-card border border-ok/40 bg-ok-soft p-4">
                             <div className="flex items-center gap-3">
-                                <ShieldCheck className="h-6 w-6 text-emerald-600" />
+                                <ShieldCheck className="h-6 w-6 text-ok" />
                                 <div>
-                                    <p className="font-semibold text-emerald-800">MFA is enabled</p>
-                                    <p className="text-sm text-emerald-600">Your account is protected with two-factor authentication.</p>
+                                    <p className="font-semibold text-ok">MFA is enabled</p>
+                                    <p className="text-sm text-ok/80">Your account is protected with two-factor authentication.</p>
                                 </div>
                             </div>
                             <Button
                                 variant="outline"
                                 onClick={() => { setIsDisableMfaModalOpen(true); setDisableMfaCode(""); }}
-                                className="border-red-200 text-red-600 hover:bg-red-50"
+                                className="border-danger/40 text-danger hover:bg-danger-soft"
                             >
-                                <ShieldOff className="h-4 w-4 mr-2" />
+                                <ShieldOff className="mr-2 h-4 w-4" />
                                 Disable MFA
                             </Button>
                         </div>
                     ) : mfaSetupStep === "idle" ? (
-                        <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                        <div className="flex items-center justify-between rounded-card border border-edge-subtle bg-surface-muted p-4">
                             <div className="flex items-center gap-3">
-                                <Shield className="h-6 w-6 text-slate-400" />
+                                <Shield className="h-6 w-6 text-faint-fg" />
                                 <div>
-                                    <p className="font-semibold text-slate-700">MFA is not enabled</p>
-                                    <p className="text-sm text-slate-500">Enable MFA to secure your account with a TOTP code.</p>
+                                    <p className="font-semibold text-foreground">MFA is not enabled</p>
+                                    <p className="text-sm text-muted-fg">Enable MFA to secure your account with a TOTP code.</p>
                                 </div>
                             </div>
-                            <Button
-                                onClick={handleStartMfaSetup}
-                                isLoading={isMfaLoading}
-                                className="bg-indigo-600 hover:bg-indigo-700"
-                            >
-                                <ShieldCheck className="h-4 w-4 mr-2" />
+                            <Button onClick={handleStartMfaSetup} isLoading={isMfaLoading}>
+                                <ShieldCheck className="mr-2 h-4 w-4" />
                                 Enable MFA
                             </Button>
                         </div>
                     ) : (
                         <div className="space-y-6">
-                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+                            <div className="rounded-card border border-info/40 bg-info-soft p-4 text-sm text-info">
                                 Scan the QR code below with your authenticator app, then enter the 6-digit code to confirm.
                             </div>
                             {mfaSetupData && (
@@ -372,11 +361,11 @@ export default function ProfilePage() {
                                     <img
                                         src={mfaSetupData.qrCodeImage}
                                         alt="MFA QR Code"
-                                        className="w-48 h-48 border border-slate-200 rounded-lg"
+                                        className="h-48 w-48 rounded-card border border-edge-subtle"
                                     />
                                     <div className="text-center">
-                                        <p className="text-xs text-slate-500 mb-1">Manual entry key:</p>
-                                        <code className="text-sm font-mono bg-slate-100 px-3 py-1 rounded-md border border-slate-200 tracking-widest">
+                                        <p className="mb-1 text-xs text-faint-fg">Manual entry key:</p>
+                                        <code className="data-mono rounded-control border border-edge-subtle bg-surface-muted px-3 py-1 text-sm tracking-widest text-foreground">
                                             {mfaSetupData.secret}
                                         </code>
                                     </div>
@@ -391,9 +380,9 @@ export default function ProfilePage() {
                                         maxLength={6}
                                         value={mfaCode}
                                         onChange={e => setMfaCode(e.target.value.replace(/\D/g, ""))}
-                                        className="max-w-[160px] text-center text-lg tracking-widest font-mono"
+                                        className="data-mono max-w-[160px] text-center text-lg tracking-widest"
                                     />
-                                    <Button onClick={handleVerifyMfa} isLoading={isMfaLoading} className="bg-indigo-600 hover:bg-indigo-700">
+                                    <Button onClick={handleVerifyMfa} isLoading={isMfaLoading}>
                                         Verify & Enable
                                     </Button>
                                     <Button variant="outline" onClick={() => { setMfaSetupStep("idle"); setMfaSetupData(null); setMfaCode(""); }}>
@@ -406,7 +395,6 @@ export default function ProfilePage() {
                 </CardContent>
             </Card>
 
-            {/* Disable MFA Modal */}
             <Modal
                 isOpen={isDisableMfaModalOpen}
                 onClose={() => setIsDisableMfaModalOpen(false)}
@@ -414,7 +402,7 @@ export default function ProfilePage() {
                 description="Enter your current TOTP code to confirm disabling MFA."
             >
                 <div className="space-y-4">
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                    <div className="rounded-card border border-warn/40 bg-warn-soft p-3 text-sm text-warn">
                         Disabling MFA will reduce your account security. Make sure this is intentional.
                     </div>
                     <div className="space-y-2">
@@ -425,15 +413,15 @@ export default function ProfilePage() {
                             maxLength={6}
                             value={disableMfaCode}
                             onChange={e => setDisableMfaCode(e.target.value.replace(/\D/g, ""))}
-                            className="max-w-[160px] text-center text-lg tracking-widest font-mono"
+                            className="data-mono max-w-[160px] text-center text-lg tracking-widest"
                         />
                     </div>
-                    <div className="flex justify-end gap-2 pt-2 border-t">
+                    <div className="flex justify-end gap-2 border-t border-edge-subtle pt-2">
                         <Button variant="outline" onClick={() => setIsDisableMfaModalOpen(false)}>Cancel</Button>
                         <Button
                             isLoading={isMfaLoading}
                             onClick={handleDisableMfa}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-danger text-white hover:bg-danger/90"
                         >
                             Disable MFA
                         </Button>

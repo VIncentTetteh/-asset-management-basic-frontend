@@ -1,290 +1,242 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Category, CategoryDto } from "@/types";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
+import { Plus, Pencil, Trash2, Tags, Search } from "lucide-react";
+import type { Category, CategoryDto } from "@/types";
 import { categoryService } from "@/services/categoryService";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { makeCrudHooks } from "@/features/shared/crudHooks";
+import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
+import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
 import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { PageSpinner } from "@/components/ui/spinner";
-import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, Tags, Shield, Clock } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { Textarea } from "@/components/ui/textarea";
 import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
 
+const categories = makeCrudHooks<Category, CategoryDto>("categories", categoryService, { entity: "Category" });
 
 export default function CategoriesPage() {
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [deletingId, setDeletingId] = useState<string | null>(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-    const { confirm, ConfirmDialog } = useConfirm();
+  const { data: rows = [], isLoading } = categories.useList();
+  const save = categories.useSave();
+  const remove = categories.useDelete();
+  const { confirm, ConfirmDialog } = useConfirm();
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CategoryDto>();
+  const [search, setSearch] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Category | null>(null);
 
-    const fetchCategories = async () => {
-        try {
-            setIsLoading(true);
-            const data = await categoryService.getAll();
-            setCategories(data);
-        } catch (error) {
-            toast.error("Failed to load categories");
-            console.error(error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<CategoryDto>();
 
-    useEffect(() => {
-        fetchCategories();
-    }, []);
-
-    const handleOpenCreate = () => {
-        setEditingCategory(null);
-        reset({ name: "", description: "", assetPrefixCode: "", parentCategoryId: "", defaultWarrantyPeriodMonths: undefined });
-        setIsModalOpen(true);
-    };
-
-    const handleOpenEdit = (category: Category) => {
-        setEditingCategory(category);
-        reset({
-            name: category.name,
-            description: category.description || "",
-            assetPrefixCode: category.assetPrefixCode || "",
-            parentCategoryId: category.parentCategoryId || "",
-            depreciationPolicyId: category.depreciationPolicyId || "",
-            defaultWarrantyPeriodMonths: category.defaultWarrantyPeriodMonths,
-        });
-        setIsModalOpen(true);
-    };
-
-    const handleDelete = async (id: string) => {
-        if (!await confirm({ message: "Are you sure you want to delete this category?", variant: "danger" })) return;
-        setDeletingId(id);
-        try {
-            await categoryService.delete(id);
-            toast.success("Category deleted");
-            fetchCategories();
-        } catch (error) {
-            toast.error("Failed to delete category");
-            console.error(error);
-        } finally {
-            setDeletingId(null);
-        }
-    };
-
-    const onSubmit = async (data: CategoryDto) => {
-        const isDuplicate = categories.some(
-            cat => cat.name.toLowerCase() === data.name.toLowerCase() && cat.id !== editingCategory?.id
-        );
-
-        if (isDuplicate) {
-            toast.error(`Category "${data.name}" already exists.`);
-            return;
-        }
-
-        // Clean up payload
-        if (!data.description) delete data.description;
-        if (!data.parentCategoryId) delete data.parentCategoryId;
-        if (!data.depreciationPolicyId) delete data.depreciationPolicyId;
-        if (!data.assetPrefixCode) delete data.assetPrefixCode;
-        if (data.defaultWarrantyPeriodMonths) {
-            data.defaultWarrantyPeriodMonths = Number(data.defaultWarrantyPeriodMonths);
-        } else {
-            delete data.defaultWarrantyPeriodMonths;
-        }
-
-        try {
-            if (editingCategory) {
-                const patch = buildPatchPayload<CategoryDto>(editingCategory as unknown as Partial<CategoryDto>, data);
-                if (Object.keys(patch).length === 0) {
-                    toast("No changes to update");
-                    return;
-                }
-                await categoryService.update(editingCategory.id!, patch);
-                toast.success("Category updated");
-            } else {
-                await categoryService.create(data);
-                toast.success("Category created");
-            }
-            setIsModalOpen(false);
-            fetchCategories();
-        } catch (error) {
-            toast.error("Failed to save category");
-            console.error(error);
-        }
-    };
-
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Categories</h1>
-                    <p className="text-slate-500">Organize and classify your assets.</p>
-                </div>
-                <Button onClick={handleOpenCreate} className="bg-orange-600 hover:bg-orange-700">
-                    <Plus className="mr-2 h-4 w-4" /> Add Category
-                </Button>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {isLoading ? (
-                    <div className="col-span-full h-64 flex items-center justify-center">
-                        <PageSpinner />
-                    </div>
-                ) : categories.length === 0 ? (
-                    <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
-                        <Tags className="h-12 w-12 text-slate-300 mb-4" />
-                        <h3 className="text-lg font-medium text-slate-900">No categories found</h3>
-                        <p className="text-slate-500 mt-1 max-w-sm">Create categories to better classify your asset portfolio.</p>
-                        <Button onClick={handleOpenCreate} className="mt-6 border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:border-orange-300">
-                            Add Category
-                        </Button>
-                    </div>
-                ) : (
-                    categories.map((category) => (
-                        <Card key={category.id} className="overflow-hidden hover:shadow-md transition-all flex flex-col h-full border-slate-200">
-                            <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-3 bg-slate-50/50 border-b border-slate-100">
-                                <div className="p-2 bg-orange-100 text-orange-600 rounded-lg shrink-0">
-                                    <Tags className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <CardTitle className="text-base font-semibold text-slate-900 truncate" title={category.name}>
-                                        {category.name}
-                                    </CardTitle>
-                                    {category.parentCategoryId && (
-                                        <span className="text-[10px] font-bold uppercase text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
-                                            Sub-category
-                                        </span>
-                                    )}
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-0 flex-1 flex flex-col">
-                                <div className="p-4 space-y-3 flex-1">
-                                    <div className="pt-2">
-                                        <p className="text-xs text-slate-500">
-                                            Prefix: <span className="font-mono font-bold text-slate-700">{category.assetPrefixCode || 'N/A'}</span>
-                                        </p>
-                                    </div>
-
-                                    {category.description ? (
-                                        <p className="text-sm text-slate-600 line-clamp-2" title={category.description}>
-                                            {category.description}
-                                        </p>
-                                    ) : (
-                                        <p className="text-xs text-slate-400 italic">No description provided.</p>
-                                    )}
-
-                                    {(category.defaultWarrantyPeriodMonths || category.depreciationPolicyId) && (
-                                        <div className="pt-3 border-t border-slate-100 space-y-2">
-                                            {category.defaultWarrantyPeriodMonths && (
-                                                <div className="flex items-center gap-2 text-sm text-slate-600">
-                                                    <Shield className="h-4 w-4 text-blue-400 shrink-0" />
-                                                    <span className="text-xs">Default Warranty:</span>
-                                                    <span className="font-semibold text-slate-800 text-xs">
-                                                        {category.defaultWarrantyPeriodMonths} months
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {category.depreciationPolicyId && (
-                                                <div className="flex items-center gap-2 text-sm text-slate-600">
-                                                    <Clock className="h-4 w-4 text-purple-400 shrink-0" />
-                                                    <span className="text-xs text-slate-500">Depreciation policy linked</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="p-4 bg-slate-50/50 mt-auto border-t border-slate-100 flex justify-end gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenEdit(category)} className="h-8">
-                                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(category.id!)} isLoading={deletingId === category.id} className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50">
-                                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))
-                )}
-            </div>
-
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingCategory ? "Edit Category" : "Create Category"}
-                description={editingCategory ? "Update the details of the category." : "Add a new asset category."}
-            >
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
-                    <div className="space-y-2">
-                        <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
-                        <Input
-                            id="name"
-                            placeholder="e.g. IT Equipment"
-                            {...register("name", { required: "Name is required" })}
-                        />
-                        {errors.name && <p className="text-sm text-red-500">{errors.name.message as string}</p>}
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="description">Description</Label>
-                        <textarea
-                            id="description"
-                            rows={3}
-                            placeholder="All computers, servers, and peripherals"
-                            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                            {...register("description")}
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="assetPrefixCode">Asset Prefix Code</Label>
-                        <Input
-                            id="assetPrefixCode"
-                            placeholder="e.g. LTP"
-                            maxLength={10}
-                            {...register("assetPrefixCode")}
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="defaultWarrantyPeriodMonths">Default Warranty (Months)</Label>
-                            <Input
-                                type="number"
-                                id="defaultWarrantyPeriodMonths"
-                                min="0"
-                                placeholder="24"
-                                {...register("defaultWarrantyPeriodMonths")}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="parentCategoryId">Parent Category</Label>
-                            <Select id="parentCategoryId" {...register("parentCategoryId")}>
-                                <option value="">None (Top Level)</option>
-                                {categories.filter(c => c.id !== editingCategory?.id).map((cat) => (
-                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                ))}
-                            </Select>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-4 border-t">
-                        <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" isLoading={isSubmitting} className="bg-orange-600 hover:bg-orange-700">
-                            {editingCategory ? "Save Changes" : "Create Category"}
-                        </Button>
-                    </div>
-                </form>
-        {ConfirmDialog}
-            </Modal>
-        </div>
+  useEffect(() => {
+    if (!isModalOpen) return;
+    reset(
+      editing
+        ? {
+            name: editing.name,
+            description: editing.description || "",
+            assetPrefixCode: editing.assetPrefixCode || "",
+            parentCategoryId: editing.parentCategoryId || "",
+            defaultWarrantyPeriodMonths: editing.defaultWarrantyPeriodMonths,
+          }
+        : { name: "", description: "", assetPrefixCode: "", parentCategoryId: "", defaultWarrantyPeriodMonths: undefined },
     );
+  }, [isModalOpen, editing, reset]);
+
+  const parentName = useMemo(() => {
+    const map = new Map(rows.map((c) => [c.id, c.name]));
+    return (id?: string | null) => (id ? map.get(id) ?? "—" : "—");
+  }, [rows]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return rows;
+    const q = search.toLowerCase();
+    return rows.filter((c) => c.name.toLowerCase().includes(q) || (c.assetPrefixCode || "").toLowerCase().includes(q));
+  }, [rows, search]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (cat: Category) => {
+    if (!(await confirm({ message: `Delete "${cat.name}"?`, variant: "danger" }))) return;
+    remove.mutate(cat.id!);
+  };
+
+  const onSubmit = async (data: CategoryDto) => {
+    const payload: CategoryDto = { ...data };
+    if (payload.defaultWarrantyPeriodMonths != null && String(payload.defaultWarrantyPeriodMonths) !== "") {
+      payload.defaultWarrantyPeriodMonths = Number(payload.defaultWarrantyPeriodMonths);
+    } else {
+      delete payload.defaultWarrantyPeriodMonths;
+    }
+    (Object.keys(payload) as (keyof CategoryDto)[]).forEach((k) => {
+      if (payload[k] === "") delete (payload as unknown as Record<string, unknown>)[k];
+    });
+
+    if (editing) {
+      const patch = buildPatchPayload<CategoryDto>(editing as unknown as Partial<CategoryDto>, payload);
+      if (Object.keys(patch).length === 0) {
+        toast("No changes to update");
+        return;
+      }
+      await save.mutateAsync({ id: editing.id, data: patch as CategoryDto });
+    } else {
+      await save.mutateAsync({ data: payload });
+    }
+    setIsModalOpen(false);
+  };
+
+  const columns = useMemo<ColumnDef<Category, unknown>[]>(
+    () => [
+      {
+        accessorKey: "name",
+        header: "Category",
+        cell: ({ row }) => (
+          <div className="min-w-0 max-w-56">
+            <p className="truncate font-semibold text-foreground">{row.original.name}</p>
+            {row.original.description ? (
+              <p className="truncate text-xs text-faint-fg">{row.original.description}</p>
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "assetPrefixCode",
+        header: "Prefix",
+        cell: ({ row }) =>
+          row.original.assetPrefixCode ? (
+            <span className="data-mono text-xs">{row.original.assetPrefixCode}</span>
+          ) : (
+            <span className="text-faint-fg">—</span>
+          ),
+      },
+      {
+        id: "parent",
+        header: "Parent",
+        enableSorting: false,
+        cell: ({ row }) => <span className="text-muted-fg">{parentName(row.original.parentCategoryId)}</span>,
+      },
+      {
+        accessorKey: "defaultWarrantyPeriodMonths",
+        header: () => <span className="block text-right">Warranty (mo)</span>,
+        cell: ({ row }) => (
+          <span className="data-mono block text-right">{row.original.defaultWarrantyPeriodMonths ?? "—"}</span>
+        ),
+      },
+      {
+        id: "actions",
+        header: "",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label="Edit category"
+              onClick={() => {
+                setEditing(row.original);
+                setIsModalOpen(true);
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-danger"
+              aria-label="Delete category"
+              onClick={() => handleDelete(row.original)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [parentName],
+  );
+
+  return (
+    <ListPageTemplate
+      title="Categories"
+      subtitle={isLoading ? "Loading categories…" : `${rows.length} asset categories`}
+      actions={
+        <Button onClick={openCreate}>
+          <Plus className="mr-2 h-4 w-4" /> New category
+        </Button>
+      }
+      toolbar={
+        <div className="relative w-full max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-faint-fg" />
+          <Input placeholder="Search name or prefix…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
+        </div>
+      }
+    >
+      <DataTable
+        columns={columns}
+        data={filtered}
+        isLoading={isLoading}
+        emptyTitle="No categories yet"
+        emptyDescription="Organise assets into categories with prefix codes and default warranty periods."
+        emptyAction={
+          <Button size="sm" onClick={openCreate}>
+            <Tags className="mr-1.5 h-4 w-4" /> New category
+          </Button>
+        }
+      />
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editing ? "Edit category" : "New category"}
+        description="Categories group assets and can nest under a parent category."
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="cat-name">Name <span className="text-danger">*</span></Label>
+            <Input id="cat-name" placeholder="Laptops" {...register("name", { required: "Name is required" })} />
+            {errors.name && <p className="text-sm text-danger">{errors.name.message as string}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="cat-prefix">Asset prefix code</Label>
+              <Input id="cat-prefix" className="data-mono" placeholder="LT" {...register("assetPrefixCode")} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cat-warranty">Default warranty (months)</Label>
+              <Input id="cat-warranty" type="number" min="0" {...register("defaultWarrantyPeriodMonths")} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cat-parent">Parent category</Label>
+            <Select id="cat-parent" {...register("parentCategoryId")}>
+              <option value="">None</option>
+              {rows.filter((c) => c.id !== editing?.id).map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cat-description">Description</Label>
+            <Textarea id="cat-description" {...register("description")} />
+          </div>
+          <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" isLoading={save.isPending}>
+              {editing ? "Save changes" : "Create category"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+      {ConfirmDialog}
+    </ListPageTemplate>
+  );
 }

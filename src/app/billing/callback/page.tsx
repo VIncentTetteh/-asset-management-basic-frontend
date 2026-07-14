@@ -39,34 +39,36 @@ export default function BillingCallbackPage() {
     }, [searchParams]);
 
     return (
-        <div className="min-h-[70vh] flex items-center justify-center p-6">
-            <Card className="w-full max-w-xl border-slate-200">
+        <div className="flex min-h-[70vh] items-center justify-center p-6">
+            <Card className="w-full max-w-xl">
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl">Billing Verification</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 text-center">
                     {state === "loading" && (
                         <div className="space-y-3">
-                            <Loader2 className="h-8 w-8 animate-spin mx-auto text-slate-500" />
-                            <p className="text-slate-600">Verifying your payment with Paystack...</p>
+                            <Loader2 className="mx-auto h-8 w-8 animate-spin text-faint-fg" />
+                            <p className="text-muted-fg">Verifying your payment with Paystack...</p>
                         </div>
                     )}
 
                     {state === "success" && subscription && (
                         <div className="space-y-3">
-                            <CheckCircle2 className="h-10 w-10 mx-auto text-emerald-600" />
-                            <p className="font-semibold text-slate-900">Subscription updated successfully</p>
-                            <p className="text-sm text-slate-600">Plan: {subscription.plan.name} ({subscription.plan.code})</p>
-                            <p className="text-sm text-slate-600">Status: {subscription.status}</p>
+                            <CheckCircle2 className="mx-auto h-10 w-10 text-ok" />
+                            <p className="font-semibold text-foreground">Subscription updated successfully</p>
+                            <p className="text-sm text-muted-fg">
+                                Plan: {subscription.plan.name} ({subscription.plan.code})
+                            </p>
+                            <p className="text-sm text-muted-fg">Status: {subscription.status}</p>
                             <Button onClick={() => router.push("/billing")}>Go to Billing</Button>
                         </div>
                     )}
 
                     {state === "error" && (
                         <div className="space-y-3">
-                            <XCircle className="h-10 w-10 mx-auto text-red-600" />
-                            <p className="font-semibold text-slate-900">Payment verification failed</p>
-                            <p className="text-sm text-slate-600">{errorMessage}</p>
+                            <XCircle className="mx-auto h-10 w-10 text-danger" />
+                            <p className="font-semibold text-foreground">Payment verification failed</p>
+                            <p className="text-sm text-muted-fg">{errorMessage}</p>
                             <div className="flex justify-center gap-2">
                                 <Button variant="outline" onClick={() => router.push("/billing")}>Back to Billing</Button>
                                 <Button onClick={() => router.push("/dashboard")}>Go to Dashboard</Button>
@@ -78,4 +80,3 @@ export default function BillingCallbackPage() {
         </div>
     );
 }
-

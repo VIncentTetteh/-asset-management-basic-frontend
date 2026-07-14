@@ -114,7 +114,7 @@ export default function BillingPage() {
     };
 
     if (loading) {
-        return <div className="h-72 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+        return <div className="flex h-72 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-faint-fg" /></div>;
     }
 
     return (
@@ -122,41 +122,41 @@ export default function BillingPage() {
             <PageHeader title="Billing & Subscription" subtitle="Manage plan, limits, and renewal settings for your organisation." />
 
             {subscription && (
-                <Card className="border-slate-200">
-                    <CardHeader className="border-b bg-slate-50/80">
+                <Card>
+                    <CardHeader className="border-b border-edge-subtle bg-surface-muted/80">
                         <CardTitle className="flex items-center gap-2 text-lg">
-                            <CreditCard className="h-4 w-4 text-teal-700" /> Current Subscription
+                            <CreditCard className="h-4 w-4 text-brand" /> Current Subscription
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-6 grid gap-4 md:grid-cols-3">
+                    <CardContent className="grid gap-4 p-6 md:grid-cols-3">
                         <div className="space-y-1">
-                            <p className="text-xs uppercase tracking-wide text-slate-500">Plan</p>
+                            <p className="text-xs uppercase tracking-wide text-faint-fg">Plan</p>
                             <div className="flex flex-wrap items-center gap-2">
-                                <p className="font-semibold text-slate-900">{subscription.plan.name} ({subscription.plan.code})</p>
-                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                <p className="font-semibold text-foreground">{subscription.plan.name} ({subscription.plan.code})</p>
+                                <span className="inline-flex items-center gap-1 rounded-full border border-ok/40 bg-ok-soft px-2 py-0.5 text-xs font-semibold text-ok">
                                     <CheckCircle2 className="h-3 w-3" /> Current package
                                 </span>
                             </div>
-                            <p className="text-sm text-slate-600">{formatMoneyMinor(subscription.plan.amountMinor, subscription.plan.currency)} / {subscription.plan.interval.toLowerCase()}</p>
-                            <p className="text-xs text-slate-500">Status: <span className="font-semibold">{subscription.status}</span></p>
+                            <p className="text-sm text-muted-fg">{formatMoneyMinor(subscription.plan.amountMinor, subscription.plan.currency)} / {subscription.plan.interval.toLowerCase()}</p>
+                            <p className="text-xs text-faint-fg">Status: <span className="font-semibold text-muted-fg">{subscription.status}</span></p>
                         </div>
                         <div className="space-y-2">
-                            <p className="text-xs uppercase tracking-wide text-slate-500">Usage</p>
-                            <p className="text-sm text-slate-700">Assets: {subscription.currentAssetCount} / {subscription.plan.maxAssets} ({assetUsage}%)</p>
-                            <p className="text-sm text-slate-700">Employees: {subscription.currentEmployeeCount} / {subscription.plan.maxEmployees} ({employeeUsage}%)</p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs uppercase tracking-wide text-faint-fg">Usage</p>
+                            <p className="text-sm text-muted-fg">Assets: {subscription.currentAssetCount} / {subscription.plan.maxAssets} ({assetUsage}%)</p>
+                            <p className="text-sm text-muted-fg">Employees: {subscription.currentEmployeeCount} / {subscription.plan.maxEmployees} ({employeeUsage}%)</p>
+                            <p className="text-xs text-faint-fg">
                                 {subscription.autoRenew ? "Renews" : "Downgrades"} on {formatDate(subscription.currentPeriodEnd)}
                             </p>
                         </div>
                         <div className="space-y-2">
-                            <p className="text-xs uppercase tracking-wide text-slate-500">Subscription Controls</p>
-                            <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                                <span className="text-sm text-slate-700">
+                            <p className="text-xs uppercase tracking-wide text-faint-fg">Subscription Controls</p>
+                            <div className="flex items-center justify-between rounded-control border border-edge-subtle bg-surface-muted px-3 py-2">
+                                <span className="text-sm text-muted-fg">
                                     {subscription.autoRenew ? "Auto-renew enabled" : "Auto-renew disabled"}
                                 </span>
-                                <input aria-label="Toggle auto-renew" type="checkbox" checked={subscription.autoRenew} onChange={onToggleAutoRenew} disabled={savingAutoRenew} />
+                                <input aria-label="Toggle auto-renew" type="checkbox" checked={subscription.autoRenew} onChange={onToggleAutoRenew} disabled={savingAutoRenew} className="accent-[var(--primary)]" />
                             </div>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-faint-fg">
                                 {subscription.autoRenew
                                     ? `Next billing: ${formatDate(subscription.nextBillingAt ?? subscription.currentPeriodEnd)}`
                                     : "Your paid package remains active until the period ends."}
@@ -168,7 +168,7 @@ export default function BillingPage() {
                                     onClick={onDowngradeToFree}
                                     disabled={savingAutoRenew || !subscription.autoRenew}
                                 >
-                                    {savingAutoRenew ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Undo2 className="h-4 w-4 mr-2" />}
+                                    {savingAutoRenew ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
                                     {subscription.autoRenew ? "Downgrade to Freemium" : "Downgrade scheduled"}
                                 </Button>
                             )}
@@ -185,21 +185,21 @@ export default function BillingPage() {
                     const action = subscription && planRank(plan) < planRank(subscription.plan) ? "Downgrade" : "Upgrade";
                     const canCheckout = !isCurrent && !isEnterprise && !isFree;
                     return (
-                        <Card key={plan.code} className={`border ${isCurrent ? "border-emerald-300 bg-emerald-50/50 shadow-sm" : "border-slate-200"}`}>
+                        <Card key={plan.code} className={isCurrent ? "border-ok/40 bg-ok-soft shadow-sm" : undefined}>
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center justify-between text-base">
                                     <span>{plan.name}</span>
-                                    <span className={`text-xs rounded-full border px-2 py-0.5 ${isCurrent ? "border-emerald-200 bg-white text-emerald-700" : ""}`}>
+                                    <span className={`rounded-full border px-2 py-0.5 text-xs ${isCurrent ? "border-ok/40 bg-surface text-ok" : "border-edge-subtle text-muted-fg"}`}>
                                         {isCurrent ? "Purchased" : plan.tier}
                                     </span>
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                <p className="text-2xl font-bold text-slate-900">
+                                <p className="text-2xl font-bold text-foreground">
                                     {isEnterprise ? "Contact sales" : isFree ? "Free" : formatMoneyMinor(plan.amountMinor, plan.currency)}
                                 </p>
-                                <p className="text-xs text-slate-500 -mt-2">{plan.interval.toLowerCase()}</p>
-                                <div className="text-sm text-slate-700 space-y-1">
+                                <p className="-mt-2 text-xs text-faint-fg">{plan.interval.toLowerCase()}</p>
+                                <div className="space-y-1 text-sm text-muted-fg">
                                     <p>Max assets: {plan.maxAssets}</p>
                                     <p>Max employees: {plan.maxEmployees}</p>
                                     <p>Analytics: {plan.analyticsEnabled ? "Included" : "Not included"}</p>
@@ -217,13 +217,13 @@ export default function BillingPage() {
                                         onClick={() => onUpgrade(plan.code)}
                                     >
                                         {checkoutPlanCode === plan.code ? (
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                         ) : action === "Downgrade" ? (
-                                            <TrendingDown className="h-4 w-4 mr-2" />
+                                            <TrendingDown className="mr-2 h-4 w-4" />
                                         ) : isFree ? (
-                                            <RefreshCw className="h-4 w-4 mr-2" />
+                                            <RefreshCw className="mr-2 h-4 w-4" />
                                         ) : (
-                                            <TrendingUp className="h-4 w-4 mr-2" />
+                                            <TrendingUp className="mr-2 h-4 w-4" />
                                         )}
                                         {isCurrent ? "Current Package" : isFree ? "Included by default" : action}
                                     </Button>

@@ -5,6 +5,7 @@ import { reportService } from "@/services/reportService";
 import { ReportHistory, ReportRequest, ReportResponse } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { toast } from "react-hot-toast";
 import {
     Loader2, Download, FileText, FileSpreadsheet, Wrench,
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/time";
 import { useConfirm } from "@/hooks/useConfirm";
-
+import { cn } from "@/lib/utils";
 
 type Format = "PDF" | "EXCEL" | "CSV";
 type ReportType = "assets" | "financial" | "maintenance";
@@ -34,21 +35,21 @@ const REPORT_CONFIGS: {
         label: "Asset Report",
         description: "Complete portfolio inventory with asset status, department assignment, locations, and current book values.",
         icon: FileText,
-        accentClass: "text-indigo-600 bg-indigo-50 border-indigo-100",
+        accentClass: "text-indigo-600 bg-indigo-50 border-indigo-100 dark:text-indigo-300 dark:bg-indigo-500/15 dark:border-indigo-500/30",
     },
     {
         type: "financial",
         label: "Financial Report",
         description: "Depreciation schedules, acquisition costs, net book value movement, and disposal summaries.",
         icon: BarChart3,
-        accentClass: "text-emerald-600 bg-emerald-50 border-emerald-100",
+        accentClass: "text-ok bg-ok-soft border-ok/30",
     },
     {
         type: "maintenance",
         label: "Maintenance Report",
         description: "Service history, scheduled tasks, downtime records, maintenance costs, and technician assignments.",
         icon: Wrench,
-        accentClass: "text-amber-600 bg-amber-50 border-amber-100",
+        accentClass: "text-warn bg-warn-soft border-warn/30",
     },
 ];
 
@@ -56,17 +57,17 @@ function StatusBadge({ status }: { status?: string }) {
     if (!status) return null;
     const s = status.toUpperCase();
     if (s === "COMPLETED") return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200">
+        <span className="inline-flex items-center gap-1 rounded-full border border-ok/30 bg-ok-soft px-2 py-0.5 text-[10px] font-bold text-ok">
             <CheckCircle2 className="h-2.5 w-2.5" /> DONE
         </span>
     );
     if (s === "FAILED") return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 bg-red-100 text-red-700 border border-red-200">
+        <span className="inline-flex items-center gap-1 rounded-full border border-danger/30 bg-danger-soft px-2 py-0.5 text-[10px] font-bold text-danger">
             <AlertCircle className="h-2.5 w-2.5" /> FAILED
         </span>
     );
     return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 bg-amber-100 text-amber-700 border border-amber-200">
+        <span className="inline-flex items-center gap-1 rounded-full border border-warn/30 bg-warn-soft px-2 py-0.5 text-[10px] font-bold text-warn">
             <Clock className="h-2.5 w-2.5" /> {s}
         </span>
     );
@@ -75,13 +76,13 @@ function StatusBadge({ status }: { status?: string }) {
 function FormatBadge({ format }: { format?: string }) {
     const f = (format || "").toUpperCase();
     const colors: Record<string, string> = {
-        PDF: "bg-red-50 text-red-700 border-red-200",
-        EXCEL: "bg-green-50 text-green-700 border-green-200",
-        CSV: "bg-blue-50 text-blue-700 border-blue-200",
+        PDF: "bg-danger-soft text-danger border-danger/30",
+        EXCEL: "bg-ok-soft text-ok border-ok/30",
+        CSV: "bg-info-soft text-info border-info/30",
     };
     const label: Record<string, string> = { PDF: "PDF", EXCEL: "XLS", CSV: "CSV" };
     return (
-        <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 border ${colors[f] || "bg-slate-100 text-slate-600 border-slate-200"}`}>
+        <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-bold", colors[f] || "border-edge-subtle bg-surface-muted text-muted-fg")}>
             {label[f] || f}
         </span>
     );
@@ -204,38 +205,39 @@ export default function ReportsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Reports</h1>
-                    <p className="text-slate-500">Generate and download operational and compliance reports in PDF, Excel, or CSV.</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => fetchHistory()} disabled={historyLoading} className="gap-1.5 text-xs h-8">
-                    <RefreshCw className={`h-3.5 w-3.5 ${historyLoading ? "animate-spin" : ""}`} /> Refresh History
-                </Button>
-            </div>
+            <PageHeader
+                title="Reports"
+                subtitle="Generate and download operational and compliance reports in PDF, Excel, or CSV."
+                actions={
+                    <Button variant="outline" size="sm" onClick={() => fetchHistory()} disabled={historyLoading} className="h-8 gap-1.5 text-xs">
+                        <RefreshCw className={cn("h-3.5 w-3.5", historyLoading && "animate-spin")} /> Refresh History
+                    </Button>
+                }
+            />
 
-            {/* Report cards */}
             <div className="grid gap-4 md:grid-cols-3">
                 {REPORT_CONFIGS.map(config => (
-                    <Card key={config.type} className="border-slate-200 flex flex-col hover:shadow-md transition-all">
-                        <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100">
-                            <div className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg border w-fit text-sm font-semibold ${config.accentClass}`}>
+                    <Card key={config.type} className="flex flex-col transition-all hover:shadow-md">
+                        <CardHeader className="border-b border-edge-subtle bg-surface-muted/50 pb-3">
+                            <div className={cn("inline-flex w-fit items-center gap-2 rounded-control border px-2.5 py-1.5 text-sm font-semibold", config.accentClass)}>
                                 <config.icon className="h-4 w-4" />
                                 {config.label}
                             </div>
                         </CardHeader>
-                        <CardContent className="p-5 flex flex-col gap-4 flex-1">
-                            <p className="text-sm text-slate-500 leading-relaxed flex-1">{config.description}</p>
+                        <CardContent className="flex flex-1 flex-col gap-4 p-5">
+                            <p className="flex-1 text-sm leading-relaxed text-muted-fg">{config.description}</p>
 
                             <div>
-                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Output Format</p>
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint-fg">Output Format</p>
                                 <div className="flex gap-1.5">
                                     {FORMAT_OPTIONS.map(f => (
                                         <button key={f} onClick={() => setFormats(prev => ({ ...prev, [config.type]: f }))}
-                                            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${formats[config.type] === f
-                                                ? "bg-teal-600 text-white border-teal-600"
-                                                : "bg-white text-slate-600 border-slate-200 hover:border-teal-300 hover:text-teal-700"
-                                            }`}>
+                                            className={cn(
+                                                "rounded-control border px-3 py-1.5 text-xs font-bold transition-colors",
+                                                formats[config.type] === f
+                                                    ? "border-brand bg-brand text-white"
+                                                    : "border-edge-subtle bg-surface text-muted-fg hover:border-brand/40 hover:text-brand",
+                                            )}>
                                             {f}
                                         </button>
                                     ))}
@@ -245,7 +247,7 @@ export default function ReportsPage() {
                             <Button
                                 onClick={() => generateReport(config.type)}
                                 disabled={generating !== ""}
-                                className="bg-teal-600 hover:bg-teal-700 w-full gap-2"
+                                className="w-full gap-2"
                             >
                                 {generating === config.type ? (
                                     <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</>
@@ -258,57 +260,56 @@ export default function ReportsPage() {
                 ))}
             </div>
 
-            {/* History table */}
-            <Card className="border-slate-200">
-                <CardHeader className="pb-3 bg-slate-50/50 border-b border-slate-100">
+            <Card>
+                <CardHeader className="border-b border-edge-subtle bg-surface-muted/50 pb-3">
                     <div className="flex items-center justify-between">
-                        <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-slate-500" /> Generated Reports History
+                        <CardTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
+                            <Clock className="h-4 w-4 text-faint-fg" /> Generated Reports History
                         </CardTitle>
-                        {history && <span className="text-xs text-slate-400">{history.totalReports} total</span>}
+                        {history && <span className="text-xs text-faint-fg">{history.totalReports} total</span>}
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
                     {historyLoading ? (
                         <div className="space-y-2 p-4">
-                            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-12 bg-slate-100 rounded-lg animate-pulse" />)}
+                            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-control bg-surface-muted" />)}
                         </div>
                     ) : !history?.reports?.length ? (
                         <div className="flex flex-col items-center justify-center py-16 text-center">
-                            <FileSpreadsheet className="h-12 w-12 text-slate-200 mb-3" />
-                            <p className="text-sm font-medium text-slate-500">No reports generated yet</p>
-                            <p className="text-xs text-slate-400 mt-1">Generate a report above and it will appear here</p>
+                            <FileSpreadsheet className="mb-3 h-12 w-12 text-faint-fg" />
+                            <p className="text-sm font-medium text-muted-fg">No reports generated yet</p>
+                            <p className="mt-1 text-xs text-faint-fg">Generate a report above and it will appear here</p>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b border-slate-100">
-                                        <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-3">Report</th>
-                                        <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-3">Format</th>
-                                        <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-3">Generated</th>
-                                        <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-3">Rows</th>
-                                        <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-3">Status</th>
-                                        <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-3">Action</th>
+                                    <tr className="border-b border-edge-subtle">
+                                        <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-faint-fg">Report</th>
+                                        <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-faint-fg">Format</th>
+                                        <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-faint-fg">Generated</th>
+                                        <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-faint-fg">Rows</th>
+                                        <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-faint-fg">Status</th>
+                                        <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-faint-fg">Action</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100">
+                                <tbody className="divide-y divide-[var(--border-subtle)]">
                                     {history.reports.map((r, i) => {
                                         const rowId = r.reportId || r.downloadUrl || `row-${i}`;
                                         const isDownloadable = !r.status || r.status.toUpperCase() === "COMPLETED";
                                         const isDownloading = downloadingId === rowId;
                                         return (
-                                            <tr key={rowId} className="hover:bg-slate-50/50 transition-colors">
+                                            <tr key={rowId} className="transition-colors hover:bg-surface-muted/50">
                                                 <td className="px-5 py-3">
-                                                    <div className="font-medium text-slate-800">{r.type || r.reportType || "Asset Report"}</div>
-                                                    <div className="text-xs font-mono text-slate-400 truncate max-w-[200px]">{r.reportId || r.downloadUrl || "—"}</div>
+                                                    <div className="font-medium text-foreground">{r.type || r.reportType || "Asset Report"}</div>
+                                                    <div className="data-mono max-w-[200px] truncate text-xs text-faint-fg">{r.reportId || r.downloadUrl || "—"}</div>
                                                 </td>
                                                 <td className="px-5 py-3"><FormatBadge format={r.format} /></td>
-                                                <td className="px-5 py-3 text-slate-600 text-xs whitespace-nowrap">
+                                                <td className="whitespace-nowrap px-5 py-3 text-xs text-muted-fg">
                                                     <div>{new Date(r.generatedAt).toLocaleString()}</div>
-                                                    <div className="text-slate-400">{formatRelativeTime(r.generatedAt)}</div>
+                                                    <div className="text-faint-fg">{formatRelativeTime(r.generatedAt)}</div>
                                                 </td>
-                                                <td className="px-5 py-3 text-slate-600">{r.rowCount ?? "—"}</td>
+                                                <td className="px-5 py-3 text-muted-fg">{r.rowCount ?? "—"}</td>
                                                 <td className="px-5 py-3"><StatusBadge status={r.status || "COMPLETED"} /></td>
                                                 <td className="px-5 py-3 text-right">
                                                     <Button
@@ -316,20 +317,20 @@ export default function ReportsPage() {
                                                         size="sm"
                                                         disabled={!isDownloadable || isDownloading}
                                                         onClick={() => handleDownload(r)}
-                                                        className="gap-1.5 h-7 text-xs"
+                                                        className="h-7 gap-1.5 text-xs"
                                                     >
                                                         {isDownloading
                                                             ? <><Loader2 className="h-3 w-3 animate-spin" /> Downloading</>
                                                             : <><Download className="h-3 w-3" /> Download</>
                                                         }
                                                     </Button>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="sm" 
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
                                                         disabled={!r.reportId}
                                                         onClick={() => handleDeleteReport(r.reportId!)}
                                                         isLoading={deletingId === r.reportId}
-                                                        className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 ml-1"
+                                                        className="ml-1 h-7 w-7 p-0 text-faint-fg hover:bg-danger-soft hover:text-danger"
                                                     >
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
@@ -343,7 +344,7 @@ export default function ReportsPage() {
                     )}
                 </CardContent>
             </Card>
-        {ConfirmDialog}
+            {ConfirmDialog}
         </div>
     );
 }

@@ -12,15 +12,16 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { toast } from "react-hot-toast";
+import { cn } from "@/lib/utils";
 
 const TYPE_COLORS: Record<string, string> = {
-    DEPRECATION:    "bg-orange-100 text-orange-700 border-orange-200",
-    MAINTENANCE:    "bg-blue-100 text-blue-700 border-blue-200",
-    APPROVAL:       "bg-purple-100 text-purple-700 border-purple-200",
-    SYSTEM:         "bg-slate-100 text-slate-700 border-slate-200",
-    TRANSFER:       "bg-cyan-100 text-cyan-700 border-cyan-200",
-    DISPOSAL:       "bg-red-100 text-red-700 border-red-200",
-    PURCHASE_ORDER: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    DEPRECATION:    "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:border-orange-500/30",
+    MAINTENANCE:    "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30",
+    APPROVAL:       "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30",
+    SYSTEM:         "bg-surface-muted text-muted-fg border-edge-subtle",
+    TRANSFER:       "bg-cyan-100 text-cyan-700 border-cyan-200 dark:bg-cyan-500/15 dark:text-cyan-300 dark:border-cyan-500/30",
+    DISPOSAL:       "bg-danger-soft text-danger border-danger/30",
+    PURCHASE_ORDER: "bg-ok-soft text-ok border-ok/30",
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -36,7 +37,7 @@ const TYPE_LABELS: Record<string, string> = {
 function TypeBadge({ type }: { type: string }) {
     const t = type.toUpperCase();
     return (
-        <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${TYPE_COLORS[t] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+        <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", TYPE_COLORS[t] ?? "border-edge-subtle bg-surface-muted text-muted-fg")}>
             {TYPE_LABELS[t] ?? type}
         </span>
     );
@@ -154,40 +155,39 @@ export default function NotificationsPage() {
 
     const applyFilters = () => fetchData(filters);
 
-    if (loading) return <div className="flex p-10 justify-center"><Loader2 className="animate-spin w-8 h-8" /></div>;
+    if (loading) return <div className="flex justify-center p-10"><Loader2 className="h-8 w-8 animate-spin text-faint-fg" /></div>;
 
     return (
-        <div className="p-6 max-w-5xl mx-auto space-y-6">
+        <div className="mx-auto max-w-5xl space-y-6 p-6">
             <PageHeader
                 title="Notifications"
                 subtitle="Operational alerts, approvals, and compliance updates across your workspace."
                 actions={<>
-                    <Button variant="outline" onClick={markAllRead} isLoading={markingAllRead}><CheckCircle2 className="w-4 h-4 mr-2" /> Mark all read</Button>
-                    <Button variant="secondary" onClick={deleteAll} isLoading={clearingAll}><Trash2 className="w-4 h-4 mr-2" /> Clear all</Button>
+                    <Button variant="outline" onClick={markAllRead} isLoading={markingAllRead}><CheckCircle2 className="mr-2 h-4 w-4" /> Mark all read</Button>
+                    <Button variant="secondary" onClick={deleteAll} isLoading={clearingAll}><Trash2 className="mr-2 h-4 w-4" /> Clear all</Button>
                 </>}
             />
 
-            {/* Summary cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <Card>
                     <CardContent className="p-4">
-                        <p className="text-xs text-slate-500">Unread</p>
-                        <p className="text-xl font-bold">{summary?.unreadCount ?? notifications.filter(n => !n.read).length}</p>
+                        <p className="text-xs text-faint-fg">Unread</p>
+                        <p className="data-mono text-xl font-bold text-foreground">{summary?.unreadCount ?? notifications.filter(n => !n.read).length}</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardContent className="p-4">
-                        <p className="text-xs text-slate-500">Total</p>
-                        <p className="text-xl font-bold">{summary?.totalNotifications ?? notifications.length}</p>
+                        <p className="text-xs text-faint-fg">Total</p>
+                        <p className="data-mono text-xl font-bold text-foreground">{summary?.totalNotifications ?? notifications.length}</p>
                     </CardContent>
                 </Card>
                 {summary?.byType && Object.keys(summary.byType).length > 0 && (
                     <Card className="md:col-span-2">
                         <CardContent className="p-4">
-                            <p className="text-xs text-slate-500 mb-2">By Type</p>
+                            <p className="mb-2 text-xs text-faint-fg">By Type</p>
                             <div className="flex flex-wrap gap-2">
                                 {Object.entries(summary.byType).map(([type, count]) => (
-                                    <span key={type} className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${TYPE_COLORS[type] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                                    <span key={type} className={cn("rounded-full border px-2 py-0.5 text-[10px] font-bold", TYPE_COLORS[type] ?? "border-edge-subtle bg-surface-muted text-muted-fg")}>
                                         {TYPE_LABELS[type] ?? type}: {count}
                                     </span>
                                 ))}
@@ -197,9 +197,8 @@ export default function NotificationsPage() {
                 )}
             </div>
 
-            {/* Filters */}
             <Card>
-                <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                <CardContent className="grid grid-cols-1 items-end gap-3 p-4 sm:grid-cols-4">
                     <div className="space-y-1">
                         <Label className="text-xs">Type</Label>
                         <Select
@@ -238,37 +237,36 @@ export default function NotificationsPage() {
                 </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Notification list */}
-                <div className="md:col-span-2 space-y-3">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                <div className="space-y-3 md:col-span-2">
                     {notifications.map(n => {
                         const nid = resolveNotifId(n);
                         return (
-                            <Card key={nid || n.createdAt} className={n.read ? "opacity-70" : "border-l-4 border-l-blue-500"}>
-                                <CardContent className="p-4 flex gap-4 items-start">
-                                    <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded-full shrink-0">
-                                        <Bell className="w-4 h-4 text-slate-500" />
+                            <Card key={nid || n.createdAt} className={n.read ? "opacity-70" : "border-l-4 border-l-brand"}>
+                                <CardContent className="flex items-start gap-4 p-4">
+                                    <div className="shrink-0 rounded-full bg-surface-muted p-2">
+                                        <Bell className="h-4 w-4 text-faint-fg" />
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <h3 className="font-bold text-sm">{n.title}</h3>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <h3 className="text-sm font-bold text-foreground">{n.title}</h3>
                                                 <TypeBadge type={n.type} />
                                             </div>
-                                            <span className="text-xs text-slate-400 shrink-0">
+                                            <span className="shrink-0 text-xs text-faint-fg">
                                                 {new Date(n.createdAt).toLocaleString()}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-slate-600 dark:text-slate-300">{n.message}</p>
+                                        <p className="text-sm text-muted-fg">{n.message}</p>
                                         {n.read && n.readAt && (
-                                            <p className="text-[10px] text-slate-400 mt-1">
+                                            <p className="mt-1 text-[10px] text-faint-fg">
                                                 Read {new Date(n.readAt).toLocaleString()}
                                             </p>
                                         )}
-                                        <div className="mt-2 flex gap-2 flex-wrap">
+                                        <div className="mt-2 flex flex-wrap gap-2">
                                             {!n.read && (
                                                 <Button variant="ghost" size="sm" onClick={() => markAsRead(nid)} isLoading={markingReadId === nid}>
-                                                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Mark read
+                                                    <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Mark read
                                                 </Button>
                                             )}
                                             {n.actionUrl && (
@@ -279,39 +277,38 @@ export default function NotificationsPage() {
                                         </div>
                                     </div>
                                     <Button variant="ghost" size="icon" className="shrink-0" onClick={() => deleteNotif(nid)} isLoading={deletingNotifId === nid}>
-                                        <Trash2 className="w-4 h-4 text-red-400 hover:text-red-500" />
+                                        <Trash2 className="h-4 w-4 text-danger" />
                                     </Button>
                                 </CardContent>
                             </Card>
                         );
                     })}
                     {!notifications.length && (
-                        <div className="text-center p-12 text-muted-foreground border rounded-lg border-dashed">
+                        <div className="rounded-card border border-dashed border-edge-subtle p-12 text-center text-muted-fg">
                             No notifications found
                         </div>
                     )}
                 </div>
 
-                {/* Preferences panel */}
                 <div>
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Settings className="w-4 h-4" /> Delivery Preferences
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Settings className="h-4 w-4 text-faint-fg" /> Delivery Preferences
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4 text-sm">
-                            <div className="flex justify-between items-center">
-                                <span>In-App Notifications</span>
-                                <input type="checkbox" checked={Boolean(preferences?.inAppNotifications)} onChange={(e) => updatePreference("inAppNotifications", e.target.checked)} />
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-fg">In-App Notifications</span>
+                                <input type="checkbox" checked={Boolean(preferences?.inAppNotifications)} onChange={(e) => updatePreference("inAppNotifications", e.target.checked)} className="accent-[var(--primary)]" />
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span>Push Notifications</span>
-                                <input type="checkbox" checked={Boolean(preferences?.pushNotifications)} onChange={(e) => updatePreference("pushNotifications", e.target.checked)} />
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-fg">Push Notifications</span>
+                                <input type="checkbox" checked={Boolean(preferences?.pushNotifications)} onChange={(e) => updatePreference("pushNotifications", e.target.checked)} className="accent-[var(--primary)]" />
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span>Daily Digest</span>
-                                <input type="checkbox" checked={Boolean(preferences?.dailyDigest)} onChange={(e) => updatePreference("dailyDigest", e.target.checked)} />
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-fg">Daily Digest</span>
+                                <input type="checkbox" checked={Boolean(preferences?.dailyDigest)} onChange={(e) => updatePreference("dailyDigest", e.target.checked)} className="accent-[var(--primary)]" />
                             </div>
                             {preferences?.dailyDigest && (
                                 <div className="space-y-1">
@@ -319,24 +316,24 @@ export default function NotificationsPage() {
                                     <Input type="time" value={preferences?.digestTime || "09:00"} onChange={(e) => updatePreference("digestTime", e.target.value)} />
                                 </div>
                             )}
-                            <div className="pt-2 border-t space-y-2">
-                                <p className="font-semibold text-xs text-slate-500 uppercase tracking-wide">Email by Category</p>
+                            <div className="space-y-2 border-t border-edge-subtle pt-2">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-faint-fg">Email by Category</p>
                                 {NOTIFICATION_TYPES.map((t) => (
                                     <div key={t} className="flex items-center justify-between">
-                                        <span className="flex items-center gap-2">
-                                            <span className={`h-2 w-2 rounded-full inline-block ${TYPE_COLORS[t]?.split(" ")[0] ?? "bg-slate-300"}`} />
+                                        <span className="flex items-center gap-2 text-muted-fg">
+                                            <span className={cn("inline-block h-2 w-2 rounded-full", TYPE_COLORS[t]?.split(" ")[0] ?? "bg-faint-fg")} />
                                             {TYPE_LABELS[t]}
                                         </span>
                                         <input
                                             type="checkbox"
                                             checked={Boolean(preferences?.emailNotifications?.[t])}
                                             onChange={(e) => updateEmailPreference(t, e.target.checked)}
+                                            className="accent-[var(--primary)]"
                                         />
                                     </div>
                                 ))}
                             </div>
-                            <Button onClick={savePreferences} disabled={savingPrefs} className="w-full">
-                                {savingPrefs && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            <Button onClick={savePreferences} disabled={savingPrefs} isLoading={savingPrefs} className="w-full">
                                 Save Preferences
                             </Button>
                         </CardContent>
