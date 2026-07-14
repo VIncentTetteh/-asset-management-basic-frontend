@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * LicenseContext — Phase 0 foundation
+ * LicenseContext
  *
  * In cloud mode  (NEXT_PUBLIC_APP_MODE=cloud, the default):
  *   - No API calls are made
@@ -10,12 +10,9 @@
  *   - Zero visible change to the existing cloud UI
  *
  * In standalone mode (NEXT_PUBLIC_APP_MODE=standalone):
- *   - Polls GET /api/v1/license/status every 5 minutes (added in Phase 2)
+ *   - Polls GET /license/status (backend: /api/v1/license/status) every 5 minutes
  *   - useLicenseStatus() returns full license state
  *   - LicenseGate gates write actions and shows banners
- *
- * This file is the Phase 0 stub. The polling logic and full LicenseStatus
- * type will be filled in during Phase 2 & 3.
  */
 
 import React, {
@@ -26,6 +23,7 @@ import React, {
     useCallback,
     ReactNode,
 } from "react";
+import api from "@/lib/axios";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -112,24 +110,14 @@ export function LicenseProvider({ children }: { children: ReactNode }) {
     );
 
     const fetchStatus = useCallback(async () => {
-        // Phase 0: no-op in cloud mode — no API call made, zero network traffic.
+        // No API call in cloud mode — zero network traffic.
         if (APP_MODE === "cloud") return;
 
-        // Phase 2 will implement the actual fetch from GET /api/v1/license/status.
-        // Stub below keeps TypeScript happy and is safe to leave in place.
         try {
-            const res = await fetch("/api/v1/license/status", {
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            });
-            if (!res.ok) {
-                setStatus({ mode: "standalone", readOnly: true, error: `HTTP ${res.status}` });
-                return;
-            }
-            const data: Omit<LicenseStatus, "mode"> = await res.json();
-            setStatus({ mode: "standalone", ...data });
-        } catch (err) {
-            setStatus((prev) => ({ ...prev, error: "Unable to reach license endpoint" }));
+            const res = await api.get<Omit<LicenseStatus, "mode">>("/license/status");
+            setStatus({ mode: "standalone", ...res.data });
+        } catch {
+            setStatus((prev) => ({ ...prev, mode: "standalone", error: "Unable to reach license endpoint" }));
         }
     }, []);
 

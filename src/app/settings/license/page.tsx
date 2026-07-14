@@ -27,7 +27,7 @@ export default function LicensePage() {
         if (!newKey.trim()) return;
         setActivating(true);
         try {
-            await api.post("/api/v1/license/activate", { key: newKey.trim() });
+            await api.post("/license/activate", { key: newKey.trim() });
             await refresh();
             setNewKey("");
             toast.success("License key activated successfully.");
