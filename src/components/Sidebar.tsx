@@ -118,6 +118,7 @@ export function Sidebar() {
         {
             group: "People",
             items: [
+                { href: "/employees", label: "Employees", icon: UserCheck, active: pathname.startsWith("/employees"), permission: "VIEW_EMPLOYEES" },
                 { href: "/users", label: "Users", icon: Users, active: pathname.startsWith("/users"), permission: "VIEW_USERS" },
                 { href: "/roles", label: "Roles", icon: Shield, active: pathname.startsWith("/roles"), permission: "VIEW_ROLES" },
                 { href: "/departments", label: "Departments", icon: Layers, active: pathname.startsWith("/departments"), permission: "MANAGE_ORGANIZATION_SETTINGS" },

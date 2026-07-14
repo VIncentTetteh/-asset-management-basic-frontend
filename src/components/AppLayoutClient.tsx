@@ -38,6 +38,7 @@ const ROUTE_PERMISSIONS: { pattern: string; permission: string }[] = [
     { pattern: "/organisations",      permission: "MANAGE_ORGANIZATION_SETTINGS" },
     { pattern: "/departments",        permission: "MANAGE_ORGANIZATION_SETTINGS" },
     { pattern: "/locations",          permission: "VIEW_LOCATIONS" },
+    { pattern: "/employees",          permission: "VIEW_EMPLOYEES" },
     { pattern: "/users",              permission: "VIEW_USERS" },
     { pattern: "/roles",              permission: "VIEW_ROLES" },
     { pattern: "/assets",             permission: "VIEW_ASSETS" },
