@@ -1,314 +1,269 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { Audit, AssetAuditDto, Department, User, AuditStatus } from "@/types";
-import { auditService } from "@/services/auditService";
-import { departmentService } from "@/services/departmentService";
-import { userService } from "@/services/userService";
-import { authService } from "@/services/authService";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { ClipboardCheck, Pencil, Trash2, CheckSquare } from "lucide-react";
+import { Audit, AssetAuditDto, AuditStatus } from "@/types";
+import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
+import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
 import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { PageSpinner } from "@/components/ui/spinner";
-import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, ClipboardCheck, Calendar, Layers, User as UserIcon, CheckSquare, XSquare } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { Textarea } from "@/components/ui/textarea";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { AuditSeal } from "@/components/ui/audit-seal";
 import { useConfirm } from "@/hooks/useConfirm";
-
+import {
+  useAudits,
+  useAuditMasterData,
+  useCreateAudit,
+  useUpdateAuditStatus,
+  useDeleteAudit,
+} from "@/features/audits/hooks";
 
 export default function AuditsPage() {
-    const [audits, setAudits] = useState<Audit[]>([]);
-    const [departments, setDepartments] = useState<Department[]>([]);
-    const [users, setUsers] = useState<User[]>([]);
-    const [orgId, setOrgId] = useState<string>("");
-    const [isLoading, setIsLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingAudit, setEditingAudit] = useState<Audit | null>(null);
+  const { data: audits = [], isLoading } = useAudits();
+  const master = useAuditMasterData();
+  const createAudit = useCreateAudit();
+  const updateStatus = useUpdateAuditStatus();
+  const remove = useDeleteAudit();
+  const { confirm, ConfirmDialog } = useConfirm();
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<AssetAuditDto>();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAudit, setEditingAudit] = useState<Audit | null>(null);
 
-    const fetchData = async () => {
-        try {
-            setIsLoading(true);
-            const [auditsData, deptsData, usersData, profileData] = await Promise.all([
-                auditService.getAll(),
-                departmentService.getAll(),
-                userService.getAll(),
-                authService.getProfile(),
-            ]);
-            setAudits(auditsData);
-            setDepartments(deptsData);
-            setUsers(usersData);
-            setOrgId((profileData as any).organisationId || "");
-        } catch (error) {
-            toast.error("Failed to load audit records");
-            console.error(error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<AssetAuditDto>();
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
-    const userMap = useMemo(() => new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`])), [users]);
-    const { confirm, ConfirmDialog } = useConfirm();
-
-    const handleOpenCreate = () => {
-        setEditingAudit(null);
-        reset({
-            organisationId: orgId,
+  useEffect(() => {
+    if (!isModalOpen) return;
+    reset(
+      editingAudit
+        ? {
+            organisationId: editingAudit.organisationId || "",
+            departmentId: editingAudit.departmentId || "",
+            auditDate: editingAudit.auditDate ? new Date(editingAudit.auditDate).toISOString().split("T")[0] : "",
+            conductedById: editingAudit.conductedById || "",
+            status: (editingAudit.status as AuditStatus) || AuditStatus.PLANNED,
+            remarks: editingAudit.remarks || "",
+          }
+        : {
+            organisationId: master.orgId,
             departmentId: "",
-            auditDate: new Date().toISOString().split('T')[0],
+            auditDate: new Date().toISOString().split("T")[0],
             conductedById: "",
             status: AuditStatus.PLANNED,
             remarks: "",
-        });
-        setIsModalOpen(true);
-    };
-
-    const handleEdit = (audit: Audit) => {
-        setEditingAudit(audit);
-        reset({
-            organisationId: audit.organisationId || "",
-            departmentId: audit.departmentId || "",
-            auditDate: audit.auditDate ? new Date(audit.auditDate).toISOString().split('T')[0] : "",
-            conductedById: audit.conductedById || "",
-            status: audit.status as AuditStatus || AuditStatus.PLANNED,
-            remarks: audit.remarks || ""
-        });
-        setIsModalOpen(true);
-    };
-
-    const handleDelete = async (id: string) => {
-        if (!await confirm({ message: "Are you sure you want to delete this audit record?", variant: "danger" })) return;
-        try {
-            await auditService.delete(id);
-            toast.success("Audit deleted");
-            fetchData();
-        } catch (error) {
-            toast.error("Failed to delete audit");
-            console.error(error);
-        }
-    };
-
-    const handleMarkStatus = async (id: string, status: AuditStatus) => {
-        try {
-            await auditService.updateStatus(id, status);
-            toast.success(`Audit status updated to ${status.replace(/_/g, ' ')}`);
-            fetchData();
-        } catch (error) {
-            toast.error("Failed to update status");
-        }
-    };
-
-    const onSubmit = async (data: AssetAuditDto) => {
-        try {
-            if (editingAudit) {
-                // On edit, only status can be PATCH'd via API
-                await auditService.updateStatus(editingAudit.id!, data.status!);
-                toast.success("Audit status updated");
-            } else {
-                // Ensure organisationId is set from profile
-                if (!data.organisationId) data.organisationId = orgId;
-                await auditService.create(data);
-                toast.success("Audit scheduled");
-            }
-            setIsModalOpen(false);
-            fetchData();
-        } catch (error) {
-            toast.error("Failed to save audit");
-            console.error(error);
-        }
-    };
-
-    const getStatusStyles = (status: string) => {
-        switch (status) {
-            case AuditStatus.COMPLETED: return "bg-emerald-100 text-emerald-700 border-emerald-200";
-            case AuditStatus.PLANNED: return "bg-blue-100 text-blue-700 border-blue-200";
-            case AuditStatus.IN_PROGRESS: return "bg-amber-100 text-amber-700 border-amber-200";
-            case AuditStatus.CANCELLED: return "bg-red-100 text-red-700 border-red-200";
-            default: return "bg-gray-100 text-gray-700 border-gray-200";
-        }
-    };
-
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Audits & Inspections</h1>
-                    <p className="text-slate-500">Track compliance and verify physical asset inventory.</p>
-                </div>
-                <Button onClick={handleOpenCreate} className="bg-fuchsia-600 hover:bg-fuchsia-700">
-                    <Plus className="mr-2 h-4 w-4" /> Schedule Audit
-                </Button>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {isLoading ? (
-                    <div className="col-span-full h-64 flex items-center justify-center">
-                        <PageSpinner />
-                    </div>
-                ) : audits.length === 0 ? (
-                    <div className="col-span-full bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-12 text-center">
-                        <ClipboardCheck className="h-12 w-12 text-slate-300 mb-4" />
-                        <h3 className="text-lg font-medium text-slate-900">No audits found</h3>
-                        <p className="text-slate-500 mt-1 max-w-sm">Schedule regular audits to ensure your asset inventory remains accurate and compliant.</p>
-                        <Button onClick={handleOpenCreate} className="mt-6 border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 hover:border-fuchsia-300">
-                            Schedule Audit
-                        </Button>
-                    </div>
-                ) : (
-                    audits.map((audit) => (
-                        <Card key={audit.id} className={`overflow-hidden hover:shadow-md transition-all group border-l-4 ${audit.status === AuditStatus.COMPLETED ? 'border-l-emerald-500' :
-                            audit.status === AuditStatus.CANCELLED ? 'border-l-red-500' :
-                                audit.status === AuditStatus.IN_PROGRESS ? 'border-l-amber-500' :
-                                    'border-l-blue-500'
-                            }`}>
-                            <CardHeader className="flex flex-row items-baseline justify-between space-y-0 pb-3 bg-slate-50/50 border-b border-slate-100">
-                                <div className="truncate pr-2 w-full">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <CardTitle className="text-sm font-semibold text-slate-900 flex items-center gap-1.5 truncate pr-2">
-                                            <ClipboardCheck className="h-3.5 w-3.5 text-fuchsia-600" />
-                                            {deptMap.get(audit.departmentId || "") || "Department Audit"}
-                                        </CardTitle>
-                                        <div className="flex flex-col items-end gap-1">
-                                            <div className="text-xs font-semibold text-slate-800">
-                                                {audit.auditDate ? new Date(audit.auditDate).toLocaleDateString() : ""}
-                                            </div>
-                                            <div className={`px-2 flex items-center h-5 text-[10px] font-bold rounded-full border shrink-0 ${getStatusStyles(audit.status || 'PLANNED')}`}>
-                                                {audit.status?.replace(/_/g, ' ')}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-4 flex-1 flex flex-col">
-                                <div className="space-y-3 text-sm text-slate-600 flex-1">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-2 text-slate-700">
-                                            <Calendar className="h-4 w-4 text-slate-400" />
-                                            <span className="font-medium">{audit.auditDate ? new Date(audit.auditDate).toLocaleDateString() : ""}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-slate-700 mt-1 truncate" title={userMap.get(audit.conductedById || "") || "Unassigned"}>
-                                            <UserIcon className="h-4 w-4 text-slate-400 shrink-0" />
-                                            <span className="truncate">{userMap.get(audit.conductedById || "") || "Unassigned"}</span>
-                                        </div>
-                                    </div>
-
-                                    {(audit.remarks) && (
-                                        <div className="mt-3 pt-3 border-t border-slate-100">
-                                            {audit.remarks && (
-                                                <p className="text-sm text-slate-600 pt-2 border-t border-slate-100 mt-2 line-clamp-2" title={audit.remarks}>
-                                                    <b className="text-slate-700">Remarks:</b> {audit.remarks}
-                                                </p>
-                                            )}    </div>
-                                    )}
-                                </div>
-
-                                <div className="flex justify-between items-center gap-2 pt-4 border-t border-slate-100 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <div className="flex gap-1">
-                                        {(audit.status === AuditStatus.PLANNED) && (
-                                            <Button variant="ghost" size="sm" onClick={() => handleMarkStatus(audit.id!, AuditStatus.IN_PROGRESS)} className="h-8 gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50" title="Start Audit">
-                                                <ClipboardCheck className="h-4 w-4" /> Start
-                                            </Button>
-                                        )}
-                                        {audit.status === AuditStatus.IN_PROGRESS && (
-                                            <>
-                                                <Button variant="ghost" size="sm" onClick={() => handleMarkStatus(audit.id!, AuditStatus.COMPLETED)} className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Mark Completed">
-                                                    <CheckSquare className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => handleMarkStatus(audit.id!, AuditStatus.CANCELLED)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50" title="Cancel">
-                                                    <XSquare className="h-4 w-4" />
-                                                </Button>
-                                            </>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" size="sm" className="h-8 gap-1 border-slate-200 text-slate-600 hover:bg-slate-50"
-                                            onClick={() => handleEdit(audit)}
-                                        >
-                                            <Pencil className="h-3.5 w-3.5" />
-                                        </Button>
-                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(audit.id!)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))
-                )}
-            </div>
-
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingAudit ? "Edit Audit Record" : "Schedule Audit"}
-                description={editingAudit ? "Update the audit findings." : "Schedule an asset for review or inspection."}
-            >
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
-                    {/* Hidden organisationId - read from profile */}
-                    <input type="hidden" {...register("organisationId")} value={editingAudit ? (editingAudit.organisationId || orgId) : orgId} />
-
-                    <div className="space-y-2">
-                        <Label htmlFor="departmentId">Target Department <span className="text-red-500">*</span></Label>
-                        <Select id="departmentId" {...register("departmentId", { required: "Department is required" })} disabled={!!editingAudit}>
-                            <option value="">Select Department</option>
-                            {departments.map((d) => (
-                                <option key={d.id} value={d.id}>{d.name}</option>
-                            ))}
-                        </Select>
-                        {errors.departmentId && <p className="text-sm text-red-500">{errors.departmentId.message as string}</p>}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="auditDate">Audit Date <span className="text-red-500">*</span></Label>
-                            <Input id="auditDate" type="date" {...register("auditDate", { required: true })} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="status">Audit Status</Label>
-                            <Select id="status" {...register("status", { required: true })}>
-                                {Object.values(AuditStatus).map((s) => (
-                                    <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-                                ))}
-                            </Select>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="conductedById">Assigned Auditor</Label>
-                        <Select id="conductedById" {...register("conductedById", { required: true })}>
-                            <option value="">Unassigned</option>
-                            {users.map((u) => (
-                                <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
-                            ))}
-                        </Select>
-                    </div>
-
-                    <div className="space-y-2 col-span-2">
-                        <Label htmlFor="remarks">Audit Notes / Findings</Label>
-                        <Textarea id="remarks" placeholder="Any initial remarks or findings observed during the audit..." {...register("remarks")} />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-                        <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" isLoading={isSubmitting} className="bg-fuchsia-600 hover:bg-fuchsia-700">
-                            {editingAudit ? "Save Changes" : "Schedule Audit"}
-                        </Button>
-                    {ConfirmDialog}
-                    </div>
-                </form>
-            </Modal>
-        </div >
+          },
     );
+  }, [isModalOpen, editingAudit, master.orgId, reset]);
+
+  const lookups = useMemo(() => {
+    const deptMap = new Map(master.departments.map((d) => [d.id, d.name]));
+    const userMap = new Map(master.users.map((u) => [u.id, `${u.firstName} ${u.lastName}`]));
+    return {
+      deptName: (id?: string) => deptMap.get(id ?? "") ?? "Whole organisation",
+      userName: (id?: string) => userMap.get(id ?? "") ?? "—",
+    };
+  }, [master.departments, master.users]);
+
+  const openCreate = () => {
+    setEditingAudit(null);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (audit: Audit) => {
+    if (!(await confirm({ message: "Delete this audit record?", variant: "danger" }))) return;
+    remove.mutate(audit.id!);
+  };
+
+  const onSubmit = async (data: AssetAuditDto) => {
+    if (editingAudit) {
+      // The API only supports PATCHing status on existing audits.
+      await updateStatus.mutateAsync({ id: editingAudit.id!, status: data.status as AuditStatus });
+    } else {
+      if (!data.organisationId) data.organisationId = master.orgId;
+      await createAudit.mutateAsync(data);
+    }
+    setIsModalOpen(false);
+  };
+
+  const columns = useMemo<ColumnDef<Audit, unknown>[]>(
+    () => [
+      {
+        accessorKey: "auditDate",
+        header: "Audit date",
+        cell: ({ row }) => (
+          <span className="font-semibold text-foreground">
+            {row.original.auditDate ? new Date(row.original.auditDate).toLocaleDateString() : "—"}
+          </span>
+        ),
+      },
+      {
+        id: "scope",
+        header: "Scope",
+        enableSorting: false,
+        cell: ({ row }) => <span className="text-muted-fg">{lookups.deptName(row.original.departmentId)}</span>,
+      },
+      {
+        id: "conductedBy",
+        header: "Conducted by",
+        enableSorting: false,
+        cell: ({ row }) => <span className="text-muted-fg">{lookups.userName(row.original.conductedById)}</span>,
+      },
+      {
+        id: "remarks",
+        header: "Remarks",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="block max-w-64 truncate text-muted-fg" title={row.original.remarks}>
+            {row.original.remarks || "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => <StatusBadge status={row.original.status ?? "PLANNED"} />,
+      },
+      {
+        id: "verified",
+        header: "Verified",
+        enableSorting: false,
+        cell: ({ row }) => <AuditSeal verified={row.original.status === AuditStatus.COMPLETED} />,
+      },
+      {
+        id: "actions",
+        header: "",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-0.5">
+            {row.original.status !== AuditStatus.COMPLETED && row.original.status !== AuditStatus.CANCELLED && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs text-brand"
+                onClick={() => updateStatus.mutate({ id: row.original.id!, status: AuditStatus.COMPLETED })}
+              >
+                <CheckSquare className="h-3.5 w-3.5" /> Complete
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label="Edit audit"
+              onClick={() => {
+                setEditingAudit(row.original);
+                setIsModalOpen(true);
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-danger"
+              aria-label="Delete audit"
+              onClick={() => handleDelete(row.original)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lookups],
+  );
+
+  const openCount = audits.filter(
+    (a) => a.status !== AuditStatus.COMPLETED && a.status !== AuditStatus.CANCELLED,
+  ).length;
+
+  return (
+    <ListPageTemplate
+      title="Audits & inspections"
+      subtitle={isLoading ? "Loading audits…" : `${audits.length} audits · ${openCount} open`}
+      actions={
+        <Button onClick={openCreate}>
+          <ClipboardCheck className="mr-2 h-4 w-4" /> Schedule audit
+        </Button>
+      }
+    >
+      <DataTable
+        columns={columns}
+        data={audits}
+        isLoading={isLoading}
+        emptyTitle="No audits yet"
+        emptyDescription="Schedule physical inventory checks; completed audits earn the verification seal."
+        emptyAction={
+          <Button size="sm" onClick={openCreate}>
+            <ClipboardCheck className="mr-1.5 h-4 w-4" /> Schedule audit
+          </Button>
+        }
+      />
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingAudit ? "Update audit status" : "Schedule audit"}
+        description={
+          editingAudit
+            ? "Existing audits only support status changes."
+            : "Plan a physical inventory verification."
+        }
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="au-date">Audit date <span className="text-danger">*</span></Label>
+              <Input id="au-date" type="date" disabled={!!editingAudit} {...register("auditDate", { required: true })} />
+              {errors.auditDate && <p className="text-sm text-danger">Audit date is required</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="au-status">Status</Label>
+              <Select id="au-status" {...register("status")}>
+                {Object.values(AuditStatus).map((s) => (
+                  <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="au-dept">Department scope</Label>
+              <Select id="au-dept" disabled={!!editingAudit} {...register("departmentId")}>
+                <option value="">Whole organisation</option>
+                {master.departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="au-user">Conducted by</Label>
+              <Select id="au-user" disabled={!!editingAudit} {...register("conductedById")}>
+                <option value="">Select auditor</option>
+                {master.users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="au-remarks">Remarks</Label>
+            <Textarea id="au-remarks" disabled={!!editingAudit} placeholder="Scope notes, findings…" {...register("remarks")} />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" isLoading={createAudit.isPending || updateStatus.isPending}>
+              {editingAudit ? "Update status" : "Schedule audit"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+      {ConfirmDialog}
+    </ListPageTemplate>
+  );
 }
