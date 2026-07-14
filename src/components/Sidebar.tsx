@@ -108,9 +108,9 @@ export function Sidebar() {
                 { href: "/categories", label: "Categories", icon: Tags, active: pathname.startsWith("/categories"), permission: "VIEW_CATEGORIES" },
                 { href: "/checkouts", label: "Checkouts", icon: PackageCheck, active: pathname.startsWith("/checkouts"), permission: "VIEW_ASSETS" },
                 { href: "/maintenance", label: "Maintenance", icon: Wrench, active: pathname.startsWith("/maintenance"), permission: "VIEW_MAINTENANCE" },
-                { href: "/transfers", label: "Transfers", icon: ArrowRightLeft, active: pathname.startsWith("/transfers"), permission: "VIEW_TRANSFERS" },
-                { href: "/disposals", label: "Disposals", icon: Trash2, active: pathname.startsWith("/disposals"), permission: "VIEW_DISPOSALS" },
-                { href: "/audits", label: "Audits", icon: ClipboardCheck, active: pathname.startsWith("/audits"), permission: "VIEW_AUDITS" },
+                { href: "/transfers", label: "Transfers", icon: ArrowRightLeft, active: pathname.startsWith("/transfers"), permission: "TRANSFER_ASSET" },
+                { href: "/disposals", label: "Disposals", icon: Trash2, active: pathname.startsWith("/disposals"), permission: "DISPOSE_ASSET" },
+                { href: "/audits", label: "Audits", icon: ClipboardCheck, active: pathname.startsWith("/audits"), permission: "VIEW_AUDIT_LOGS" },
                 { href: "/discovery", label: "Asset Discovery", icon: ScanLine, active: pathname.startsWith("/discovery"), permission: "VIEW_NETWORK_DISCOVERY" },
                 { href: "/cloud-assets", label: "Cloud Assets", icon: Cloud, active: pathname.startsWith("/cloud-assets"), permission: "VIEW_CLOUD_ASSETS" },
             ]

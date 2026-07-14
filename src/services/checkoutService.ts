@@ -15,6 +15,9 @@ export interface CheckoutRecordDto {
   notes?: string;
   status?: "ACTIVE" | "RETURNED" | "OVERDUE";
   organisationId?: string;
+  /** Employee recipient (Phase 2 backend) — set when the asset was issued to a non-user employee. */
+  employeeId?: string;
+  employeeName?: string;
 }
 
 export interface CheckInDto {
