@@ -1,414 +1,403 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { SoftwareLicense, SoftwareLicenseDto, Supplier } from "@/types";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Pencil, Trash2, Key, AlertTriangle, Users } from "lucide-react";
+import type { SoftwareLicense, SoftwareLicenseDto, LicenseType, LicenseStatus } from "@/types";
 import { licenseService } from "@/services/licenseService";
 import { supplierService } from "@/services/supplierService";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { qk } from "@/lib/queryClient";
+import { makeCrudHooks } from "@/features/shared/crudHooks";
+import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
+import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
+import { Card, CardContent } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { PageSpinner } from "@/components/ui/spinner";
-import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, Key, AlertTriangle, BarChart2 } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { cn } from "@/lib/utils";
 
+const LICENSE_TYPES: LicenseType[] = ["SUBSCRIPTION", "PERPETUAL", "VOLUME", "NODE_LOCKED", "OPEN_SOURCE", "TRIAL", "ENTERPRISE", "OEM"];
+const LICENSE_STATUSES: LicenseStatus[] = ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "SUSPENDED", "CANCELLED"];
 
-type TabType = "all" | "expiring" | "over-allocated";
+type ViewType = "all" | "expiring" | "over-allocated";
+
+const licenses = makeCrudHooks<SoftwareLicense, SoftwareLicenseDto>("licenses", licenseService, { entity: "License" });
+
+function SeatBar({ seats, allocated }: { seats: number; allocated: number }) {
+  const pct = seats > 0 ? Math.min((allocated / seats) * 100, 100) : 0;
+  const over = allocated > seats;
+  return (
+    <div className="min-w-28">
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <span className={cn("data-mono text-xs", over ? "font-bold text-danger" : "text-muted-fg")}>
+          {allocated}/{seats}
+        </span>
+        {over && <AlertTriangle className="h-3 w-3 text-danger" />}
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${pct}%`, background: over ? "var(--danger)" : "var(--primary)" }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function LicensesPage() {
-    const [allLicenses, setAllLicenses] = useState<SoftwareLicense[]>([]);
-    const [displayedLicenses, setDisplayedLicenses] = useState<SoftwareLicense[]>([]);
-    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-    const [activeTab, setActiveTab] = useState<TabType>("all");
-    const [isLoading, setIsLoading] = useState(true);
-    const [deletingId, setDeletingId] = useState<string | null>(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingLicense, setEditingLicense] = useState<SoftwareLicense | null>(null);
-    const [utilization, setUtilization] = useState<{ totalSeats: number; totalAllocated: number; utilizationPct: number } | null>(null);
-    const { confirm, ConfirmDialog } = useConfirm();
+  const { format } = useCurrency();
+  const [view, setView] = useState<ViewType>("all");
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<SoftwareLicenseDto>();
+  const { data: allRows = [], isLoading: allLoading } = licenses.useList();
+  const { data: expiringRows = [], isLoading: expLoading } = useQuery({
+    queryKey: [...licenses.key.all, "expiring"],
+    queryFn: () => licenseService.getExpiringSoon(30),
+    enabled: view === "expiring",
+  });
+  const { data: overRows = [], isLoading: overLoading } = useQuery({
+    queryKey: [...licenses.key.all, "over-allocated"],
+    queryFn: () => licenseService.getOverAllocated(),
+    enabled: view === "over-allocated",
+  });
+  const { data: utilization } = useQuery({
+    queryKey: [...licenses.key.all, "utilization"],
+    queryFn: () => licenseService.getUtilization(),
+  });
+  const { data: suppliers = [] } = useQuery({
+    queryKey: qk.module("suppliers").list(),
+    queryFn: () => supplierService.getAll(),
+    staleTime: 300_000,
+  });
 
-    const fetchAll = async () => {
-        try {
-            setIsLoading(true);
-            const [licenses, suppliersData, util] = await Promise.allSettled([
-                licenseService.getAll(),
-                supplierService.getAll(),
-                licenseService.getUtilization(),
-            ]);
-            if (licenses.status === "fulfilled") {
-                setAllLicenses(licenses.value);
-                setDisplayedLicenses(licenses.value);
-            }
-            if (suppliersData.status === "fulfilled") setSuppliers(suppliersData.value);
-            if (util.status === "fulfilled") setUtilization(util.value);
-        } catch {
-            toast.error("Failed to load licenses");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+  const rows = view === "expiring" ? expiringRows : view === "over-allocated" ? overRows : allRows;
+  const isLoading = view === "expiring" ? expLoading : view === "over-allocated" ? overLoading : allLoading;
 
-    useEffect(() => { fetchAll(); }, []);
+  const save = licenses.useSave();
+  const remove = licenses.useDelete();
+  const { confirm, ConfirmDialog } = useConfirm();
 
-    const handleTabChange = async (tab: TabType) => {
-        setActiveTab(tab);
-        setIsLoading(true);
-        try {
-            if (tab === "all") {
-                setDisplayedLicenses(allLicenses);
-            } else if (tab === "expiring") {
-                const data = await licenseService.getExpiringSoon(30);
-                setDisplayedLicenses(data);
-            } else if (tab === "over-allocated") {
-                const data = await licenseService.getOverAllocated();
-                setDisplayedLicenses(data);
-            }
-        } catch {
-            toast.error("Failed to load licenses");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editing, setEditing] = useState<SoftwareLicense | null>(null);
 
-    const handleOpenCreate = () => {
-        setEditingLicense(null);
-        reset({ productName: "", licenseType: "SUBSCRIPTION", status: "ACTIVE", seats: 1, allocatedSeats: 0, currency: "USD" });
-        setIsModalOpen(true);
-    };
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<SoftwareLicenseDto>();
 
-    const handleOpenEdit = (license: SoftwareLicense) => {
-        setEditingLicense(license);
-        reset({
-            productName: license.productName,
-            licenseType: license.licenseType,
-            status: license.status,
-            licenseKey: license.licenseKey || "",
-            vendor: license.vendor || "",
-            seats: license.seats,
-            allocatedSeats: license.allocatedSeats,
-            purchaseDate: license.purchaseDate || "",
-            expiryDate: license.expiryDate || "",
-            monthlyCost: license.monthlyCost ?? undefined,
-            currency: license.currency || "USD",
-            supplierId: license.supplierId || "",
-        });
-        setIsModalOpen(true);
-    };
-
-    const handleDelete = async (id: string) => {
-        if (!await confirm({ message: "Delete this license?", variant: "danger" })) return;
-        setDeletingId(id);
-        try {
-            await licenseService.delete(id);
-            toast.success("License deleted");
-            fetchAll();
-        } catch {
-            toast.error("Failed to delete license");
-        } finally {
-            setDeletingId(null);
-        }
-    };
-
-    const onSubmit = async (data: SoftwareLicenseDto) => {
-        const payload = { ...data };
-        (Object.keys(payload) as (keyof SoftwareLicenseDto)[]).forEach((k) => {
-            if (payload[k] === "") delete (payload as Partial<SoftwareLicenseDto>)[k];
-        });
-        try {
-            if (editingLicense) {
-                const patch = buildPatchPayload<SoftwareLicenseDto>(editingLicense as unknown as Partial<SoftwareLicenseDto>, payload);
-                if (Object.keys(patch).length === 0) { toast("No changes"); return; }
-                await licenseService.update(editingLicense.id, patch);
-                toast.success("License updated");
-            } else {
-                await licenseService.create(payload);
-                toast.success("License created");
-            }
-            setIsModalOpen(false);
-            fetchAll();
-        } catch {
-            toast.error("Failed to save license");
-        }
-    };
-
-    const getStatusStyles = (status: string) => {
-        switch (status) {
-            case "ACTIVE": return "bg-emerald-100 text-emerald-700 border-emerald-200";
-            case "EXPIRING_SOON": return "bg-amber-100 text-amber-700 border-amber-200";
-            case "EXPIRED": return "bg-red-100 text-red-700 border-red-200";
-            case "SUSPENDED": return "bg-orange-100 text-orange-700 border-orange-200";
-            case "CANCELLED": return "bg-slate-100 text-slate-500 border-slate-200";
-            default: return "bg-slate-100 text-slate-500 border-slate-200";
-        }
-    };
-
-    const getLicenseTypeStyles = (type: string) => {
-        switch (type) {
-            case "SUBSCRIPTION": return "bg-blue-100 text-blue-700";
-            case "PERPETUAL": return "bg-slate-100 text-slate-700";
-            case "VOLUME": return "bg-purple-100 text-purple-700";
-            case "ENTERPRISE": return "bg-indigo-100 text-indigo-700";
-            case "TRIAL": return "bg-yellow-100 text-yellow-700";
-            default: return "bg-slate-100 text-slate-500";
-        }
-    };
-
-    const isExpiringSoon = (expiryDate?: string | null) => {
-        if (!expiryDate) return false;
-        const diff = new Date(expiryDate).getTime() - Date.now();
-        return diff > 0 && diff < 30 * 24 * 60 * 60 * 1000;
-    };
-
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Software Licenses</h1>
-                    <p className="text-slate-500">Track and manage your software license inventory.</p>
-                </div>
-                <Button onClick={handleOpenCreate} className="bg-purple-600 hover:bg-purple-700">
-                    <Plus className="mr-2 h-4 w-4" /> Add License
-                </Button>
-            </div>
-
-            {utilization && (
-                <div className="grid gap-4 md:grid-cols-3">
-                    <Card className="border-slate-200">
-                        <CardContent className="p-4 flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-lg"><Key className="h-5 w-5 text-blue-600" /></div>
-                            <div>
-                                <p className="text-xs text-slate-500">Total Licenses</p>
-                                <p className="text-xl font-bold text-slate-900">{allLicenses.length}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-slate-200">
-                        <CardContent className="p-4 flex items-center gap-3">
-                            <div className="p-2 bg-emerald-100 rounded-lg"><BarChart2 className="h-5 w-5 text-emerald-600" /></div>
-                            <div>
-                                <p className="text-xs text-slate-500">Seat Utilization</p>
-                                <p className="text-xl font-bold text-slate-900">{utilization.utilizationPct?.toFixed(1)}%</p>
-                                <p className="text-xs text-slate-400">{utilization.totalAllocated} / {utilization.totalSeats} seats</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-slate-200">
-                        <CardContent className="p-4 flex items-center gap-3">
-                            <div className="p-2 bg-red-100 rounded-lg"><AlertTriangle className="h-5 w-5 text-red-600" /></div>
-                            <div>
-                                <p className="text-xs text-slate-500">Expiring (30 days)</p>
-                                <p className="text-xl font-bold text-slate-900">
-                                    {allLicenses.filter(l => isExpiringSoon(l.expiryDate)).length}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            <div className="flex gap-2 border-b border-slate-200">
-                {(["all", "expiring", "over-allocated"] as TabType[]).map((tab) => (
-                    <button
-                        key={tab}
-                        onClick={() => handleTabChange(tab)}
-                        className={`pb-2 px-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? "border-purple-600 text-purple-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-                    >
-                        {tab === "all" ? "All Licenses" : tab === "expiring" ? "Expiring Soon" : "Over-Allocated"}
-                    </button>
-                ))}
-            </div>
-
-            <Card className="border-slate-200">
-                <CardHeader className="pb-0">
-                    <CardTitle className="text-base font-semibold text-slate-700">
-                        {displayedLicenses.length} {activeTab === "all" ? "total" : activeTab === "expiring" ? "expiring soon" : "over-allocated"} license{displayedLicenses.length !== 1 ? "s" : ""}
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {isLoading ? (
-                        <div className="h-40 flex items-center justify-center">
-                            <PageSpinner />
-                        </div>
-                    ) : displayedLicenses.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center p-12 text-center">
-                            <Key className="h-12 w-12 text-slate-300 mb-4" />
-                            <h3 className="text-lg font-medium text-slate-900">No licenses found</h3>
-                            <p className="text-slate-500 mt-1">Add software licenses to track seat usage and expiry.</p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-slate-100 bg-slate-50/50">
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Product</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Type</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Seats</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Expiry</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Cost/mo</th>
-                                        <th className="text-left py-3 px-4 font-medium text-slate-600">Status</th>
-                                        <th className="text-right py-3 px-4 font-medium text-slate-600">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {displayedLicenses.map((lic) => {
-                                        const overAllocated = lic.allocatedSeats > lic.seats;
-                                        const expiring = isExpiringSoon(lic.expiryDate);
-                                        return (
-                                            <tr key={lic.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                                                <td className="py-3 px-4">
-                                                    <div className="font-medium text-slate-900">{lic.productName}</div>
-                                                    {lic.vendor && <div className="text-xs text-slate-400">{lic.vendor}</div>}
-                                                </td>
-                                                <td className="py-3 px-4">
-                                                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getLicenseTypeStyles(lic.licenseType)}`}>
-                                                        {lic.licenseType}
-                                                    </span>
-                                                </td>
-                                                <td className="py-3 px-4">
-                                                    <div className={`flex items-center gap-1 ${overAllocated ? "text-red-600" : "text-slate-700"}`}>
-                                                        {overAllocated && <AlertTriangle className="h-3.5 w-3.5" />}
-                                                        <span className="font-medium">{lic.allocatedSeats}</span>
-                                                        <span className="text-slate-400">/ {lic.seats}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="py-3 px-4">
-                                                    <div className={`flex items-center gap-1 ${expiring ? "text-amber-600" : "text-slate-600"}`}>
-                                                        {expiring && <AlertTriangle className="h-3.5 w-3.5" />}
-                                                        {lic.expiryDate ? new Date(lic.expiryDate).toLocaleDateString() : "—"}
-                                                    </div>
-                                                </td>
-                                                <td className="py-3 px-4 text-slate-700">
-                                                    {lic.monthlyCost != null ? `${lic.currency || "USD"} ${lic.monthlyCost.toLocaleString()}` : "—"}
-                                                </td>
-                                                <td className="py-3 px-4">
-                                                    <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${getStatusStyles(lic.status)}`}>
-                                                        {lic.status}
-                                                    </span>
-                                                </td>
-                                                <td className="py-3 px-4">
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button variant="outline" size="sm" onClick={() => handleOpenEdit(lic)} className="h-7 px-2">
-                                                            <Pencil className="h-3 w-3" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(lic.id)} isLoading={deletingId === lic.id} className="h-7 px-2 text-red-600 hover:bg-red-50">
-                                                            <Trash2 className="h-3 w-3" />
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingLicense ? "Edit License" : "Add License"}
-                description={editingLicense ? "Update license details." : "Register a new software license."}
-            >
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
-                    <div className="space-y-2">
-                        <Label htmlFor="productName">Product Name <span className="text-red-500">*</span></Label>
-                        <Input id="productName" placeholder="e.g. Microsoft Office 365" {...register("productName", { required: "Product name is required" })} />
-                        {errors.productName && <p className="text-sm text-red-500">{errors.productName.message}</p>}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="licenseType">License Type</Label>
-                            <Select id="licenseType" {...register("licenseType")}>
-                                {["SUBSCRIPTION", "PERPETUAL", "VOLUME", "NODE_LOCKED", "OPEN_SOURCE", "TRIAL", "ENTERPRISE", "OEM"].map(t => (
-                                    <option key={t} value={t}>{t}</option>
-                                ))}
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="status">Status</Label>
-                            <Select id="status" {...register("status")}>
-                                {["ACTIVE", "EXPIRING_SOON", "EXPIRED", "SUSPENDED", "CANCELLED"].map(s => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </Select>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="vendor">Vendor</Label>
-                        <Input id="vendor" placeholder="e.g. Microsoft" {...register("vendor")} />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="licenseKey">License Key</Label>
-                        <Input id="licenseKey" placeholder="XXXXX-XXXXX-XXXXX" {...register("licenseKey")} />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="seats">Total Seats <span className="text-red-500">*</span></Label>
-                            <Input id="seats" type="number" min={1} {...register("seats", { required: true, valueAsNumber: true })} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="allocatedSeats">Allocated Seats</Label>
-                            <Input id="allocatedSeats" type="number" min={0} {...register("allocatedSeats", { valueAsNumber: true })} />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="purchaseDate">Purchase Date</Label>
-                            <Input id="purchaseDate" type="date" {...register("purchaseDate")} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="expiryDate">Expiry Date</Label>
-                            <Input id="expiryDate" type="date" {...register("expiryDate")} />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="monthlyCost">Monthly Cost</Label>
-                            <Input id="monthlyCost" type="number" step="0.01" placeholder="0.00" {...register("monthlyCost", { valueAsNumber: true })} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="currency">Currency</Label>
-                            <Select id="currency" {...register("currency")}>
-                                <option value="USD">USD</option>
-                                <option value="GHS">GHS</option>
-                                <option value="EUR">EUR</option>
-                                <option value="GBP">GBP</option>
-                            </Select>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="supplierId">Supplier</Label>
-                        <Select id="supplierId" {...register("supplierId")}>
-                            <option value="">— None —</option>
-                            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </Select>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-4 border-t">
-                        <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                        <Button type="submit" isLoading={isSubmitting} className="bg-purple-600 hover:bg-purple-700">
-                            {editingLicense ? "Save Changes" : "Add License"}
-                        </Button>
-                    </div>
-                </form>
-        {ConfirmDialog}
-            </Modal>
-        </div>
+  useEffect(() => {
+    if (!isModalOpen) return;
+    reset(
+      editing
+        ? {
+            productName: editing.productName,
+            licenseType: editing.licenseType,
+            status: editing.status,
+            licenseKey: editing.licenseKey || "",
+            vendor: editing.vendor || "",
+            seats: editing.seats,
+            allocatedSeats: editing.allocatedSeats,
+            purchaseDate: editing.purchaseDate || "",
+            expiryDate: editing.expiryDate || "",
+            monthlyCost: editing.monthlyCost ?? undefined,
+            currency: editing.currency || "GHS",
+            supplierId: editing.supplierId || "",
+          }
+        : { productName: "", licenseType: "SUBSCRIPTION", status: "ACTIVE", seats: 1, allocatedSeats: 0, currency: "GHS" },
     );
+  }, [isModalOpen, editing, reset]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (license: SoftwareLicense) => {
+    if (!(await confirm({ message: `Delete "${license.productName}"?`, variant: "danger" }))) return;
+    remove.mutate(license.id);
+  };
+
+  const onSubmit = async (data: SoftwareLicenseDto) => {
+    const payload: SoftwareLicenseDto = {
+      ...data,
+      seats: Number(data.seats),
+      allocatedSeats: Number(data.allocatedSeats),
+      monthlyCost: data.monthlyCost != null && String(data.monthlyCost) !== "" ? Number(data.monthlyCost) : undefined,
+    };
+    (Object.keys(payload) as (keyof SoftwareLicenseDto)[]).forEach((k) => {
+      if (payload[k] === "") delete (payload as unknown as Record<string, unknown>)[k];
+    });
+
+    if (editing) {
+      const patch = buildPatchPayload<SoftwareLicenseDto>(editing as unknown as Partial<SoftwareLicenseDto>, payload);
+      if (Object.keys(patch).length === 0) {
+        toast("No changes to update");
+        return;
+      }
+      await save.mutateAsync({ id: editing.id, data: patch as SoftwareLicenseDto });
+    } else {
+      await save.mutateAsync({ data: payload });
+    }
+    setIsModalOpen(false);
+  };
+
+  const columns = useMemo<ColumnDef<SoftwareLicense, unknown>[]>(
+    () => [
+      {
+        accessorKey: "productName",
+        header: "Product",
+        cell: ({ row }) => (
+          <div className="min-w-0 max-w-56">
+            <p className="truncate font-semibold text-foreground">{row.original.productName}</p>
+            <p className="truncate text-xs text-faint-fg">
+              {row.original.vendor || "—"} · {String(row.original.licenseType ?? "").replace(/_/g, " ").toLowerCase()}
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: "seats",
+        header: "Seats",
+        enableSorting: false,
+        cell: ({ row }) => <SeatBar seats={row.original.seats} allocated={row.original.allocatedSeats} />,
+      },
+      {
+        accessorKey: "expiryDate",
+        header: "Expires",
+        cell: ({ row }) => (
+          <span className="text-muted-fg">
+            {row.original.expiryDate ? new Date(row.original.expiryDate).toLocaleDateString() : "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "monthlyCost",
+        header: () => <span className="block text-right">Monthly</span>,
+        cell: ({ row }) => (
+          <span className="data-mono block text-right">
+            {row.original.monthlyCost != null ? format(row.original.monthlyCost, row.original.currency || "GHS") : "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => (
+          <StatusBadge
+            status={row.original.status ?? "ACTIVE"}
+            tone={
+              row.original.status === "EXPIRING_SOON"
+                ? "maintenance"
+                : row.original.status === "EXPIRED" || row.original.status === "SUSPENDED"
+                  ? "flagged"
+                  : undefined
+            }
+          />
+        ),
+      },
+      {
+        id: "actions",
+        header: "",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label="Edit license"
+              onClick={() => {
+                setEditing(row.original);
+                setIsModalOpen(true);
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-danger"
+              aria-label="Delete license"
+              onClick={() => handleDelete(row.original)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [format],
+  );
+
+  return (
+    <ListPageTemplate
+      title="Software licenses"
+      subtitle={isLoading ? "Loading licenses…" : `${rows.length} licenses in view`}
+      actions={
+        <Button onClick={openCreate}>
+          <Plus className="mr-2 h-4 w-4" /> New license
+        </Button>
+      }
+      toolbar={
+        <div className="flex gap-1.5">
+          {(
+            [
+              ["all", "All"],
+              ["expiring", "Expiring 30d"],
+              ["over-allocated", "Over-allocated"],
+            ] as [ViewType, string][]
+          ).map(([key, label]) => (
+            <Button key={key} variant={view === key ? "default" : "outline"} size="sm" onClick={() => setView(key)}>
+              {label}
+            </Button>
+          ))}
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        {utilization ? (
+          <Card>
+            <CardContent className="flex flex-wrap items-center gap-8 pt-5">
+              <div className="flex items-center gap-3">
+                <Users className="h-4 w-4 text-brand" />
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.06em] text-faint-fg">Seat utilisation</p>
+                  <p className="data-mono text-lg font-bold text-foreground">
+                    {utilization.utilizationPct?.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.06em] text-faint-fg">Allocated / total seats</p>
+                <p className="data-mono text-lg font-bold text-foreground">
+                  {utilization.totalAllocated} / {utilization.totalSeats}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <DataTable
+          columns={columns}
+          data={rows}
+          isLoading={isLoading}
+          emptyTitle={view === "all" ? "No software licenses" : "Nothing in this view"}
+          emptyDescription="Track subscriptions and perpetual licenses, seat allocation, and renewal dates."
+          emptyAction={
+            view === "all" ? (
+              <Button size="sm" onClick={openCreate}>
+                <Key className="mr-1.5 h-4 w-4" /> New license
+              </Button>
+            ) : undefined
+          }
+        />
+      </div>
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editing ? "Edit license" : "New license"}
+        description="Seats, costs, and renewal tracking for software entitlements."
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+          <div className="space-y-2">
+            <Label htmlFor="lic-name">Product name <span className="text-danger">*</span></Label>
+            <Input id="lic-name" placeholder="Microsoft 365 E3" {...register("productName", { required: "Product name is required" })} />
+            {errors.productName && <p className="text-sm text-danger">{errors.productName.message as string}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="lic-type">Type</Label>
+              <Select id="lic-type" {...register("licenseType")}>
+                {LICENSE_TYPES.map((t) => (
+                  <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lic-status">Status</Label>
+              <Select id="lic-status" {...register("status")}>
+                {LICENSE_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="lic-key">License key</Label>
+            <Input id="lic-key" className="data-mono" placeholder="XXXX-XXXX-XXXX" {...register("licenseKey")} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="lic-vendor">Vendor</Label>
+              <Input id="lic-vendor" placeholder="Microsoft" {...register("vendor")} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lic-supplier">Supplier</Label>
+              <Select id="lic-supplier" {...register("supplierId")}>
+                <option value="">— None —</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="lic-seats">Total seats</Label>
+              <Input id="lic-seats" type="number" min="1" {...register("seats", { required: true, min: 1 })} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lic-alloc">Allocated seats</Label>
+              <Input id="lic-alloc" type="number" min="0" {...register("allocatedSeats", { min: 0 })} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="lic-purchase">Purchase date</Label>
+              <Input id="lic-purchase" type="date" {...register("purchaseDate")} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lic-expiry">Expiry date</Label>
+              <Input id="lic-expiry" type="date" {...register("expiryDate")} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="lic-cost">Monthly cost</Label>
+              <Input id="lic-cost" type="number" step="0.01" min="0" {...register("monthlyCost")} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lic-currency">Currency</Label>
+              <Select id="lic-currency" {...register("currency")}>
+                <option value="GHS">GHS</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" isLoading={save.isPending}>
+              {editing ? "Save changes" : "Create license"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+      {ConfirmDialog}
+    </ListPageTemplate>
+  );
 }
