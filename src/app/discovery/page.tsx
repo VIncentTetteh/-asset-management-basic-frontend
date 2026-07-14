@@ -383,8 +383,9 @@ export default function DiscoveryPage() {
                                                     </Button>
                                                 )}
                                                 <button onClick={() => handleDelete(device.id)}
-                                                    className="rounded-control p-1.5 text-danger/70 transition-colors hover:bg-danger-soft hover:text-danger">
-                                                    <Trash2 className="h-4 w-4" />
+                                                    disabled={deletingId === device.id}
+                                                    className="rounded-control p-1.5 text-danger/70 transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40">
+                                                    <Trash2 className={cn("h-4 w-4", deletingId === device.id && "animate-pulse")} />
                                                 </button>
                                             </div>
                                         </div>
@@ -422,11 +423,7 @@ export default function DiscoveryPage() {
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span className="text-faint-fg">OS / Platform</span>
-                                                            <span className="font-medium text-muted-fg">{(device as any).os || "Unknown"}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-faint-fg">Vendor / OUI</span>
-                                                            <span className="font-medium text-muted-fg">{(device as any).vendor || "Unknown"}</span>
+                                                            <span className="font-medium text-muted-fg">{device.osHint || "Unknown"}</span>
                                                         </div>
                                                     </div>
                                                 </div>

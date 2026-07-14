@@ -15,6 +15,7 @@ import { toast } from "react-hot-toast";
 import { useForm } from "react-hook-form";
 import { KeyRound, Shield, ToggleLeft, ToggleRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import axios from "axios";
 
 type TabType = "oauth2" | "saml";
 
@@ -52,8 +53,8 @@ export default function SsoConfigurationPage() {
                     emailDomain: data.emailDomain || "",
                 });
             }
-        } catch (error: any) {
-            toast.error(error?.response?.status === 403
+        } catch (error) {
+            toast.error(axios.isAxiosError(error) && error.response?.status === 403
                 ? "You need admin or security permission to manage SSO."
                 : "Failed to load SSO configuration");
         } finally {

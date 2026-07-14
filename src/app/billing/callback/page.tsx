@@ -7,6 +7,7 @@ import { Subscription } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { extractErrorMessage } from "@/lib/error";
 
 type VerifyState = "loading" | "success" | "error";
 
@@ -30,9 +31,9 @@ export default function BillingCallbackPage() {
                 const sub = await billingService.verifyCheckout(reference);
                 setSubscription(sub);
                 setState("success");
-            } catch (error: any) {
+            } catch (error) {
                 setState("error");
-                setErrorMessage(error?.response?.data?.message || "Failed to verify checkout");
+                setErrorMessage(extractErrorMessage(error, "Failed to verify checkout"));
             }
         };
         verify();

@@ -19,6 +19,7 @@ import { useForm } from "react-hook-form";
 import { UserCircle, Mail, Phone, Building, Briefcase, Shield, Save, ShieldCheck, ShieldOff } from "lucide-react";
 import { buildPatchPayload } from "@/lib/patch";
 import { mergeStoredUser, verifyOrganisationContext } from "@/lib/authContext";
+import { extractErrorMessage } from "@/lib/error";
 
 export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
@@ -163,8 +164,8 @@ export default function ProfilePage() {
             setUser(merged);
 
             toast.success("Profile updated successfully");
-        } catch (error: any) {
-            toast.error(error.response?.data?.message || "Failed to update profile");
+        } catch (error) {
+            toast.error(extractErrorMessage(error, "Failed to update profile"));
             console.error(error);
         }
     };
