@@ -3,29 +3,37 @@ import { User, UserDto } from "@/types";
 import { extractList } from "@/services/responseUtils";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
 import { AxiosError } from "axios";
+import { invalidateRequestCache, withRequestCache } from "@/services/requestCache";
 
 export const userService = {
     /** GET /users — all users in org (JWT-scoped, no organisationId param) */
     getAll: async (): Promise<User[]> => {
-        const response = await api.get("/users");
-        return extractList<User>(response.data);
+        return withRequestCache(`users:${getOrganisationIdFromStorage() ?? "default"}:list`, async () => {
+            const response = await api.get("/users");
+            return extractList<User>(response.data);
+        }, 2 * 60_000);
     },
 
     /** GET /users?departmentId={uuid} */
     getByDepartment: async (departmentId: string): Promise<User[]> => {
-        const response = await api.get("/users", { params: { departmentId } });
-        return extractList<User>(response.data);
+        return withRequestCache(`users:${getOrganisationIdFromStorage() ?? "default"}:department:${departmentId}`, async () => {
+            const response = await api.get("/users", { params: { departmentId } });
+            return extractList<User>(response.data);
+        }, 2 * 60_000);
     },
 
     /** GET /users/{id} */
     get: async (id: string): Promise<User> => {
-        const response = await api.get<User>(`/users/${id}`);
-        return response.data;
+        return withRequestCache(`users:${getOrganisationIdFromStorage() ?? "default"}:one:${id}`, async () => {
+            const response = await api.get<User>(`/users/${id}`);
+            return response.data;
+        }, 2 * 60_000);
     },
 
     /** POST /users — password required on creation */
     create: async (data: UserDto & { password: string }): Promise<User> => {
         const response = await api.post<User>("/users", data);
+        invalidateRequestCache("users:");
         return response.data;
     },
 
@@ -39,6 +47,7 @@ export const userService = {
 
         try {
             const patchResponse = await api.patch<User>(`/users/${id}`, patchPayload);
+            invalidateRequestCache("users:");
             return patchResponse.data;
         } catch (error) {
             const status = (error as AxiosError)?.response?.status;
@@ -66,6 +75,7 @@ export const userService = {
         };
 
         const response = await api.put<User>(`/users/${id}`, payload);
+        invalidateRequestCache("users:");
         return response.data;
     },
 
@@ -84,12 +94,14 @@ export const userService = {
      */
     patchMe: async (data: Pick<UserDto, "firstName" | "lastName" | "phone" | "jobTitle">): Promise<User> => {
         const response = await api.patch<User>("/users/me", data);
+        invalidateRequestCache("users:");
         return response.data;
     },
 
     /** PUT /users/{id}/deactivate — sets status → INACTIVE */
     deactivate: async (id: string): Promise<void> => {
         await api.put(`/users/${id}/deactivate`);
+        invalidateRequestCache("users:");
     },
 
     /** PUT /users/{id}/role?roleId={uuid} */
@@ -97,6 +109,7 @@ export const userService = {
         const response = await api.put<User>(`/users/${id}/role`, null, {
             params: { roleId }
         });
+        invalidateRequestCache("users:");
         return response.data;
     },
 };

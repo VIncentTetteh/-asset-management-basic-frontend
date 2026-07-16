@@ -22,12 +22,6 @@ export default function ForgotPasswordPage() {
         try {
             const response = await authService.forgotPassword(data);
             toast.success(response.message || "Password reset instructions sent to email");
-
-            // Note: Since emails aren't sent right now, auto-redirect or allow testing token
-            if (response.token) {
-                console.log("Reset token for testing:", response.token);
-                toast.success(`Testing Token: ${response.token}`);
-            }
             setIsSubmitted(true);
         } catch (error: any) {
             toast.error(error.response?.data?.error || "Failed to process request. Please try again.");
@@ -59,7 +53,10 @@ export default function ForgotPasswordPage() {
                                     id="email"
                                     type="email"
                                     placeholder="name@company.com"
-                                    {...register("email", { required: "Email is required" })}
+                                    {...register("email", {
+                                    required: "Email is required",
+                                    pattern: { value: /\S+@\S+\.\S+/, message: "Invalid email address" }
+                                })}
                                     className={errors.email ? "border-red-500" : ""}
                                 />
                                 {errors.email && (

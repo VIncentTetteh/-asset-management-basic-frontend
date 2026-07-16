@@ -18,7 +18,7 @@ function ResetPasswordForm() {
     const token = searchParams.get("token");
 
     const [isLoading, setIsLoading] = useState(false);
-    const { register, handleSubmit, formState: { errors } } = useForm();
+    const { register, handleSubmit, watch, formState: { errors } } = useForm();
 
     const onSubmit = async (data: any) => {
         if (!token) {
@@ -62,7 +62,7 @@ function ResetPasswordForm() {
                         type="password"
                         placeholder="••••••••"
                         {...register("newPassword", {
-                            required: "New boundary password is required",
+                            required: "New password is required",
                             minLength: {
                                 value: 8,
                                 message: "Password must be at least 8 characters long"
@@ -72,6 +72,23 @@ function ResetPasswordForm() {
                     />
                     {errors.newPassword && (
                         <p className="text-sm text-red-500">{errors.newPassword.message as string}</p>
+                    )}
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                    <Input
+                        id="confirmPassword"
+                        type="password"
+                        placeholder="••••••••"
+                        {...register("confirmPassword", {
+                            required: "Please confirm your new password",
+                            validate: (value) =>
+                                value === watch("newPassword") || "Passwords do not match"
+                        })}
+                        className={errors.confirmPassword ? "border-red-500" : ""}
+                    />
+                    {errors.confirmPassword && (
+                        <p className="text-sm text-red-500">{errors.confirmPassword.message as string}</p>
                     )}
                 </div>
             </CardContent>

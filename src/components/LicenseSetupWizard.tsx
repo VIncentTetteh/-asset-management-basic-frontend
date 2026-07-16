@@ -50,12 +50,10 @@ const STEPS: StepInfo[] = [
 // ── Helper: call the backend activate endpoint ─────────────────────────────────
 
 async function activateLicenseKey(key: string): Promise<void> {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     const res = await fetch("/api/v1/license/activate", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ licenseKey: key }),
         credentials: "include",

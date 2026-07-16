@@ -223,6 +223,9 @@ export const pciSaqService = {
         const res = await api.patch<PCISAQRecord>(`${BASE}/pci-saq/${id}`, data);
         return res.data;
     },
+    delete: async (id: string): Promise<void> => {
+        await api.delete(`${BASE}/pci-saq/${id}`);
+    },
 };
 
 // ─── 10) SLA Metrics ──────────────────────────────────────────────────────────
@@ -242,6 +245,9 @@ export const slaMetricService = {
     update: async (id: string, data: Partial<SLAMetricDto>): Promise<SLAMetric> => {
         const res = await api.patch<SLAMetric>(`${BASE}/sla-metrics/${id}`, data);
         return res.data;
+    },
+    delete: async (id: string): Promise<void> => {
+        await api.delete(`${BASE}/sla-metrics/${id}`);
     },
 };
 

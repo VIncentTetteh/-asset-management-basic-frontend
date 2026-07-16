@@ -12,9 +12,16 @@ import { NextRequest } from "next/server";
  * the rewrite was removed — this is the single proxy entry-point.
  */
 
-const TARGET_BASE = (process.env.API_TARGET_BASE ?? "http://localhost:8080/api").replace(/\/+$/, "");
+const isProduction = process.env.NODE_ENV === "production";
+const configuredTargetBase = process.env.API_TARGET_BASE;
 
-if (!process.env.API_TARGET_BASE) {
+if (isProduction && !configuredTargetBase) {
+    throw new Error("API_TARGET_BASE is required for production builds and deployments.");
+}
+
+const TARGET_BASE = (configuredTargetBase ?? "http://localhost:8080/api").replace(/\/+$/, "");
+
+if (!configuredTargetBase) {
     console.warn(
         "[proxy] API_TARGET_BASE is not set — falling back to http://localhost:8080/api. " +
         "Set API_TARGET_BASE in your environment for production deployments."
@@ -46,10 +53,13 @@ async function handleProxy(req: NextRequest, params: { path: string[] }) {
         const headers = new Headers(req.headers);
         // Remove headers that would confuse the upstream server.
         headers.delete("host");
-        // Do not forward browser cookies to the backend API.
-        // This app authenticates API requests via Bearer tokens, and forwarding
-        // large third-party cookies can push Tomcat over header-size limits.
+        // Forward only AssetIQ's first-party auth cookie. Dropping third-party
+        // cookies keeps headers small without breaking the HttpOnly JWT flow.
         headers.delete("cookie");
+        const authCookie = req.cookies.get("access_token")?.value;
+        if (authCookie) {
+            headers.set("cookie", `access_token=${authCookie}`);
+        }
         // Tell the backend NOT to compress its response.
         // If we forward the browser's "Accept-Encoding: gzip, br" the backend
         // sends a compressed body. Node fetch does not auto-decompress, so the

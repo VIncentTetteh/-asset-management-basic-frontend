@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import api from "@/lib/axios";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -17,6 +18,17 @@ interface PermissionContextValue {
     refresh: () => Promise<void>;
 }
 
+interface PermissionEnvelope {
+    permissions?: unknown;
+    data?: { permissions?: unknown };
+}
+
+const getErrorStatus = (err: unknown): number | undefined => {
+    if (!err || typeof err !== "object") return undefined;
+    const response = (err as { response?: { status?: unknown } }).response;
+    return typeof response?.status === "number" ? response.status : undefined;
+};
+
 // ── Context ───────────────────────────────────────────────────────────────────
 
 const PermissionContext = createContext<PermissionContextValue>({
@@ -30,13 +42,14 @@ const PermissionContext = createContext<PermissionContextValue>({
 
 export function PermissionProvider({ children }: { children: ReactNode }) {
     const pathname = usePathname();
+    const { isAuthenticated, isReady } = useAuth();
     const [permissions, setPermissions] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
-    const publicPaths = ["/", "/login", "/register", "/register-tenant", "/forgot-password", "/reset-password"];
+    const publicPaths = ["/", "/login", "/login/sso-callback", "/register", "/register-tenant", "/forgot-password", "/reset-password"];
     const isPublicPage = publicPaths.includes(pathname);
 
     const fetchPermissions = useCallback(async () => {
-        if (isPublicPage) {
+        if (isPublicPage || !isReady || !isAuthenticated) {
             setPermissions(new Set());
             setLoading(false);
             return;
@@ -51,22 +64,25 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
                 "/auth/me/permissions"
             );
             // Tolerate both `{ permissions: [...] }` and `{ data: { permissions: [...] } }` envelopes.
-            const raw = response.data as any;
-            const list: string[] = Array.isArray(raw?.permissions)
+            const raw = response.data as PermissionEnvelope;
+            const maybeList = Array.isArray(raw.permissions)
                 ? raw.permissions
-                : Array.isArray(raw?.data?.permissions)
+                : Array.isArray(raw.data?.permissions)
                 ? raw.data.permissions
                 : [];
+            const list = maybeList.filter((permission): permission is string => typeof permission === "string");
             setPermissions(new Set(list));
         } catch (err) {
             // If the request fails (e.g., network error, token expired), leave
             // permissions empty so the user doesn't see anything they shouldn't.
-            console.warn("[PermissionContext] Failed to fetch permissions:", err);
+            if (getErrorStatus(err) !== 401) {
+                console.warn("[PermissionContext] Failed to fetch permissions:", err);
+            }
             setPermissions(new Set());
         } finally {
             setLoading(false);
         }
-    }, [isPublicPage]);
+    }, [isAuthenticated, isPublicPage, isReady]);
 
     useEffect(() => {
         fetchPermissions();

@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { authService, TenantRegistrationDto } from "@/services/authService";
-import api from "@/lib/axios";
 import { setStoredUser, setVerifiedOrganisationId } from "@/lib/authContext";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -25,8 +24,8 @@ export default function RegisterTenantPage() {
         setIsLoading(true);
         try {
             const response = await authService.registerTenant(data);
-            // API returns token + user info directly — auto-login the admin
-            localStorage.setItem("token", response.token);
+            // API returns token + user info directly — auto-login the admin.
+            // Token lives in the HttpOnly cookie set by the backend.
             setStoredUser({
                 id: response.userId,
                 firstName: response.firstName,
@@ -36,7 +35,6 @@ export default function RegisterTenantPage() {
                 organisationId: response.organisationId,
             });
             setVerifiedOrganisationId(response.organisationId);
-            api.defaults.headers.common["Authorization"] = `Bearer ${response.token}`;
             window.dispatchEvent(new Event("auth-changed"));
             toast.success(`Workspace "${response.organisationName}" created! Welcome, ${response.firstName}.`);
             router.push("/dashboard");

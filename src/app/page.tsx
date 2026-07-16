@@ -2,6 +2,7 @@
 
 import { Navbar } from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
+import { PlatformShowcase } from "@/components/landing/PlatformShowcase";
 import { FeaturesGrid } from "@/components/landing/FeaturesGrid";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { Testimonials } from "@/components/landing/Testimonials";
@@ -16,6 +17,8 @@ export default function LandingPage() {
 
             <main>
                 <Hero />
+
+                <PlatformShowcase />
 
                 <section className="py-20 bg-slate-900/10">
                     <div className="container mx-auto px-6">

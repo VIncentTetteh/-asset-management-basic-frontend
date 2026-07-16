@@ -194,9 +194,9 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
             title={asset.name} 
             description={`Asset Tag: ${asset.assetTag || 'N/A'}`}
         >
-            <div className="flex flex-col h-[70vh]">
+            <div className="flex flex-col">
                 {/* Tabs */}
-                <div className="flex gap-1 border-b border-slate-200 mb-4 overflow-x-auto pb-1">
+                <div className="flex gap-1 border-b border-slate-200 mb-4 overflow-x-auto pb-1 shrink-0">
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
@@ -213,7 +213,7 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                     ))}
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-1">
+                <div className="max-h-[55vh] overflow-y-auto px-1">
                     {activeTab === "overview" && (
                         <div className="space-y-6">
                             <div className="grid grid-cols-2 gap-x-8 gap-y-4">
@@ -381,7 +381,7 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                 </div>
 
                 {/* Footer Actions */}
-                <div className="flex justify-end pt-4 border-t mt-4 border-slate-200">
+                <div className="flex shrink-0 justify-end pt-4 border-t mt-4 border-slate-200">
                     <Button variant="outline" onClick={onClose} className="px-8 font-semibold tracking-wide border-slate-300 hover:bg-slate-50">
                         Close
                     </Button>

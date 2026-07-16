@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { authService } from "@/services/authService";
 import { clearAuthState } from "@/lib/axios";
 import type { User } from "@/types";
@@ -40,10 +41,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+    const pathname = usePathname();
     const [user, setUser] = useState<User | null>(null);
     const [permissions, setPermissions] = useState<Set<Permission>>(new Set());
     const [isLoading, setIsLoading] = useState(true);
     const [isReady, setIsReady] = useState(false);
+    const publicPaths = ["/", "/login", "/login/sso-callback", "/register", "/register-tenant", "/forgot-password", "/reset-password"];
+    const isPublicPage = publicPaths.includes(pathname);
 
     const loadProfile = useCallback(async () => {
         setIsLoading(true);
@@ -51,8 +55,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const profile = await authService.getProfile();
             setUser(profile);
             // Profile includes the user's live permissions from the backend cache
-            const perms = Array.isArray((profile as any).permissions)
-                ? (profile as any).permissions as Permission[]
+            const profileWithPermissions = profile as User & { permissions?: unknown };
+            const perms = Array.isArray(profileWithPermissions.permissions)
+                ? profileWithPermissions.permissions as Permission[]
                 : [];
             setPermissions(new Set(perms));
         } catch {
@@ -65,9 +70,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    // Load profile once on mount — the HttpOnly cookie is sent automatically
+    // Load profile on protected pages. Public pages should not generate expected
+    // 401s just because the global provider is mounted above the auth layout.
     useEffect(() => {
+        if (isPublicPage) {
+            setUser(null);
+            setPermissions(new Set());
+            setIsLoading(false);
+            setIsReady(true);
+            return;
+        }
+
         loadProfile();
+    }, [isPublicPage, loadProfile]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const onAuthChanged = () => {
+            loadProfile();
+        };
+
+        window.addEventListener("auth-changed", onAuthChanged);
+        return () => window.removeEventListener("auth-changed", onAuthChanged);
     }, [loadProfile]);
 
     const signOut = useCallback(async () => {

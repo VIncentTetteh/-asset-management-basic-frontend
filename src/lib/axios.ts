@@ -9,8 +9,7 @@ import { clearVerifiedOrganisationId, getOrganisationIdFromStorage } from "@/lib
  * credentialed request — JavaScript can never read it, which eliminates the
  * XSS token-theft attack surface.
  *
- * The Authorization: Bearer header path is preserved for the desktop (Electron)
- * app and direct API clients that still use localStorage-based tokens.
+ * Web sessions no longer read or persist JWTs in localStorage.
  */
 const api = axios.create({
     baseURL: "/api/v1",
@@ -21,27 +20,8 @@ const api = axios.create({
     },
 });
 
-const MAX_AUTH_TOKEN_HEADER_LENGTH = 4096;
-
-/**
- * Returns a stored Bearer token if one exists in localStorage.
- * Used only for desktop-app compatibility — browser sessions rely on the cookie.
- */
-const getSafeToken = (): string | null => {
-    if (typeof window === "undefined") return null;
-    const token = localStorage.getItem("token");
-    if (!token) return null;
-    const normalized = token.trim();
-    if (!normalized || normalized.length > MAX_AUTH_TOKEN_HEADER_LENGTH) {
-        localStorage.removeItem("token");
-        return null;
-    }
-    return normalized;
-};
-
 // ── Helper: clear all auth state ─────────────────────────────────────────────
 export const clearAuthState = (): void => {
-    // Remove any localStorage token (desktop/legacy compatibility)
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     sessionStorage.removeItem("user_meta");
@@ -69,18 +49,11 @@ const shouldSkipOrganisationHeader = (url?: string): boolean =>
     );
 
 // ── Request interceptor ───────────────────────────────────────────────────────
-// For browser sessions the HttpOnly cookie is sent automatically via withCredentials.
-// If a localStorage token also exists (desktop/legacy) it is added as a Bearer header
-// so the backend filter can accept it from either source.
+// Browser sessions use the HttpOnly cookie sent automatically via withCredentials.
 api.interceptors.request.use((config) => {
     if (typeof window !== "undefined") {
-        const token = getSafeToken();
-
         if (config.headers && isPublicAuthEndpoint(config.url)) {
             delete config.headers["Authorization"];
-        } else if (token && config.headers) {
-            // Desktop/legacy: add Bearer header when a stored token is present
-            config.headers["Authorization"] = `Bearer ${token}`;
         } else if (config.headers) {
             delete config.headers["Authorization"];
         }

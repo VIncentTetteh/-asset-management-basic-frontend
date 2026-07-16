@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ssoAuthService, SsoCallbackResponse } from "@/services/ssoAuthService";
 import { authService } from "@/services/authService";
-import api from "@/lib/axios";
 import { clearVerifiedOrganisationId, setStoredUser, verifyOrganisationContext } from "@/lib/authContext";
 import toast from "react-hot-toast";
 import { Loader2, ShieldCheck } from "lucide-react";
@@ -34,9 +33,8 @@ export default function SsoCallbackPage() {
                 }
 
                 if (response.token) {
-                    localStorage.setItem("token", response.token);
+                    // Token lives in the HttpOnly cookie set by the backend.
                     clearVerifiedOrganisationId();
-                    api.defaults.headers.common["Authorization"] = `Bearer ${response.token}`;
 
                     // Store user — fetch from /auth/profile if the callback didn't include it
                     let user = response.user;
@@ -66,7 +64,6 @@ export default function SsoCallbackPage() {
                     throw new Error("Failed to retrieve authentication token");
                 }
             } catch (error: any) {
-                console.error("SSO Callback Error:", error);
                 setStatus("error");
                 toast.error(error.response?.data?.message || error.message || "SSO authentication failed");
                 

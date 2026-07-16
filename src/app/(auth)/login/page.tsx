@@ -90,7 +90,6 @@ export default function LoginPage() {
 
             // ── Normal login success ──────────────────────────────────────────
             if ("token" in response && response.token) {
-                localStorage.setItem("token", response.token);
                 clearVerifiedOrganisationId();
                 setStoredUser(response.user);
                 window.dispatchEvent(new Event("auth-changed"));
@@ -117,7 +116,6 @@ export default function LoginPage() {
         try {
             const res = await mfaService.challenge({ mfaChallengeToken, code: mfaCode });
             if (res.token) {
-                localStorage.setItem("token", res.token);
                 clearVerifiedOrganisationId();
                 setStoredUser(res.user);
                 window.dispatchEvent(new Event("auth-changed"));
