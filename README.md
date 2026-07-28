@@ -21,7 +21,7 @@ Part of the AssetIQ platform:
 
 ```bash
 npm ci
-cp .env.example .env.local   # set API_TARGET_BASE to your backend, e.g. http://localhost:8085/api
+cp .env.example .env.local   # set API_TARGET_BASE to your backend, e.g. http://localhost:8080/api
 npm run dev                  # http://localhost:3000
 ```
 

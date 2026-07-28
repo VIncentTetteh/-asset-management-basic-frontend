@@ -217,8 +217,8 @@ export function DepartmentsCard({
           <EmptyState title="No department data" description="Assign assets to departments to see the spread." />
         ) : (
           <div className="space-y-2.5">
-            {rows.map((d) => (
-              <div key={d.departmentId} className="space-y-1">
+            {rows.map((d, i) => (
+              <div key={d.departmentId || d.departmentName || `dept-${i}`} className="space-y-1">
                 <div className="flex items-baseline justify-between gap-3 text-[13px]">
                   <span className="truncate text-foreground">{d.departmentName}</span>
                   <span className="data-mono shrink-0 text-xs text-muted-fg">

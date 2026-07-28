@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CountrySelect } from "@/components/ui/country-select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { authService, TenantRegistrationDto } from "@/services/authService";
 import { setStoredUser, setVerifiedOrganisationId } from "@/lib/authContext";
@@ -73,9 +74,8 @@ export default function RegisterTenantPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="country">Country</Label>
-                                    <Input
+                                    <CountrySelect
                                         id="country"
-                                        placeholder="Ghana"
                                         {...register("country")}
                                     />
                                 </div>

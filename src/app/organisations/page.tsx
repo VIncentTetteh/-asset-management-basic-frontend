@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { CountrySelect } from "@/components/ui/country-select";
+import { countryName } from "@/lib/countries";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { buildPatchPayload } from "@/lib/patch";
@@ -178,7 +180,7 @@ export default function OrganisationsPage() {
       {
         accessorKey: "country",
         header: "Country",
-        cell: ({ row }) => <span className="text-muted-fg">{row.original.country || "—"}</span>,
+        cell: ({ row }) => <span className="text-muted-fg">{countryName(row.original.country) || "—"}</span>,
       },
       {
         id: "profile",
@@ -308,7 +310,7 @@ export default function OrganisationsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="org-country">Country</Label>
-                <Input id="org-country" placeholder="Ghana" value={formData.country || ""} onChange={(e) => setFormData({ ...formData, country: e.target.value })} />
+                <CountrySelect id="org-country" value={formData.country || ""} onChange={(e) => setFormData({ ...formData, country: e.target.value })} />
               </div>
             </div>
           </div>

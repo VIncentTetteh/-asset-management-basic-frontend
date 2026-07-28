@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { CountrySelect } from "@/components/ui/country-select";
+import { countryName } from "@/lib/countries";
 import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
 
@@ -113,7 +115,7 @@ export default function LocationsPage() {
       {
         accessorKey: "country",
         header: "Country",
-        cell: ({ row }) => <span className="text-muted-fg">{row.original.country || "—"}</span>,
+        cell: ({ row }) => <span className="text-muted-fg">{countryName(row.original.country) || "—"}</span>,
       },
       {
         id: "parent",
@@ -218,7 +220,7 @@ export default function LocationsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="loc-country">Country</Label>
-              <Input id="loc-country" {...register("country")} />
+              <CountrySelect id="loc-country" {...register("country")} />
             </div>
           </div>
           <div className="space-y-2">

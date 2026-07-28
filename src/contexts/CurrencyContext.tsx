@@ -41,17 +41,18 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         if (saved === "USD" || saved === "GHS") setCurrencyState(saved);
     }, []);
 
-    // Fetch live USD→GHS rate
+    // Fetch live USD→GHS rate from our server-side cached endpoint (no direct
+    // browser dependency on the external FX provider — see /api/fx/usd-ghs).
     useEffect(() => {
         const fetchRate = async () => {
             setRateLoading(true);
             try {
-                const res = await fetch("https://open.er-api.com/v6/latest/USD");
+                const res = await fetch("/api/fx/usd-ghs");
                 if (!res.ok) throw new Error();
                 const data = await res.json();
-                if (typeof data?.rates?.GHS === "number") {
-                    setRate(data.rates.GHS);
-                    setRateLastUpdated(new Date());
+                if (typeof data?.rate === "number" && data.rate > 0) {
+                    setRate(data.rate);
+                    setRateLastUpdated(data.updatedAt ? new Date(data.updatedAt) : null);
                 }
             } catch {
                 // silently keep fallback
