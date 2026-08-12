@@ -41,18 +41,29 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         if (saved === "USD" || saved === "GHS") setCurrencyState(saved);
     }, []);
 
-    // Fetch live USD→GHS rate from our server-side cached endpoint (no direct
-    // browser dependency on the external FX provider — see /api/fx/usd-ghs).
+    // Fetch the live USD→GHS rate.
+    //
+    // This used to call /api/fx/usd-ghs, a Next route handler that fetched the upstream
+    // once and cached it server-side for everyone. The app is now built with
+    // output: "export" and served as static files from S3 behind CloudFront, so there is
+    // no server left to hold that cache and the route handler was removed.
+    //
+    // Calling the provider from the browser is what the desktop client already does. The
+    // trade-off is a per-visitor request and no shared cache; what it does not change is
+    // resilience, because this was always best-effort — any failure silently keeps the
+    // fallback rate rather than blocking the render. The rate is display-only conversion,
+    // never used for billing or persisted amounts.
     useEffect(() => {
         const fetchRate = async () => {
             setRateLoading(true);
             try {
-                const res = await fetch("/api/fx/usd-ghs");
+                const res = await fetch("https://open.er-api.com/v6/latest/USD");
                 if (!res.ok) throw new Error();
                 const data = await res.json();
-                if (typeof data?.rate === "number" && data.rate > 0) {
-                    setRate(data.rate);
-                    setRateLastUpdated(data.updatedAt ? new Date(data.updatedAt) : null);
+                const live = data?.rates?.GHS;
+                if (typeof live === "number" && Number.isFinite(live) && live > 0) {
+                    setRate(live);
+                    setRateLastUpdated(new Date());
                 }
             } catch {
                 // silently keep fallback

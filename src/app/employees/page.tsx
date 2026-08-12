@@ -152,7 +152,7 @@ function EmployeesPageInner() {
         columns={columns}
         data={data?.content ?? []}
         isLoading={isLoading}
-        onRowClick={(emp) => router.push(`/employees/${emp.id}`)}
+        onRowClick={(emp) => router.push(`/employees/detail?id=${emp.id}`)}
         pageInfo={{
           page,
           size: data?.size ?? 20,
