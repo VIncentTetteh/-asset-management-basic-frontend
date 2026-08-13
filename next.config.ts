@@ -30,7 +30,17 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
     output: "export",
-    trailingSlash: true,
+    // trailingSlash is deliberately OFF.
+    //
+    // It was set so the export emitted <route>/index.html, which maps neatly onto an
+    // S3 origin. The cost was far higher than the benefit: usePathname() started
+    // returning "/login/", which broke every exact-match route comparison in the app,
+    // and client-side navigation stopped working entirely - clicking a sidebar link
+    // or being redirected after login did nothing at all.
+    //
+    // The export now emits <route>.html and the CloudFront viewer-request function
+    // appends ".html" to extensionless paths, which keeps the S3 mapping working
+    // without changing what the router sees.
     images: {
         // The default Next image optimizer needs a server; export requires this off.
         unoptimized: true,

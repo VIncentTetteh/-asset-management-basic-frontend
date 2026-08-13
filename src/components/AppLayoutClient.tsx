@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { matchesRoute } from "@/lib/route-path";
 import { Sidebar } from "@/components/Sidebar";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -83,7 +84,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isReady } = useAuth();
 
     const publicPaths = ["/", "/login", "/register", "/register-tenant", "/forgot-password", "/reset-password", "/design"];
-    const isPublicPage = publicPaths.includes(pathname);
+    const isPublicPage = matchesRoute(pathname, publicPaths);
     const breadcrumb = pathname.split("/").filter(Boolean).join(" / ") || "home";
     const requiresOrgBootstrap =
         typeof window !== "undefined"
