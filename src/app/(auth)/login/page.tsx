@@ -94,7 +94,15 @@ export default function LoginPage() {
                 setStoredUser(response.user);
                 window.dispatchEvent(new Event("auth-changed"));
                 toast.success(`Welcome back, ${response.user.firstName}!`);
-                router.push("/dashboard");
+                // Hard navigation rather than router.push.
+                //
+                // Client-side routing does not complete here on the static export: the
+                // push resolves but the URL never changes, leaving the user staring at
+                // the login form after a successful login. A full load also guarantees
+                // every provider re-reads the session cookie that was just set, rather
+                // than relying on in-flight auth state being settled before the
+                // destination's guard runs.
+                window.location.assign("/dashboard");
             } else {
                 toast.error("Invalid response from server");
             }
@@ -120,7 +128,15 @@ export default function LoginPage() {
                 setStoredUser(res.user);
                 window.dispatchEvent(new Event("auth-changed"));
                 toast.success(`Welcome back, ${res.user.firstName}!`);
-                router.push("/dashboard");
+                // Hard navigation rather than router.push.
+                //
+                // Client-side routing does not complete here on the static export: the
+                // push resolves but the URL never changes, leaving the user staring at
+                // the login form after a successful login. A full load also guarantees
+                // every provider re-reads the session cookie that was just set, rather
+                // than relying on in-flight auth state being settled before the
+                // destination's guard runs.
+                window.location.assign("/dashboard");
             }
         } catch (error: any) {
             const msg = error.response?.data?.error || "Invalid authenticator code.";

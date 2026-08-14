@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Pencil, UserMinus, ClipboardList, CheckCircle2 } from "lucide-react";
 import type { EmployeeDto, EmployeeChecklistDto } from "@/services/employeeService";
 import type { CheckoutRecordDto } from "@/services/checkoutService";
@@ -203,9 +203,21 @@ function ChecklistsTab({
   );
 }
 
-export default function EmployeeDetailPage() {
-  const params = useParams<{ id: string }>();
-  const id = params.id;
+/**
+ * The employee id arrives as a query parameter rather than a path segment.
+ *
+ * This page was /employees/[id]. A dynamic segment cannot be statically exported:
+ * `next build` with output: "export" has to enumerate every path at build time via
+ * generateStaticParams, and employee ids are runtime UUIDs. Since the site is served
+ * as static files from S3 behind CloudFront, there is no server to render an unknown
+ * path on demand.
+ *
+ * The data was always fetched client-side anyway, so nothing is lost by reading the
+ * id from the query string instead of the route.
+ */
+function EmployeeDetailContent() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id") ?? "";
 
   const { data: employee, isLoading } = useEmployee(id);
   const { data: assetRecords = [], isLoading: assetsLoading } = useEmployeeAssets(id);
@@ -284,5 +296,15 @@ export default function EmployeeDetailPage() {
       <OnboardModal employee={onboardTarget} onClose={() => setOnboardTarget(null)} assets={master.assets} />
       <OffboardModal employee={offboardTarget} onClose={() => setOffboardTarget(null)} />
     </>
+  );
+}
+
+export default function EmployeeDetailPage() {
+  // useSearchParams needs a Suspense boundary during prerender; without one the
+  // static export fails the build rather than degrading at runtime.
+  return (
+    <Suspense fallback={<PageSpinner />}>
+      <EmployeeDetailContent />
+    </Suspense>
   );
 }

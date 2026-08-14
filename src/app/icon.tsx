@@ -1,6 +1,12 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
+// The favicon is generated once at build time and shipped as a static PNG.
+//
+// Under output: "export" there is no server to render this per request, so Next
+// requires the route to declare itself static. The icon has no dynamic input — it is
+// the same 32x32 mark on every request — so pinning it costs nothing. The edge runtime
+// declaration is gone with it: nothing executes at the edge in a static export.
+export const dynamic = "force-static";
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 

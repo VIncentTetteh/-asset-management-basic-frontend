@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Pencil, Trash2, UserPlus, PackagePlus } from "lucide-react";
+import { Pencil, Trash2, UserPlus, PackagePlus, FileSpreadsheet } from "lucide-react";
 import type { Asset } from "@/types";
 import type { PagedAssets } from "@/services/assetService";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -27,6 +27,8 @@ export function AssetRegisterTable({
   onEdit,
   onDelete,
   onCreate,
+  onImport,
+  isFirstRun = false,
   canCreate,
 }: {
   paged: PagedAssets | undefined;
@@ -44,6 +46,9 @@ export function AssetRegisterTable({
   onEdit: (asset: Asset) => void;
   onDelete: (asset: Asset) => void;
   onCreate: () => void;
+  onImport: () => void;
+  /** True when the tenant owns no assets at all, as opposed to none matching the filters. */
+  isFirstRun?: boolean;
   canCreate: boolean;
 }) {
   const items = paged?.items ?? [];
@@ -152,14 +157,37 @@ export function AssetRegisterTable({
       onRowClick={onView}
       pageInfo={{ page, size, totalElements: total, totalPages: Math.max(1, Math.ceil(total / size)) }}
       onPageChange={(p) => onPageChange(p)}
-      emptyTitle="No assets found"
-      emptyDescription="Try widening your search or filters — or register your first asset."
+      // A brand-new tenant and a tenant whose filters matched nothing are in very
+      // different situations. Telling someone with an empty register to "widen their
+      // filters" is noise; what they need is the fastest route to a populated register,
+      // which is the spreadsheet they already keep — not typing assets in one at a time.
+      emptyTitle={isFirstRun ? "Your asset register is empty" : "No assets found"}
+      emptyDescription={
+        isFirstRun
+          ? "Import the spreadsheet you already track assets in — columns are matched for you, and you can preview the result before anything is saved."
+          : "Try widening your search or filters — or register your first asset."
+      }
       emptyAction={
         canCreate ? (
-          <Button size="sm" onClick={onCreate}>
-            <PackagePlus className="mr-1.5 h-4 w-4" />
-            Add asset
-          </Button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {isFirstRun ? (
+              <>
+                <Button size="sm" onClick={onImport}>
+                  <FileSpreadsheet className="mr-1.5 h-4 w-4" />
+                  Import from Excel
+                </Button>
+                <Button size="sm" variant="outline" onClick={onCreate}>
+                  <PackagePlus className="mr-1.5 h-4 w-4" />
+                  Add one manually
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" onClick={onCreate}>
+                <PackagePlus className="mr-1.5 h-4 w-4" />
+                Add asset
+              </Button>
+            )}
+          </div>
         ) : undefined
       }
       footerSummary={
