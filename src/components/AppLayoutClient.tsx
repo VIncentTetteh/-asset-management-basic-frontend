@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { matchesRoute } from "@/lib/route-path";
+import { PageSpinner } from "@/components/ui/spinner";
 import { Sidebar } from "@/components/Sidebar";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -208,8 +210,44 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         }
     }, [permLoading, isBootstrappingAuth, requiresOrgBootstrap, pathname, isPublicPage, isAuthorized, hasPermission, router]);
 
-    if (!isMounted) return null;
-    if (!isAuthorized && !isPublicPage) return null;
+    // Neither of these branches may return null.
+    //
+    // They both used to, and it made every failure in the app look identical: a
+    // white page with nothing on it. Two separate bugs presented that way in one
+    // day — a route-matching regression that classified the login page as private,
+    // and an ordinary logged-out visit to /dashboard — and in both cases the only
+    // clue was a 403 in the network tab. A blank document is indistinguishable from
+    // a crash, so it sends you looking for a JavaScript error that does not exist.
+    //
+    // Rendering something, always, means an auth problem shows up as an auth
+    // problem.
+
+    // Auth state has not resolved yet. Normally a few hundred milliseconds.
+    if (!isMounted || !isReady) {
+        return (
+            <div className="flex min-h-screen items-center justify-center">
+                <PageSpinner />
+            </div>
+        );
+    }
+
+    // Signed out on a private route. The effect above pushes to /login; this is
+    // what renders in the meantime, and — more importantly — what renders if that
+    // push ever fails to fire. The link is the escape hatch: whatever goes wrong
+    // with the redirect, the user still lands somewhere they can act on.
+    if (!isAuthorized && !isPublicPage) {
+        return (
+            <div className="flex min-h-screen flex-col items-center justify-center gap-3 text-center">
+                <p className="text-sm text-muted-foreground">
+                    You need to sign in to view this page.
+                </p>
+                <Link href="/login" className="text-sm font-medium underline underline-offset-4">
+                    Go to sign in
+                </Link>
+            </div>
+        );
+    }
+
     if (isPublicPage) return <>{children}</>;
 
     // Block the entire authenticated shell while permissions are being fetched.
