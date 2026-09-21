@@ -7,6 +7,7 @@ import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AssetTag } from "@/components/ui/asset-tag";
 import { Button } from "@/components/ui/button";
+import { transferActionsFor, type TransferAction } from "@/features/transfers/workflow";
 
 export interface TransferLookups {
   assetName: (id?: string) => string;
@@ -30,12 +31,15 @@ export function TransferTable({
   lookups,
   onAction,
   onCreate,
+  currentUserId,
 }: {
   transfers: AssetTransfer[];
   isLoading: boolean;
   lookups: TransferLookups;
-  onAction: (transfer: AssetTransfer, action: "approve" | "reject" | "complete" | "delete") => void;
+  onAction: (transfer: AssetTransfer, action: TransferAction) => void;
   onCreate: () => void;
+  /** Hides Approve on the viewer's own requests. */
+  currentUserId?: string;
 }) {
   const columns = useMemo<ColumnDef<AssetTransfer, unknown>[]>(
     () => [
@@ -103,32 +107,35 @@ export function TransferTable({
         enableSorting: false,
         cell: ({ row }) => {
           const t = row.original;
+          const actions = transferActionsFor(t, currentUserId);
           return (
             <div className="flex justify-end gap-0.5">
-              {t.status === "REQUESTED" && (
-                <>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-ok" title="Approve" aria-label="Approve transfer" onClick={() => onAction(t, "approve")}>
-                    <ThumbsUp className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-warn" title="Reject" aria-label="Reject transfer" onClick={() => onAction(t, "reject")}>
-                    <XCircle className="h-3.5 w-3.5" />
-                  </Button>
-                </>
+              {actions.includes("approve") && (
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-ok" title="Approve" aria-label="Approve transfer" onClick={() => onAction(t, "approve")}>
+                  <ThumbsUp className="h-3.5 w-3.5" />
+                </Button>
               )}
-              {t.status === "APPROVED" && (
+              {actions.includes("complete") && (
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-brand" title="Complete transfer" aria-label="Complete transfer" onClick={() => onAction(t, "complete")}>
                   <CheckCircle2 className="h-3.5 w-3.5" />
                 </Button>
               )}
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-danger" title="Delete" aria-label="Delete transfer" onClick={() => onAction(t, "delete")}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              {actions.includes("reject") && (
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-warn" title="Reject" aria-label="Reject transfer" onClick={() => onAction(t, "reject")}>
+                  <XCircle className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {actions.includes("delete") && (
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-danger" title="Delete" aria-label="Delete transfer" onClick={() => onAction(t, "delete")}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
           );
         },
       },
     ],
-    [lookups, onAction],
+    [lookups, onAction, currentUserId],
   );
 
   return (

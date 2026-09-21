@@ -539,6 +539,8 @@ export interface AssetTransfer extends BaseEntity {
     toLocationId?: string;
     requestedById?: string;
     approvedById?: string;
+    /** Who completed the move (API V43+). */
+    completedById?: string;
     transferDate?: string;
     reason?: string;
     status?: TransferStatus | string;

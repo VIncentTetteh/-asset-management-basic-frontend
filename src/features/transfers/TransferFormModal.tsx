@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateTransfer } from "@/features/transfers/hooks";
+import { applyApiFieldErrors } from "@/lib/api-validation";
 
 export function TransferFormModal({
   isOpen,
@@ -25,7 +26,7 @@ export function TransferFormModal({
   departments: Department[];
   locations: Location[];
 }) {
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<AssetTransferDto>();
+  const { register, handleSubmit, reset, watch, setValue, setError, formState: { errors } } = useForm<AssetTransferDto>();
   const createTransfer = useCreateTransfer();
 
   const assetById = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets]);
@@ -71,15 +72,20 @@ export function TransferFormModal({
       return;
     }
 
-    await createTransfer.mutateAsync({
-      assetId: data.assetId,
-      fromDepartmentId,
-      toDepartmentId: data.toDepartmentId,
-      fromLocationId: fromLocationId || undefined,
-      toLocationId: data.toLocationId || undefined,
-      reason: data.reason || undefined,
-    });
-    onClose();
+    try {
+      await createTransfer.mutateAsync({
+        assetId: data.assetId,
+        fromDepartmentId,
+        toDepartmentId: data.toDepartmentId,
+        fromLocationId: fromLocationId || undefined,
+        toLocationId: data.toLocationId || undefined,
+        reason: data.reason?.trim() || undefined,
+      });
+      onClose();
+    } catch (err) {
+      // Toasted by the mutation (e.g. an open transfer already exists).
+      applyApiFieldErrors(err, setError);
+    }
   };
 
   return (

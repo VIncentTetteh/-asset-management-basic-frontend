@@ -9,6 +9,8 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { useTransfers, useTransferMasterData, useTransferAction } from "@/features/transfers/hooks";
 import { TransferTable } from "@/features/transfers/TransferTable";
 import { TransferFormModal } from "@/features/transfers/TransferFormModal";
+import type { TransferAction } from "@/features/transfers/workflow";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function TransfersPage() {
   const { data: transfers = [], isLoading } = useTransfers();
@@ -16,6 +18,7 @@ export default function TransfersPage() {
   const transferAction = useTransferAction();
   const { confirm, ConfirmDialog } = useConfirm();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { user } = useAuth();
 
   const lookups = useMemo(() => {
     const assetMap = new Map(master.assets.map((a) => [a.id, a]));
@@ -29,7 +32,7 @@ export default function TransfersPage() {
     };
   }, [master.assets, master.departments, master.locations]);
 
-  const handleAction = async (transfer: AssetTransfer, action: "approve" | "reject" | "complete" | "delete") => {
+  const handleAction = async (transfer: AssetTransfer, action: TransferAction) => {
     if (action === "delete") {
       if (!(await confirm({ message: "Delete this transfer request?", variant: "danger" }))) return;
     }
@@ -58,6 +61,7 @@ export default function TransfersPage() {
         lookups={lookups}
         onAction={handleAction}
         onCreate={() => setIsModalOpen(true)}
+        currentUserId={user?.id}
       />
 
       <TransferFormModal

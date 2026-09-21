@@ -8,6 +8,8 @@ import { locationService } from "@/services/locationService";
 import { departmentService } from "@/services/departmentService";
 import { qk } from "@/lib/queryClient";
 import type { AssetTransferDto } from "@/types";
+import { reportApiError } from "@/lib/api-validation";
+import { TRANSFER_ACTION_MESSAGES, type TransferAction } from "@/features/transfers/workflow";
 
 const transfersKey = qk.module("transfers");
 
@@ -58,14 +60,14 @@ export function useCreateTransfer() {
       toast.success("Transfer requested");
       invalidate();
     },
-    onError: () => toast.error("Failed to create transfer request"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to create transfer request" }),
   });
 }
 
 export function useTransferAction() {
   const invalidate = useInvalidateTransfers();
   return useMutation({
-    mutationFn: async ({ id, action }: { id: string; action: "approve" | "reject" | "complete" | "delete" }) => {
+    mutationFn: async ({ id, action }: { id: string; action: TransferAction }) => {
       switch (action) {
         case "approve": await assetTransferService.approve(id); break;
         case "reject": await assetTransferService.reject(id); break;
@@ -74,15 +76,11 @@ export function useTransferAction() {
       }
     },
     onSuccess: (_res, vars) => {
-      const messages = {
-        approve: "Transfer approved",
-        reject: "Transfer rejected",
-        complete: "Transfer completed — asset moved",
-        delete: "Transfer deleted",
-      } as const;
-      toast.success(messages[vars.action]);
+      toast.success(TRANSFER_ACTION_MESSAGES[vars.action]);
       invalidate();
     },
-    onError: (_err, vars) => toast.error(`Failed to ${vars.action} transfer`),
+    // Approve/complete need a fresh MFA step-up; a cancelled prompt and 409
+    // state-machine refusals are reported with their own message.
+    onError: (err, vars) => reportApiError(err, { fallback: `Failed to ${vars.action} transfer` }),
   });
 }
