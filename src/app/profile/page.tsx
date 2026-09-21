@@ -21,6 +21,28 @@ import { UserCircle, Mail, Phone, Building, Briefcase, Shield, Save, ShieldCheck
 import { buildPatchPayload } from "@/lib/patch";
 import { mergeStoredUser, verifyOrganisationContext } from "@/lib/authContext";
 import { extractErrorMessage } from "@/lib/error";
+import { clearAuthState } from "@/lib/axios";
+import { loginPathWithNext } from "@/lib/safe-next";
+import { MFA_SETUP_ANCHOR, isMfaCodeInvalidError } from "@/lib/step-up";
+
+/**
+ * Enabling or disabling MFA revokes every session server-side (sessionVersion
+ * bump + refresh sessions revoked), so the current cookie is already dead. Send
+ * the user to sign in straight away — with MFA now in effect — instead of letting
+ * the next request fail and bounce them there without explanation.
+ */
+const SIGN_IN_AGAIN_DELAY_MS = 1500;
+
+function signInAgain(): void {
+    clearAuthState();
+    // Brief pause so the confirmation toast is readable before the hard navigation.
+    window.setTimeout(() => {
+        window.location.href = loginPathWithNext("/profile");
+    }, SIGN_IN_AGAIN_DELAY_MS);
+}
+
+const mfaCodeErrorMessage = (error: unknown, fallback: string): string =>
+    isMfaCodeInvalidError(error) ? "That code didn't match. Check your authenticator app and try again." : extractErrorMessage(error, fallback);
 
 export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
@@ -47,25 +69,27 @@ export default function ProfilePage() {
             setMfaSetupData(data);
             setMfaSetupStep("scan");
             setMfaCode("");
-        } catch {
-            toast.error("Failed to start MFA setup");
+        } catch (error) {
+            toast.error(extractErrorMessage(error, "Failed to start MFA setup"));
         } finally {
             setIsMfaLoading(false);
         }
     };
 
     const handleVerifyMfa = async () => {
-        if (!mfaCode) { toast.error("Enter the 6-digit code"); return; }
+        if (mfaCode.length !== 6) { toast.error("Enter the 6-digit code"); return; }
         setIsMfaLoading(true);
         try {
             await mfaService.verify({ code: mfaCode });
-            toast.success("MFA enabled successfully");
+            toast.success("Two-factor authentication enabled. Sign in again to continue.");
             setMfaEnabled(true);
             setMfaSetupStep("idle");
             setMfaSetupData(null);
             setMfaCode("");
-        } catch {
-            toast.error("Invalid code. Please try again.");
+            signInAgain();
+        } catch (error) {
+            toast.error(mfaCodeErrorMessage(error, "Could not verify the code. Please try again."));
+            setMfaCode("");
         } finally {
             setIsMfaLoading(false);
         }
@@ -76,12 +100,13 @@ export default function ProfilePage() {
         setIsMfaLoading(true);
         try {
             await mfaService.disable({ code: disableMfaCode });
-            toast.success("MFA disabled");
+            toast.success("MFA disabled. Sign in again to continue.");
             setMfaEnabled(false);
             setIsDisableMfaModalOpen(false);
             setDisableMfaCode("");
-        } catch {
-            toast.error("Invalid code. MFA not disabled.");
+            signInAgain();
+        } catch (error) {
+            toast.error(mfaCodeErrorMessage(error, "MFA was not disabled. Please try again."));
         } finally {
             setIsMfaLoading(false);
         }
@@ -134,6 +159,13 @@ export default function ProfilePage() {
 
         loadUserAndOrg();
     }, [reset]);
+
+    // Deep link from the "set up two-factor" toast: the card only exists once the
+    // profile has loaded, so the browser's own hash scroll fires too early.
+    useEffect(() => {
+        if (isLoading || window.location.hash !== `#${MFA_SETUP_ANCHOR}`) return;
+        document.getElementById(MFA_SETUP_ANCHOR)?.scrollIntoView({ block: "start" });
+    }, [isLoading]);
 
     const onSubmit = async (data: UserDto) => {
         try {
@@ -310,7 +342,7 @@ export default function ProfilePage() {
                 </Card>
             </div>
 
-            <Card className="shadow-sm">
+            <Card id={MFA_SETUP_ANCHOR} className="shadow-sm scroll-mt-4">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <ShieldCheck className="h-5 w-5 text-brand" />
@@ -381,6 +413,8 @@ export default function ProfilePage() {
                                 <div className="flex gap-3">
                                     <Input
                                         id="mfaCode"
+                                        inputMode="numeric"
+                                        autoComplete="one-time-code"
                                         placeholder="000000"
                                         maxLength={6}
                                         value={mfaCode}
