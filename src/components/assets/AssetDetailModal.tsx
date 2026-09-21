@@ -9,8 +9,10 @@ import { formatRelativeTime } from "@/lib/time";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import {
-    History, QrCode, Info, Loader2, Download, Clock, User as UserIcon
+    History, QrCode, Info, Loader2, Download, Clock, User as UserIcon, Copy, Printer
 } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { printAssetLabel } from "@/features/assets/printLabel";
 
 interface Props {
     isOpen: boolean;
@@ -47,6 +49,9 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
     const [activeTab, setActiveTab] = useState<Tab>("overview");
     const [history, setHistory] = useState<AssetHistory[]>([]);
     const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
+    // Keyed by asset so a stale link from the previously opened asset never shows.
+    const [scanLink, setScanLink] = useState<{ assetId: string; url: string } | null>(null);
+    const scanUrl = scanLink && scanLink.assetId === asset?.id ? scanLink.url : "";
 
     const deptMap = new Map(departments.map(d => [d.id, d.name]));
     const locMap = new Map(locations.map(l => [l.id, l.name]));
@@ -70,6 +75,12 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                 if (!cancelled) setQrCodeUrl(resolveQrPayload(payload));
             })
             .catch((error: unknown) => console.error("Failed to load QR code", error));
+
+        void assetService.getQrPayload(assetId)
+            .then((payload) => {
+                if (!cancelled && typeof payload.url === "string") setScanLink({ assetId, url: payload.url });
+            })
+            .catch((error: unknown) => console.error("Failed to load QR scan link", error));
 
         return () => {
             cancelled = true;
@@ -246,7 +257,47 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                                     Scan this code to instantly view asset maintenance history or update its status from a mobile device.
                                 </p>
                             </div>
+                            {scanUrl ? (
+                                <div className="flex w-full max-w-sm items-center gap-2">
+                                    <input
+                                        readOnly
+                                        aria-label="Scan link"
+                                        value={scanUrl}
+                                        onFocus={(e) => e.currentTarget.select()}
+                                        className="min-w-0 flex-1 rounded-control border border-slate-200 bg-slate-50 px-2 py-1.5 font-mono text-xs text-slate-700"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        aria-label="Copy scan link"
+                                        onClick={() => {
+                                            void navigator.clipboard?.writeText(scanUrl)
+                                                .then(() => toast.success("Scan link copied"))
+                                                .catch(() => toast.error("Couldn't copy the link"));
+                                        }}
+                                    >
+                                        <Copy className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ) : null}
                             {qrCodeUrl && (
+                                <div className="flex flex-wrap justify-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        void printAssetLabel({
+                                            qrImageSrc: qrCodeUrl,
+                                            assetTag: asset.assetTag,
+                                            name: asset.name,
+                                        }).then((opened) => {
+                                            if (!opened) toast.error("Allow pop-ups to print the label");
+                                        });
+                                    }}
+                                >
+                                    <Printer className="h-4 w-4 mr-2" /> Print label
+                                </Button>
                                 <Button 
                                     onClick={() => {
                                         const link = document.createElement('a');
@@ -259,6 +310,7 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                                 >
                                     <Download className="h-4 w-4 mr-2" /> Download Image
                                 </Button>
+                                </div>
                             )}
                         </div>
                     )}
