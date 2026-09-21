@@ -17,6 +17,8 @@ import {
   useDeleteMaintenance,
 } from "@/features/maintenance/hooks";
 import { MaintenanceFormModal } from "@/features/maintenance/MaintenanceFormModal";
+import { canCompleteMaintenance } from "@/features/maintenance/payload";
+import { usePermissions } from "@/contexts/PermissionContext";
 
 export default function MaintenancePage() {
   const { format, baseCurrency } = useCurrency();
@@ -25,6 +27,9 @@ export default function MaintenancePage() {
   const complete = useCompleteMaintenance();
   const remove = useDeleteMaintenance();
   const { confirm, ConfirmDialog } = useConfirm();
+  const { hasPermission } = usePermissions();
+  // Mirrors the API: every maintenance write takes SCHEDULE_ or MARK_MAINTENANCE_COMPLETE.
+  const canManage = hasPermission("SCHEDULE_MAINTENANCE") || hasPermission("MARK_MAINTENANCE_COMPLETE");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
@@ -105,9 +110,9 @@ export default function MaintenancePage() {
         id: "actions",
         header: "",
         enableSorting: false,
-        cell: ({ row }) => (
+        cell: ({ row }) => !canManage ? null : (
           <div className="flex justify-end gap-0.5">
-            {row.original.status !== "COMPLETED" && (
+            {canCompleteMaintenance(row.original.status) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -143,7 +148,7 @@ export default function MaintenancePage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookups, format, baseCurrency],
+    [lookups, format, baseCurrency, canManage],
   );
 
   const openCount = records.filter((r) => r.status !== "COMPLETED" && r.status !== "CANCELLED").length;
@@ -153,9 +158,11 @@ export default function MaintenancePage() {
       title="Maintenance"
       subtitle={isLoading ? "Loading records…" : `${records.length} records · ${openCount} open`}
       actions={
-        <Button onClick={openCreate}>
-          <Wrench className="mr-2 h-4 w-4" /> Log maintenance
-        </Button>
+        canManage ? (
+          <Button onClick={openCreate}>
+            <Wrench className="mr-2 h-4 w-4" /> Log maintenance
+          </Button>
+        ) : undefined
       }
     >
       <DataTable
@@ -165,9 +172,11 @@ export default function MaintenancePage() {
         emptyTitle="No maintenance records"
         emptyDescription="Schedule preventive maintenance or log repair work for your assets."
         emptyAction={
-          <Button size="sm" onClick={openCreate}>
-            <Wrench className="mr-1.5 h-4 w-4" /> Log maintenance
-          </Button>
+          canManage ? (
+            <Button size="sm" onClick={openCreate}>
+              <Wrench className="mr-1.5 h-4 w-4" /> Log maintenance
+            </Button>
+          ) : undefined
         }
       />
 

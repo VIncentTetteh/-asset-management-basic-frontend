@@ -7,6 +7,7 @@ import { assetService } from "@/services/assetService";
 import { supplierService } from "@/services/supplierService";
 import { qk } from "@/lib/queryClient";
 import type { MaintenanceDto } from "@/types";
+import { reportApiError } from "@/lib/api-validation";
 
 const maintenanceKey = qk.module("maintenance");
 
@@ -43,13 +44,14 @@ function useInvalidateMaintenance() {
 export function useSaveMaintenance() {
   const invalidate = useInvalidateMaintenance();
   return useMutation({
-    mutationFn: ({ id, data }: { id?: string; data: Partial<MaintenanceDto> }) =>
-      id ? maintenanceService.update(id, data) : maintenanceService.create(data as MaintenanceDto),
+    // Edits are full-replace PUTs so cleared fields are actually cleared.
+    mutationFn: ({ id, data }: { id?: string; data: MaintenanceDto }) =>
+      id ? maintenanceService.replace(id, data) : maintenanceService.create(data),
     onSuccess: (_res, vars) => {
       toast.success(vars.id ? "Maintenance record updated" : "Maintenance scheduled");
       invalidate();
     },
-    onError: () => toast.error("Failed to save record"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to save record" }),
   });
 }
 
@@ -61,7 +63,7 @@ export function useCompleteMaintenance() {
       toast.success("Maintenance marked as completed");
       invalidate();
     },
-    onError: () => toast.error("Failed to complete maintenance"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to complete maintenance" }),
   });
 }
 
@@ -73,6 +75,6 @@ export function useDeleteMaintenance() {
       toast.success("Record deleted");
       invalidate();
     },
-    onError: () => toast.error("Failed to delete record"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to delete record" }),
   });
 }

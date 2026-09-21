@@ -481,14 +481,15 @@ export interface MaintenanceDto {
     id?: string;
     assetId: string;              // required
     maintenanceType: MaintenanceType | string;  // required
-    description?: string;
-    scheduledDate?: string;
-    vendorId?: string;
-    cost?: number;
-    currency?: string;
+    description?: string | null;
+    scheduledDate?: string | null;
+    /** null on PUT clears the vendor. */
+    vendorId?: string | null;
+    cost?: number | null;
+    currency?: string | null;
     status?: MaintenanceStatus | string;
-    nextDueDate?: string;
-    performedDate?: string;
+    nextDueDate?: string | null;
+    performedDate?: string | null;
 }
 
 // ─── Audit ────────────────────────────────────────────────────────────────────

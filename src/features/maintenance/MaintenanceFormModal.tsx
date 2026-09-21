@@ -2,18 +2,22 @@
 
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import toast from "react-hot-toast";
-import { MaintenanceRecord, MaintenanceDto, MaintenanceType, Asset, Supplier } from "@/types";
+import { MaintenanceRecord, MaintenanceType, Asset, Supplier } from "@/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { buildPatchPayload } from "@/lib/patch";
 import { useSaveMaintenance } from "@/features/maintenance/hooks";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
+import { applyApiFieldErrors } from "@/lib/api-validation";
+import {
+  buildMaintenancePayload,
+  defaultMaintenanceCurrency,
+  type MaintenanceForm,
+} from "@/features/maintenance/payload";
 
 export function MaintenanceFormModal({
   isOpen,
@@ -28,9 +32,21 @@ export function MaintenanceFormModal({
   assets: Asset[];
   suppliers: Supplier[];
 }) {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<MaintenanceDto>();
+  const { register, handleSubmit, reset, setError, setValue, watch, getFieldState, formState: { errors } } =
+    useForm<MaintenanceForm>();
   const save = useSaveMaintenance();
   const { baseCurrency } = useCurrency();
+  // React Compiler intentionally skips React Hook Form's subscription API.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const selectedAssetId = watch("assetId");
+
+  // A new record's cost is in the asset's currency unless the user picks another.
+  useEffect(() => {
+    if (!isOpen || editingRecord || !selectedAssetId) return;
+    if (getFieldState("currency").isDirty) return;
+    const asset = assets.find((a) => a.id === selectedAssetId);
+    setValue("currency", defaultMaintenanceCurrency(asset, baseCurrency));
+  }, [isOpen, editingRecord, selectedAssetId, assets, baseCurrency, getFieldState, setValue]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -40,9 +56,10 @@ export function MaintenanceFormModal({
             assetId: editingRecord.assetId,
             scheduledDate: editingRecord.scheduledDate ? editingRecord.scheduledDate.split("T")[0] : "",
             performedDate: editingRecord.performedDate ? editingRecord.performedDate.split("T")[0] : "",
+            nextDueDate: editingRecord.nextDueDate ? editingRecord.nextDueDate.split("T")[0] : "",
             description: editingRecord.description || "",
             maintenanceType: editingRecord.maintenanceType,
-            cost: editingRecord.cost,
+            cost: editingRecord.cost ?? "",
             currency: editingRecord.currency || baseCurrency,
             vendorId: editingRecord.vendorId || "",
             status: editingRecord.status,
@@ -50,9 +67,11 @@ export function MaintenanceFormModal({
         : {
             assetId: "",
             scheduledDate: new Date().toISOString().split("T")[0],
+            performedDate: "",
+            nextDueDate: "",
             description: "",
             maintenanceType: MaintenanceType.PREVENTIVE,
-            cost: 0,
+            cost: "",
             currency: baseCurrency,
             vendorId: "",
             status: "SCHEDULED",
@@ -60,27 +79,15 @@ export function MaintenanceFormModal({
     );
   }, [isOpen, editingRecord, reset, baseCurrency]);
 
-  const onSubmit = async (data: MaintenanceDto) => {
-    data.cost = Number(data.cost);
-    Object.keys(data).forEach((key) => {
-      const k = key as keyof MaintenanceDto;
-      if (data[k] === "") delete (data as unknown as Record<string, unknown>)[k];
-    });
-
-    if (editingRecord) {
-      const patch = buildPatchPayload<MaintenanceDto>(
-        editingRecord as unknown as Partial<MaintenanceDto>,
-        data,
-      );
-      if (Object.keys(patch).length === 0) {
-        toast("No changes to update");
-        return;
-      }
-      await save.mutateAsync({ id: editingRecord.id!, data: patch });
-    } else {
-      await save.mutateAsync({ data });
+  const onSubmit = async (data: MaintenanceForm) => {
+    const payload = buildMaintenancePayload(data);
+    try {
+      await save.mutateAsync(editingRecord ? { id: editingRecord.id!, data: payload } : { data: payload });
+      onClose();
+    } catch (err) {
+      // The mutation toasted; keep the modal open with any field errors marked.
+      applyApiFieldErrors(err, setError);
     }
-    onClose();
   };
 
   return (
@@ -130,7 +137,8 @@ export function MaintenanceFormModal({
         <div className="grid grid-cols-2 gap-4 border-t border-edge-subtle pt-4">
           <div className="space-y-2">
             <Label htmlFor="mt-scheduled">Scheduled date <span className="text-danger">*</span></Label>
-            <Input id="mt-scheduled" type="date" {...register("scheduledDate", { required: true })} />
+            <Input id="mt-scheduled" type="date" {...register("scheduledDate", { required: "Scheduled date is required" })} />
+            {errors.scheduledDate && <p className="text-sm text-danger">{errors.scheduledDate.message as string}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="mt-currency">Currency</Label>
@@ -143,6 +151,7 @@ export function MaintenanceFormModal({
         <div className="space-y-2">
           <Label htmlFor="mt-cost">Estimated / actual cost</Label>
           <Input id="mt-cost" type="number" step="0.01" min="0" {...register("cost")} />
+          {errors.cost && <p className="text-sm text-danger">{errors.cost.message as string}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -159,6 +168,12 @@ export function MaintenanceFormModal({
             <Label htmlFor="mt-performed">Completion date</Label>
             <Input id="mt-performed" type="date" {...register("performedDate")} />
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="mt-next-due">Next due date</Label>
+          <Input id="mt-next-due" type="date" {...register("nextDueDate")} />
+          <p className="text-xs text-muted-fg">For recurring work; drives the &ldquo;due soon&rdquo; reminders.</p>
         </div>
 
         <div className="mt-4 flex justify-end gap-2 border-t border-edge-subtle pt-4">
