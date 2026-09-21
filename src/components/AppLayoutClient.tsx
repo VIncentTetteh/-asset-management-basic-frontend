@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { matchesRoute } from "@/lib/route-path";
+import { loginPathWithNext } from "@/lib/safe-next";
 import { PageSpinner } from "@/components/ui/spinner";
 import { Sidebar } from "@/components/Sidebar";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -186,7 +187,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
             if (!isAuthenticated && !isPublicPage) {
                 setIsAuthorized(false);
                 setIsBootstrappingAuth(false);
-                router.push("/login");
+                router.push(loginPathWithNext(`${window.location.pathname}${window.location.search}`));
             } else {
                 setIsAuthorized(isAuthenticated);
                 setIsBootstrappingAuth(isAuthenticated && !isPublicPage && !getOrganisationIdFromStorage());
@@ -244,7 +245,10 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                 <p className="text-sm text-muted-foreground">
                     You need to sign in to view this page.
                 </p>
-                <Link href="/login" className="text-sm font-medium underline underline-offset-4">
+                <Link
+                    href={loginPathWithNext(`${pathname}${typeof window === "undefined" ? "" : window.location.search}`)}
+                    className="text-sm font-medium underline underline-offset-4"
+                >
                     Go to sign in
                 </Link>
             </div>

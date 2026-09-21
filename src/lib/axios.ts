@@ -1,5 +1,6 @@
 import axios from "axios";
 import { clearVerifiedOrganisationId, getOrganisationIdFromStorage } from "@/lib/authContext";
+import { loginPathWithNext } from "@/lib/safe-next";
 import { PLAN_LIMIT_EVENT, isPlanLimitError, type PlanLimitDetail } from "@/lib/plan-limit";
 
 /**
@@ -119,7 +120,9 @@ api.interceptors.response.use((response) => response, async (error) => {
             && !window.location.pathname.startsWith("/login")
             && !window.location.pathname.startsWith("/register")) {
             clearAuthState();
-            window.location.href = "/login";
+            // Carry the current page so the user lands back on it (e.g. a scanned
+            // asset label) after signing in; login validates it again.
+            window.location.href = loginPathWithNext(`${window.location.pathname}${window.location.search}`);
         }
     }
 

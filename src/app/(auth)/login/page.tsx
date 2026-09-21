@@ -18,6 +18,7 @@ import { ssoAuthService } from "@/services/ssoAuthService";
 import { clearVerifiedOrganisationId, setStoredUser } from "@/lib/authContext";
 import { Eye, EyeOff, Smartphone } from "lucide-react";
 import { extractErrorMessage } from "@/lib/error";
+import { nextFromSearch } from "@/lib/safe-next";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ export default function LoginPage() {
                 // every provider re-reads the session cookie that was just set, rather
                 // than relying on in-flight auth state being settled before the
                 // destination's guard runs.
-                window.location.assign("/dashboard");
+                window.location.assign(nextFromSearch(window.location.search));
             } else {
                 toast.error("Invalid response from server");
             }
@@ -138,7 +139,7 @@ export default function LoginPage() {
                 // every provider re-reads the session cookie that was just set, rather
                 // than relying on in-flight auth state being settled before the
                 // destination's guard runs.
-                window.location.assign("/dashboard");
+                window.location.assign(nextFromSearch(window.location.search));
             }
         } catch (error: unknown) {
             toast.error(extractErrorMessage(error, "Invalid authenticator code."));
