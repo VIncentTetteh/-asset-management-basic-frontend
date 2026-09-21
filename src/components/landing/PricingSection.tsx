@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { BillingPlan } from "@/types";
 import { filterAndOrderPlans } from "@/lib/plan-filter";
+import { formatPlanLimit, isUnlimitedLimit } from "@/features/billing/lib";
 
 /**
  * Shown only when the public plans endpoint is unreachable. These carry plan
@@ -64,10 +65,9 @@ const FALLBACK_PLANS: BillingPlan[] = [
 ];
 
 function buildFeatures(plan: BillingPlan): string[] {
-    const isUnlimited = plan.maxAssets >= 999999;
     return [
-        isUnlimited ? "Unlimited Assets" : `Up to ${plan.maxAssets.toLocaleString()} Assets`,
-        isUnlimited ? "Unlimited Employees" : `Up to ${plan.maxEmployees.toLocaleString()} Employees`,
+        isUnlimitedLimit(plan.maxAssets) ? "Unlimited Assets" : `Up to ${formatPlanLimit(plan.maxAssets)} Assets`,
+        isUnlimitedLimit(plan.maxEmployees) ? "Unlimited Employees" : `Up to ${formatPlanLimit(plan.maxEmployees)} Employees`,
         plan.analyticsEnabled ? "Advanced Analytics" : "Basic Tracking",
         `${plan.auditRetentionDays} Days Audit Retention`,
         ...(plan.tier.toUpperCase() === "ENTERPRISE" ? ["SAML SSO & Audit Logs", "Custom Retention Policies", "Dedicated Account Manager"] : []),
@@ -84,7 +84,7 @@ function isHighlight(plan: BillingPlan, allPlans: BillingPlan[]): boolean {
 }
 
 function isEnterprise(plan: BillingPlan): boolean {
-    return plan.tier.toUpperCase() === "ENTERPRISE" || (plan.amountMinor === 0 && plan.maxAssets >= 999999);
+    return plan.tier.toUpperCase() === "ENTERPRISE" || (plan.amountMinor === 0 && isUnlimitedLimit(plan.maxAssets));
 }
 
 /** Whole-unit price in the plan's own billing currency, e.g. "GH₵799" or "$49". */

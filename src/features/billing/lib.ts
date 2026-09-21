@@ -94,11 +94,22 @@ export interface UsageRow {
     percent: number | null;
 }
 
+/**
+ * Limits at or above this are "no limit". The backend encodes Enterprise's
+ * unlimited caps as Integer.MAX_VALUE (2,147,483,647); older seeds used 999,999.
+ */
 const UNLIMITED = 999_999;
+
+/** True when a plan limit means "no limit" (null/undefined, or a sentinel value). */
+export const isUnlimitedLimit = (limit: number | null | undefined): boolean => limit == null || limit >= UNLIMITED;
+
+/** "Unlimited" for sentinel limits, else the grouped number ("2,500"). */
+export const formatPlanLimit = (limit: number | null | undefined): string =>
+    isUnlimitedLimit(limit) ? "Unlimited" : (limit as number).toLocaleString();
 
 export function usageRows(subscription: Subscription): UsageRow[] {
     const row = (label: string, used: number | undefined, limit: number | null | undefined): UsageRow => {
-        const cap = limit == null || limit >= UNLIMITED ? null : limit;
+        const cap = isUnlimitedLimit(limit) ? null : (limit as number);
         const count = used ?? 0;
         return { label, used: count, limit: cap, percent: cap ? Math.min(Math.round((count / cap) * 100), 999) : null };
     };

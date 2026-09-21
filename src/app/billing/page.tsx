@@ -26,6 +26,7 @@ import {
     planInterval,
     plansForInterval,
     usageRows,
+    formatPlanLimit,
 } from "@/features/billing/lib";
 
 const STATUS_STYLES: Record<Subscription["status"], string> = {
@@ -433,9 +434,9 @@ function PlanCard({
                 </p>
                 {!enterprise && !free && <p className="-mt-2 text-xs text-faint-fg">per {intervalSuffix(plan)}</p>}
                 <div className="space-y-1 text-sm text-muted-fg">
-                    <p>Max assets: {plan.maxAssets.toLocaleString()}</p>
-                    <p>Max employees: {plan.maxEmployees.toLocaleString()}</p>
-                    {plan.maxDepartments != null && <p>Max departments: {plan.maxDepartments.toLocaleString()}</p>}
+                    <p>Max assets: {formatPlanLimit(plan.maxAssets)}</p>
+                    <p>Max employees: {formatPlanLimit(plan.maxEmployees)}</p>
+                    {plan.maxDepartments != null && <p>Max departments: {formatPlanLimit(plan.maxDepartments)}</p>}
                     <p>Analytics: {plan.analyticsEnabled ? "Included" : "Not included"}</p>
                     <p>Audit retention: {plan.auditRetentionDays} days</p>
                 </div>

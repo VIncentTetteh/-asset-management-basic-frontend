@@ -12,6 +12,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { QueryProvider } from "@/components/QueryProvider";
 import { usePlanLimitNotices } from "@/components/billing/planLimitNotice";
+import { formatPlanLimit, isUnlimitedLimit } from "@/features/billing/lib";
 import { billingService } from "@/services/billingService";
 import { authService } from "@/services/authService";
 import { organisationService } from "@/services/organisationService";
@@ -271,10 +272,10 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         );
     }
 
-    const assetUsagePercent = subscription?.plan?.maxAssets
+    const assetUsagePercent = subscription?.plan?.maxAssets && !isUnlimitedLimit(subscription.plan.maxAssets)
         ? Math.round((subscription.currentAssetCount / subscription.plan.maxAssets) * 100)
         : 0;
-    const employeeUsagePercent = subscription?.plan?.maxEmployees
+    const employeeUsagePercent = subscription?.plan?.maxEmployees && !isUnlimitedLimit(subscription.plan.maxEmployees)
         ? Math.round((subscription.currentEmployeeCount / subscription.plan.maxEmployees) * 100)
         : 0;
     const showUsageWarning = Math.max(assetUsagePercent, employeeUsagePercent) >= 80;
@@ -313,7 +314,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                 <main className="flex-1 overflow-auto p-4 md:p-6">
                     {showUsageWarning && pathname !== "/billing" ? (
                         <div className="mb-4 rounded-card border border-warn/40 bg-warn-soft px-4 py-3 text-sm text-foreground">
-                            Plan usage warning: assets {subscription?.currentAssetCount}/{subscription?.plan?.maxAssets} ({assetUsagePercent}%), employees {subscription?.currentEmployeeCount}/{subscription?.plan?.maxEmployees} ({employeeUsagePercent}%).
+                            Plan usage warning: assets {subscription?.currentAssetCount}/{formatPlanLimit(subscription?.plan?.maxAssets)} ({assetUsagePercent}%), employees {subscription?.currentEmployeeCount}/{formatPlanLimit(subscription?.plan?.maxEmployees)} ({employeeUsagePercent}%).
                             <button
                                 type="button"
                                 className="ml-2 font-semibold underline"
