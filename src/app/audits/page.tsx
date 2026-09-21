@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ClipboardCheck, Pencil, Trash2, CheckSquare } from "lucide-react";
-import { Audit, AssetAuditDto, AuditStatus } from "@/types";
+import { ClipboardCheck, Pencil, CheckSquare } from "lucide-react";
+import { Audit, AuditStatus } from "@/types";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
 import { Modal } from "@/components/ui/modal";
@@ -14,34 +14,41 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { AuditSeal } from "@/components/ui/audit-seal";
-import { useConfirm } from "@/hooks/useConfirm";
 import {
   useAudits,
   useAuditMasterData,
   useCreateAudit,
   useUpdateAuditStatus,
-  useDeleteAudit,
 } from "@/features/audits/hooks";
+import {
+  buildAuditPayload,
+  INITIAL_AUDIT_STATUSES,
+  isAuditFinal,
+  nextAuditStatuses,
+  type AuditForm,
+} from "@/features/audits/workflow";
+import { usePermissions } from "@/contexts/PermissionContext";
+import { applyApiFieldErrors } from "@/lib/api-validation";
 
 export default function AuditsPage() {
   const { data: audits = [], isLoading } = useAudits();
   const master = useAuditMasterData();
   const createAudit = useCreateAudit();
   const updateStatus = useUpdateAuditStatus();
-  const remove = useDeleteAudit();
-  const { confirm, ConfirmDialog } = useConfirm();
+  const { hasPermission } = usePermissions();
+  // Mirrors the API: scheduling and status changes need CONDUCT_AUDIT.
+  const canConduct = hasPermission("CONDUCT_AUDIT");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAudit, setEditingAudit] = useState<Audit | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<AssetAuditDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<AuditForm>();
 
   useEffect(() => {
     if (!isModalOpen) return;
     reset(
       editingAudit
         ? {
-            organisationId: editingAudit.organisationId || "",
             departmentId: editingAudit.departmentId || "",
             auditDate: editingAudit.auditDate ? new Date(editingAudit.auditDate).toISOString().split("T")[0] : "",
             conductedById: editingAudit.conductedById || "",
@@ -49,7 +56,6 @@ export default function AuditsPage() {
             remarks: editingAudit.remarks || "",
           }
         : {
-            organisationId: master.orgId,
             departmentId: "",
             auditDate: new Date().toISOString().split("T")[0],
             conductedById: "",
@@ -57,7 +63,7 @@ export default function AuditsPage() {
             remarks: "",
           },
     );
-  }, [isModalOpen, editingAudit, master.orgId, reset]);
+  }, [isModalOpen, editingAudit, reset]);
 
   const lookups = useMemo(() => {
     const deptMap = new Map(master.departments.map((d) => [d.id, d.name]));
@@ -73,20 +79,21 @@ export default function AuditsPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (audit: Audit) => {
-    if (!(await confirm({ message: "Delete this audit record?", variant: "danger" }))) return;
-    remove.mutate(audit.id!);
-  };
-
-  const onSubmit = async (data: AssetAuditDto) => {
-    if (editingAudit) {
-      // The API only supports PATCHing status on existing audits.
-      await updateStatus.mutateAsync({ id: editingAudit.id!, status: data.status as AuditStatus });
-    } else {
-      if (!data.organisationId) data.organisationId = master.orgId;
-      await createAudit.mutateAsync(data);
+  const onSubmit = async (data: AuditForm) => {
+    try {
+      if (editingAudit) {
+        // The API only supports changing the status of an existing audit.
+        if (data.status && data.status !== editingAudit.status) {
+          await updateStatus.mutateAsync({ id: editingAudit.id!, status: data.status as AuditStatus });
+        }
+      } else {
+        await createAudit.mutateAsync(buildAuditPayload(data));
+      }
+      setIsModalOpen(false);
+    } catch (err) {
+      // Toasted by the mutation; keep the modal open with field errors marked.
+      applyApiFieldErrors(err, setError);
     }
-    setIsModalOpen(false);
   };
 
   const columns = useMemo<ColumnDef<Audit, unknown>[]>(
@@ -137,59 +144,55 @@ export default function AuditsPage() {
         id: "actions",
         header: "",
         enableSorting: false,
-        cell: ({ row }) => (
-          <div className="flex justify-end gap-0.5">
-            {row.original.status !== AuditStatus.COMPLETED && row.original.status !== AuditStatus.CANCELLED && (
+        // Audits are immutable compliance records: status changes only, never deletion.
+        cell: ({ row }) =>
+          !canConduct || isAuditFinal(row.original.status) ? null : (
+            <div className="flex justify-end gap-0.5">
+              {nextAuditStatuses(row.original.status).includes(AuditStatus.COMPLETED) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-xs text-brand"
+                  onClick={() => updateStatus.mutate({ id: row.original.id!, status: AuditStatus.COMPLETED })}
+                >
+                  <CheckSquare className="h-3.5 w-3.5" /> Complete
+                </Button>
+              )}
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 gap-1 px-2 text-xs text-brand"
-                onClick={() => updateStatus.mutate({ id: row.original.id!, status: AuditStatus.COMPLETED })}
+                size="icon"
+                className="h-7 w-7"
+                aria-label="Change audit status"
+                onClick={() => {
+                  setEditingAudit(row.original);
+                  setIsModalOpen(true);
+                }}
               >
-                <CheckSquare className="h-3.5 w-3.5" /> Complete
+                <Pencil className="h-3.5 w-3.5" />
               </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              aria-label="Edit audit"
-              onClick={() => {
-                setEditingAudit(row.original);
-                setIsModalOpen(true);
-              }}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-danger"
-              aria-label="Delete audit"
-              onClick={() => handleDelete(row.original)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        ),
+            </div>
+          ),
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookups],
+    [lookups, canConduct],
   );
 
-  const openCount = audits.filter(
-    (a) => a.status !== AuditStatus.COMPLETED && a.status !== AuditStatus.CANCELLED,
-  ).length;
+  const openCount = audits.filter((a) => !isAuditFinal(a.status)).length;
+  const statusOptions = editingAudit
+    ? [editingAudit.status as AuditStatus, ...nextAuditStatuses(editingAudit.status)]
+    : [...INITIAL_AUDIT_STATUSES];
 
   return (
     <ListPageTemplate
       title="Audits & inspections"
       subtitle={isLoading ? "Loading audits…" : `${audits.length} audits · ${openCount} open`}
       actions={
-        <Button onClick={openCreate}>
-          <ClipboardCheck className="mr-2 h-4 w-4" /> Schedule audit
-        </Button>
+        canConduct ? (
+          <Button onClick={openCreate}>
+            <ClipboardCheck className="mr-2 h-4 w-4" /> Schedule audit
+          </Button>
+        ) : undefined
       }
     >
       <DataTable
@@ -199,9 +202,11 @@ export default function AuditsPage() {
         emptyTitle="No audits yet"
         emptyDescription="Schedule physical inventory checks; completed audits earn the verification seal."
         emptyAction={
-          <Button size="sm" onClick={openCreate}>
-            <ClipboardCheck className="mr-1.5 h-4 w-4" /> Schedule audit
-          </Button>
+          canConduct ? (
+            <Button size="sm" onClick={openCreate}>
+              <ClipboardCheck className="mr-1.5 h-4 w-4" /> Schedule audit
+            </Button>
+          ) : undefined
         }
       />
 
@@ -211,7 +216,7 @@ export default function AuditsPage() {
         title={editingAudit ? "Update audit status" : "Schedule audit"}
         description={
           editingAudit
-            ? "Existing audits only support status changes."
+            ? "Existing audits only support status changes; completed and cancelled audits are final."
             : "Plan a physical inventory verification."
         }
       >
@@ -220,12 +225,12 @@ export default function AuditsPage() {
             <div className="space-y-2">
               <Label htmlFor="au-date">Audit date <span className="text-danger">*</span></Label>
               <Input id="au-date" type="date" disabled={!!editingAudit} {...register("auditDate", { required: true })} />
-              {errors.auditDate && <p className="text-sm text-danger">Audit date is required</p>}
+              {errors.auditDate && <p className="text-sm text-danger">{errors.auditDate.message || "Audit date is required"}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="au-status">Status</Label>
               <Select id="au-status" {...register("status")}>
-                {Object.values(AuditStatus).map((s) => (
+                {statusOptions.map((s) => (
                   <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
                 ))}
               </Select>
@@ -244,7 +249,7 @@ export default function AuditsPage() {
             <div className="space-y-2">
               <Label htmlFor="au-user">Conducted by</Label>
               <Select id="au-user" disabled={!!editingAudit} {...register("conductedById")}>
-                <option value="">Select auditor</option>
+                <option value="">Me</option>
                 {master.users.map((u) => (
                   <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
                 ))}
@@ -263,7 +268,6 @@ export default function AuditsPage() {
           </div>
         </form>
       </Modal>
-      {ConfirmDialog}
     </ListPageTemplate>
   );
 }

@@ -5,9 +5,9 @@ import toast from "react-hot-toast";
 import { auditService } from "@/services/auditService";
 import { departmentService } from "@/services/departmentService";
 import { userService } from "@/services/userService";
-import { authService } from "@/services/authService";
 import { qk } from "@/lib/queryClient";
 import type { AssetAuditDto, AuditStatus } from "@/types";
+import { reportApiError } from "@/lib/api-validation";
 
 const auditsKey = qk.module("audits");
 
@@ -29,15 +29,9 @@ export function useAuditMasterData() {
     queryFn: () => userService.getAll(),
     staleTime: 300_000,
   });
-  const profile = useQuery({
-    queryKey: ["auth", "profile"],
-    queryFn: () => authService.getProfile(),
-    staleTime: 300_000,
-  });
   return {
     departments: departments.data ?? [],
     users: users.data ?? [],
-    orgId: ((profile.data as { organisationId?: string } | undefined)?.organisationId ?? "") as string,
   };
 }
 
@@ -49,12 +43,12 @@ function useInvalidateAudits() {
 export function useCreateAudit() {
   const invalidate = useInvalidateAudits();
   return useMutation({
-    mutationFn: (data: AssetAuditDto) => auditService.create(data),
+    mutationFn: (data: Partial<AssetAuditDto>) => auditService.create(data),
     onSuccess: () => {
       toast.success("Audit scheduled");
       invalidate();
     },
-    onError: () => toast.error("Failed to save audit"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to save audit" }),
   });
 }
 
@@ -66,18 +60,7 @@ export function useUpdateAuditStatus() {
       toast.success(`Audit status updated to ${vars.status.replace(/_/g, " ").toLowerCase()}`);
       invalidate();
     },
-    onError: () => toast.error("Failed to update status"),
-  });
-}
-
-export function useDeleteAudit() {
-  const invalidate = useInvalidateAudits();
-  return useMutation({
-    mutationFn: (id: string) => auditService.delete(id),
-    onSuccess: () => {
-      toast.success("Audit deleted");
-      invalidate();
-    },
-    onError: () => toast.error("Failed to delete audit"),
+    // e.g. 409 when the move is not allowed from the current status.
+    onError: (err) => reportApiError(err, { fallback: "Failed to update status" }),
   });
 }

@@ -513,10 +513,13 @@ export interface Audit extends BaseEntity {
 
 export interface AssetAuditDto {
     id?: string;
-    organisationId: string;       // required
-    departmentId: string;         // required
+    /** Read-only: the API scopes audits to the caller's organisation. */
+    organisationId?: string;
+    /** Omit for an organisation-wide audit. */
+    departmentId?: string;
     auditDate: string;            // required
-    conductedById: string;        // required
+    /** Omit to record the current user as the auditor. */
+    conductedById?: string;
     status?: AuditStatus | string;
     remarks?: string;
 }

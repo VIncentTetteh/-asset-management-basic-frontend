@@ -29,14 +29,15 @@ export const auditService = {
     },
 
     /** POST /audits */
-    create: async (data: AssetAuditDto): Promise<Audit> => {
+    create: async (data: Partial<AssetAuditDto>): Promise<Audit> => {
         const response = await api.post<Audit>("/audits", data);
         return response.data;
     },
 
     /**
      * PATCH /audits/{id}/status?status={value}
-     * status: PLANNED | IN_PROGRESS | COMPLETED | CANCELLED
+     * status: PLANNED | IN_PROGRESS | COMPLETED | DISCREPANCY_FOUND | RESOLVED | CANCELLED,
+     * limited to the transitions in features/audits/workflow.ts.
      */
     updateStatus: async (id: string, status: string): Promise<Audit> => {
         const response = await api.patch<Audit>(`/audits/${id}/status`, null, {
@@ -45,8 +46,4 @@ export const auditService = {
         return response.data;
     },
 
-    /** DELETE /audits/{id} — ADMIN only */
-    delete: async (id: string): Promise<void> => {
-        await api.delete(`/audits/${id}`);
-    },
 };
