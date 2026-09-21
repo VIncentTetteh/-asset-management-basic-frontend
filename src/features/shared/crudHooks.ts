@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { qk } from "@/lib/queryClient";
+import { reportApiError } from "@/lib/api-validation";
 
 interface CrudService<T, TDto> {
   getAll: () => Promise<T[]>;
@@ -20,7 +21,7 @@ interface CrudService<T, TDto> {
 export function makeCrudHooks<T, TDto>(
   moduleName: string,
   service: CrudService<T, TDto>,
-  labels: { entity: string },
+  labels: { entity: string; fields?: Record<string, string> },
   extraInvalidations: readonly (readonly string[])[] = [],
 ) {
   const key = qk.module(moduleName);
@@ -49,11 +50,10 @@ export function makeCrudHooks<T, TDto>(
         toast.success(vars.id ? `${labels.entity} updated` : `${labels.entity} created`);
         invalidate();
       },
+      // Field-level validation failures are listed by field; pages that also want
+      // the messages on their inputs call applyApiFieldErrors in their own catch.
       onError: (error) => {
-        const message =
-          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          `Failed to save ${labels.entity.toLowerCase()}`;
-        toast.error(message);
+        reportApiError(error, { fallback: `Failed to save ${labels.entity.toLowerCase()}`, labels: labels.fields });
       },
     });
   }
