@@ -22,7 +22,7 @@ export const disposalService = {
         return response.data;
     },
 
-    /** POST /disposals */
+    /** POST /disposals — a request; the asset is disposed only on approval. */
     create: async (data: DisposalsDto): Promise<DisposalRecord> => {
         const response = await api.post<DisposalRecord>("/disposals", data);
         return response.data;
@@ -34,7 +34,19 @@ export const disposalService = {
         return response.data;
     },
 
-    /** DELETE /disposals/{id} — ADMIN only */
+    /** POST /disposals/{id}/approve — a user other than the requester; fresh MFA. Disposes the asset. */
+    approve: async (id: string): Promise<DisposalRecord> => {
+        const response = await api.post<DisposalRecord>(`/disposals/${id}/approve`);
+        return response.data;
+    },
+
+    /** POST /disposals/{id}/reject — refuse (or withdraw) a pending disposal. */
+    reject: async (id: string): Promise<DisposalRecord> => {
+        const response = await api.post<DisposalRecord>(`/disposals/${id}/reject`);
+        return response.data;
+    },
+
+    /** DELETE /disposals/{id} — pending or rejected only */
     delete: async (id: string): Promise<void> => {
         await api.delete(`/disposals/${id}`);
     },

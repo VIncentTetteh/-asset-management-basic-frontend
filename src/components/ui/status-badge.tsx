@@ -44,6 +44,8 @@ const GENERIC_TONE: Record<string, Tone> = {
   ACTIVE: "in-use",
   OPEN: "in-stock",
   PENDING: "reserved",
+  PENDING_APPROVAL: "reserved",
+  REQUESTED: "reserved",
   IN_PROGRESS: "maintenance",
   COMPLETED: "in-use",
   RETURNED: "in-use",

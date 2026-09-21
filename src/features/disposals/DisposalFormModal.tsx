@@ -2,17 +2,22 @@
 
 import { useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import toast from "react-hot-toast";
-import type { Asset, DisposalRecord, DisposalsDto } from "@/types";
+import type { Asset, DisposalRecord } from "@/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { buildPatchPayload } from "@/lib/patch";
 import { useSaveDisposal } from "@/features/disposals/hooks";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
+import { applyApiFieldErrors } from "@/lib/api-validation";
+import {
+  buildDisposalPayload,
+  DISPOSAL_DOC_MAX_LENGTH,
+  disposalTermsLocked,
+  type DisposalForm,
+} from "@/features/disposals/workflow";
 
 export function DisposalFormModal({
   isOpen,
@@ -25,8 +30,9 @@ export function DisposalFormModal({
   editingDisposal: DisposalRecord | null;
   assets: Asset[];
 }) {
-  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<DisposalsDto>();
+  const { register, handleSubmit, reset, control, setError, formState: { errors } } = useForm<DisposalForm>();
   const save = useSaveDisposal();
+  const locked = disposalTermsLocked(editingDisposal);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -37,7 +43,7 @@ export function DisposalFormModal({
             disposalDate: editingDisposal.disposalDate ? editingDisposal.disposalDate.split("T")[0] : "",
             reason: editingDisposal.reason || "",
             disposalMethod: editingDisposal.disposalMethod || "SCRAP",
-            saleValue: editingDisposal.saleValue || 0,
+            saleValue: editingDisposal.saleValue ?? "",
             currency: editingDisposal.currency || "",
             complianceDocumentUrl: editingDisposal.complianceDocumentUrl || "",
           }
@@ -46,7 +52,7 @@ export function DisposalFormModal({
             disposalDate: new Date().toISOString().split("T")[0],
             reason: "",
             disposalMethod: "SCRAP",
-            saleValue: 0,
+            saleValue: "",
             currency: "",
             complianceDocumentUrl: "",
           },
@@ -56,52 +62,28 @@ export function DisposalFormModal({
   const watchedAssetId = useWatch({ control, name: "assetId" });
   const selectedAsset = assets.find((a) => a.id === watchedAssetId);
 
-  const onSubmit = async (data: DisposalsDto) => {
-    const rawSaleValue = data.saleValue as unknown;
-    const hasSaleValue = rawSaleValue !== undefined && rawSaleValue !== null && String(rawSaleValue).trim() !== "";
-    const saleValue = hasSaleValue ? Number(rawSaleValue) : undefined;
-    if (hasSaleValue && (Number.isNaN(saleValue) || (saleValue as number) < 0)) {
-      toast.error("Recovered value must be a valid positive number");
-      return;
+  const onSubmit = async (data: DisposalForm) => {
+    const payload = buildDisposalPayload(data, editingDisposal);
+    try {
+      await save.mutateAsync(editingDisposal ? { id: editingDisposal.id!, data: payload } : { data: payload });
+      onClose();
+    } catch (err) {
+      // Toasted by the mutation; keep the form open with field errors marked.
+      applyApiFieldErrors(err, setError);
     }
-
-    const payload: DisposalsDto = {
-      id: editingDisposal?.id,
-      assetId: data.assetId,
-      disposalDate: data.disposalDate,
-      disposalMethod: data.disposalMethod,
-      reason: data.reason || undefined,
-      saleValue,
-      // Empty = the asset's own currency (the API fills it in).
-      currency: data.currency || undefined,
-      complianceDocumentUrl: data.complianceDocumentUrl || undefined,
-    };
-
-    if (editingDisposal) {
-      const patch = buildPatchPayload<DisposalsDto>(
-        editingDisposal as unknown as Partial<DisposalsDto>,
-        payload,
-      );
-      if (Object.keys(patch).length === 0) {
-        toast("No changes to update");
-        return;
-      }
-      await save.mutateAsync({ id: editingDisposal.id!, data: patch });
-    } else {
-      await save.mutateAsync({ data: payload });
-    }
-    onClose();
   };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={editingDisposal ? "Edit disposal record" : "Decommission asset"}
+      title={editingDisposal ? "Edit disposal record" : "Request disposal"}
       description={
-        editingDisposal
-          ? "Update the disposal data."
-          : "Permanently remove an asset from active use and log its disposal."
+        locked
+          ? "This disposal is approved: its method, date and recovered value are locked. You can still update the reason and document reference."
+          : editingDisposal
+            ? "Update the disposal request before it is approved."
+            : "Request an asset's disposal. A different user must approve it before the asset is marked disposed."
       }
     >
       <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
@@ -121,11 +103,12 @@ export function DisposalFormModal({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="dp-date">Disposal date <span className="text-danger">*</span></Label>
-            <Input id="dp-date" type="date" {...register("disposalDate", { required: true })} />
+            <Input id="dp-date" type="date" disabled={locked} {...register("disposalDate", { required: "Disposal date is required" })} />
+            {errors.disposalDate && <p className="text-sm text-danger">{errors.disposalDate.message as string}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="dp-method">Disposal method</Label>
-            <Select id="dp-method" {...register("disposalMethod", { required: true })}>
+            <Select id="dp-method" disabled={locked} {...register("disposalMethod", { required: true })}>
               <option value="SALE">Sale — sold to buyer</option>
               <option value="SCRAP">Scrap</option>
               <option value="RECYCLING">Recycling</option>
@@ -138,18 +121,20 @@ export function DisposalFormModal({
 
         <div className="space-y-2">
           <Label htmlFor="dp-reason">Primary reason <span className="text-danger">*</span></Label>
-          <Textarea id="dp-reason" placeholder="e.g. End of life, irreparable damage, obsolete" {...register("reason", { required: true })} />
+          <Textarea id="dp-reason" placeholder="e.g. End of life, irreparable damage, obsolete" {...register("reason", { required: "Reason is required" })} />
+          {errors.reason && <p className="text-sm text-danger">{errors.reason.message as string}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-4 border-y border-edge-subtle py-4">
           <div className="space-y-2">
             <Label htmlFor="dp-saleValue">Value recovered</Label>
-            <Input id="dp-saleValue" type="number" step="0.01" min="0" placeholder="0.00" {...register("saleValue")} />
+            <Input id="dp-saleValue" type="number" step="0.01" min="0" placeholder="0.00" disabled={locked} {...register("saleValue", { min: { value: 0, message: "Cannot be negative" } })} />
+            {errors.saleValue && <p className="text-sm text-danger">{errors.saleValue.message as string}</p>}
             <p className="text-[11px] text-faint-fg">If the asset was sold or scrapped for cash.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="dp-currency">Currency</Label>
-            <Select id="dp-currency" {...register("currency")}>
+            <Select id="dp-currency" disabled={locked} {...register("currency")}>
               <option value="">{selectedAsset?.currency ? `Asset's currency (${selectedAsset.currency})` : "Asset's currency"}</option>
               <CurrencyOptions current={editingDisposal?.currency ?? undefined} />
             </Select>
@@ -158,13 +143,14 @@ export function DisposalFormModal({
 
         <div className="space-y-2">
           <Label htmlFor="dp-doc">Notes / document references</Label>
-          <Textarea id="dp-doc" placeholder="Certificate of destruction #12345…" {...register("complianceDocumentUrl")} />
+          <Textarea id="dp-doc" maxLength={DISPOSAL_DOC_MAX_LENGTH} placeholder="Certificate of destruction #12345…" {...register("complianceDocumentUrl")} />
+          {errors.complianceDocumentUrl && <p className="text-sm text-danger">{errors.complianceDocumentUrl.message as string}</p>}
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="destructive" isLoading={save.isPending}>
-            {editingDisposal ? "Save changes" : "Confirm disposal"}
+            {editingDisposal ? "Save changes" : "Request disposal"}
           </Button>
         </div>
       </form>

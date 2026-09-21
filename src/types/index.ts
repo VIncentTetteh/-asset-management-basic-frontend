@@ -567,6 +567,9 @@ export enum DisposalMethod {
     RETURN = "RETURN",
 }
 
+/** Maker-checker lifecycle (API V44): requested, then approved by someone else. */
+export type DisposalStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+
 export interface DisposalRecord extends BaseEntity {
     assetId: string;
     disposalMethod: DisposalMethod | string;
@@ -574,7 +577,12 @@ export interface DisposalRecord extends BaseEntity {
     saleValue?: number;
     /** Currency of saleValue when the backend reports one; otherwise the base currency. */
     currency?: string | null;
+    status?: DisposalStatus;
+    requestedById?: string;
     approvedById?: string;
+    approvedAt?: string;
+    rejectedById?: string;
+    rejectedAt?: string;
     reason?: string;
     complianceDocumentUrl?: string;
     organisationId?: string;
@@ -585,13 +593,11 @@ export interface DisposalsDto {
     assetId: string;              // required
     disposalMethod: DisposalMethod | string;  // required
     disposalDate: string;         // required
-    saleValue?: number;
+    saleValue?: number | null;
     /** ISO code of saleValue; the API defaults it to the asset's currency. */
-    currency?: string;
-    approvedById?: string;        // server-assigned from the authenticated session
-    reason?: string;
-    complianceDocumentUrl?: string;
-    organisationId?: string;
+    currency?: string | null;
+    reason?: string | null;
+    complianceDocumentUrl?: string | null;
 }
 
 // ─── Supplier ─────────────────────────────────────────────────────────────────

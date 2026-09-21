@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Trash, Pencil, Trash2 } from "lucide-react";
+import { Trash, Pencil, Trash2, ThumbsUp, XCircle } from "lucide-react";
 import type { DisposalRecord } from "@/types";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -11,7 +11,10 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
-import { useDisposals, useDisposalAssets, useDeleteDisposal } from "@/features/disposals/hooks";
+import { useDisposals, useDisposalAssets, useDeleteDisposal, useDisposalDecision } from "@/features/disposals/hooks";
+import { disposalActionsFor, disposalStatusOf } from "@/features/disposals/workflow";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { useAuth } from "@/contexts/AuthContext";
 import { DisposalFormModal } from "@/features/disposals/DisposalFormModal";
 
 const METHOD_LABEL: Record<string, string> = {
@@ -28,6 +31,8 @@ export default function DisposalsPage() {
   const { data: disposals = [], isLoading } = useDisposals();
   const assets = useDisposalAssets();
   const remove = useDeleteDisposal();
+  const decide = useDisposalDecision();
+  const { user } = useAuth();
   const { confirm, ConfirmDialog } = useConfirm();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -49,12 +54,23 @@ export default function DisposalsPage() {
   const handleDelete = async (record: DisposalRecord) => {
     if (
       !(await confirm({
-        message: "Delete this disposal record? The asset's state will need reverting manually.",
+        message: "Delete this disposal request? The asset is not affected.",
         variant: "danger",
       }))
     )
       return;
     remove.mutate(record.id!);
+  };
+
+  const handleApprove = async (record: DisposalRecord) => {
+    if (
+      !(await confirm({
+        message: `Approve disposing "${lookups.assetName(record.assetId)}"? The asset will be marked disposed and its value locked.`,
+        variant: "danger",
+      }))
+    )
+      return;
+    decide.mutate({ id: record.id!, decision: "approve" });
   };
 
   const columns = useMemo<ColumnDef<DisposalRecord, unknown>[]>(
@@ -109,53 +125,97 @@ export default function DisposalsPage() {
         ),
       },
       {
+        id: "status",
+        header: "Status",
+        enableSorting: false,
+        cell: ({ row }) => <StatusBadge status={disposalStatusOf(row.original)} />,
+      },
+      {
         id: "actions",
         header: "",
         enableSorting: false,
-        cell: ({ row }) => (
-          <div className="flex justify-end gap-0.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              aria-label="Edit disposal"
-              onClick={() => {
-                setEditingDisposal(row.original);
-                setIsModalOpen(true);
-              }}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-danger"
-              aria-label="Delete disposal"
-              onClick={() => handleDelete(row.original)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const actions = disposalActionsFor(row.original, user?.id);
+          return (
+            <div className="flex justify-end gap-0.5">
+              {actions.includes("approve") && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-ok"
+                  title="Approve and dispose"
+                  aria-label="Approve disposal"
+                  onClick={() => handleApprove(row.original)}
+                >
+                  <ThumbsUp className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {actions.includes("reject") && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-warn"
+                  title="Reject"
+                  aria-label="Reject disposal"
+                  onClick={() => decide.mutate({ id: row.original.id!, decision: "reject" })}
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {actions.includes("edit") && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  aria-label="Edit disposal"
+                  onClick={() => {
+                    setEditingDisposal(row.original);
+                    setIsModalOpen(true);
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {actions.includes("delete") && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-danger"
+                  aria-label="Delete disposal"
+                  onClick={() => handleDelete(row.original)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          );
+        },
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookups, format, baseCurrency],
+    [lookups, format, baseCurrency, user?.id],
   );
 
   // Sale values are recorded in the disposal's currency (base currency when unset).
+  // Only approved disposals have recovered anything.
   const recovered = useMemo(
-    () => sum(disposals.map((d) => ({ amount: d.saleValue, currency: d.currency }))),
+    () =>
+      sum(
+        disposals
+          .filter((d) => disposalStatusOf(d) === "APPROVED")
+          .map((d) => ({ amount: d.saleValue, currency: d.currency })),
+      ),
     [disposals, sum],
   );
+  const pendingCount = disposals.filter((d) => disposalStatusOf(d) === "PENDING_APPROVAL").length;
 
   return (
     <ListPageTemplate
       title="Disposals"
-      subtitle={isLoading ? "Loading records…" : `${disposals.length} disposals recorded`}
+      subtitle={isLoading ? "Loading records…" : `${disposals.length} disposals · ${pendingCount} awaiting approval`}
       actions={
         <Button variant="destructive" onClick={openCreate}>
-          <Trash className="mr-2 h-4 w-4" /> Decommission asset
+          <Trash className="mr-2 h-4 w-4" /> Request disposal
         </Button>
       }
     >
@@ -166,10 +226,10 @@ export default function DisposalsPage() {
         data={disposals}
         isLoading={isLoading}
         emptyTitle="No disposals yet"
-        emptyDescription="Assets you decommission are recorded here with method, reason, and recovered value."
+        emptyDescription="Disposal requests and approvals are recorded here with method, reason, and recovered value."
         emptyAction={
           <Button size="sm" onClick={openCreate}>
-            <Trash className="mr-1.5 h-4 w-4" /> Record disposal
+            <Trash className="mr-1.5 h-4 w-4" /> Request disposal
           </Button>
         }
         footerSummary={

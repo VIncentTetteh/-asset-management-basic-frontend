@@ -6,6 +6,7 @@ import { disposalService } from "@/services/disposalService";
 import { assetService } from "@/services/assetService";
 import { qk } from "@/lib/queryClient";
 import type { DisposalsDto } from "@/types";
+import { reportApiError } from "@/lib/api-validation";
 
 const disposalsKey = qk.module("disposals");
 
@@ -37,13 +38,28 @@ function useInvalidateDisposals() {
 export function useSaveDisposal() {
   const invalidate = useInvalidateDisposals();
   return useMutation({
-    mutationFn: ({ id, data }: { id?: string; data: Partial<DisposalsDto> }) =>
-      id ? disposalService.update(id, data) : disposalService.create(data as DisposalsDto),
+    // Edits are full-replace PUTs so cleared fields are actually cleared.
+    mutationFn: ({ id, data }: { id?: string; data: DisposalsDto }) =>
+      id ? disposalService.replace(id, data) : disposalService.create(data),
     onSuccess: (_res, vars) => {
-      toast.success(vars.id ? "Disposal record updated" : "Asset disposed");
+      toast.success(vars.id ? "Disposal record updated" : "Disposal requested — awaiting approval");
       invalidate();
     },
-    onError: () => toast.error("Failed to save disposal record"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to save disposal record" }),
+  });
+}
+
+export function useDisposalDecision() {
+  const invalidate = useInvalidateDisposals();
+  return useMutation({
+    mutationFn: ({ id, decision }: { id: string; decision: "approve" | "reject" }) =>
+      decision === "approve" ? disposalService.approve(id) : disposalService.reject(id),
+    onSuccess: (_res, vars) => {
+      toast.success(vars.decision === "approve" ? "Disposal approved — asset disposed" : "Disposal rejected");
+      invalidate();
+    },
+    // Approval needs a fresh MFA step-up; a cancelled prompt or 409 shows its own message.
+    onError: (err, vars) => reportApiError(err, { fallback: `Failed to ${vars.decision} disposal` }),
   });
 }
 
@@ -55,6 +71,6 @@ export function useDeleteDisposal() {
       toast.success("Disposal record deleted");
       invalidate();
     },
-    onError: () => toast.error("Failed to delete record"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to delete record" }),
   });
 }
