@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { buildPatchPayload } from "@/lib/patch";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
+import { toastActionError } from "@/lib/step-up";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
@@ -70,7 +71,7 @@ export default function PurchaseOrdersPage() {
       toast.success(messages[vars.action]);
       invalidate();
     },
-    onError: (_err, vars) => toast.error(`Failed to ${vars.action} purchase order`),
+    onError: (err, vars) => toastActionError(err, `Failed to ${vars.action} purchase order`),
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -207,7 +208,7 @@ export default function PurchaseOrdersPage() {
       invalidate();
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message ?? "Failed to save purchase order");
+      toastActionError(error, err.response?.data?.message ?? "Failed to save purchase order");
     } finally {
       setIsSaving(false);
     }

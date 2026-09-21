@@ -16,6 +16,7 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Shield, Lock, ShieldAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
+import { toastActionError } from "@/lib/step-up";
 import { useConfirm } from "@/hooks/useConfirm";
 
 
@@ -64,7 +65,7 @@ export default function RolesPage() {
     const deleteRole = useMutation({
         mutationFn: (id: string) => roleService.delete(id),
         onSuccess: () => { toast.success("Role deleted"); invalidate(); },
-        onError: () => toast.error("Failed to delete role"),
+        onError: (err) => toastActionError(err, "Failed to delete role"),
     });
 
     // Build the grouped permission list: known groups first, then any extra from the server
@@ -177,7 +178,7 @@ export default function RolesPage() {
             setIsModalOpen(false);
             invalidate();
         } catch (error) {
-            toast.error("Failed to save role");
+            toastActionError(error, "Failed to save role");
             console.error(error);
         }
     };

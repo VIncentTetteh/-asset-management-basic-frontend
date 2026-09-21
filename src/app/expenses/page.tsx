@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
+import { toastActionError } from "@/lib/step-up";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Receipt, ThumbsUp, XCircle, Search } from "lucide-react";
 import type { Expense, ExpenseStatus } from "@/types";
@@ -111,7 +112,7 @@ export default function ExpensesPage() {
       toast.success("Expense approved");
       invalidate();
     },
-    onError: () => toast.error("Failed to approve expense"),
+    onError: (err) => toastActionError(err, "Failed to approve expense"),
   });
   const rejectExpense = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) => expenseService.reject(id, reason),
@@ -119,7 +120,7 @@ export default function ExpensesPage() {
       toast.success("Expense rejected");
       invalidate();
     },
-    onError: () => toast.error("Failed to reject expense"),
+    onError: (err) => toastActionError(err, "Failed to reject expense"),
   });
   const deleteExpense = useMutation({
     mutationFn: (id: string) => expenseService.delete(id),

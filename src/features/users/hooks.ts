@@ -9,6 +9,7 @@ import { mfaService } from "@/services/mfaService";
 import { qk } from "@/lib/queryClient";
 import type { User, UserDto } from "@/types";
 import { buildPatchPayload } from "@/lib/patch";
+import { toastActionError } from "@/lib/step-up";
 
 const usersKey = qk.module("users");
 
@@ -74,7 +75,7 @@ export function useUpdateUser() {
       }
       invalidate();
     },
-    onError: () => toast.error("Failed to save profile"),
+    onError: (err) => toastActionError(err, "Failed to save profile"),
   });
 }
 
@@ -86,7 +87,7 @@ export function useDeactivateUser() {
       toast.success("User deactivated");
       invalidate();
     },
-    onError: () => toast.error("Failed to deactivate user"),
+    onError: (err) => toastActionError(err, "Failed to deactivate user"),
   });
 }
 

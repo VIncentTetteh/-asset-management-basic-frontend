@@ -15,6 +15,7 @@ import { toast } from "react-hot-toast";
 import { useForm } from "react-hook-form";
 import { KeyRound, Shield, ToggleLeft, ToggleRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toastActionError } from "@/lib/step-up";
 import axios from "axios";
 
 type TabType = "oauth2" | "saml";
@@ -72,8 +73,8 @@ export default function SsoConfigurationPage() {
             setConfig(updated);
             toast.success(`SSO ${updated.enabled ? "enabled" : "disabled"}`);
         } catch (error) {
-            toast.error(axios.isAxiosError(error) && error.response?.status === 403
-                ? "A recent MFA sign-in is required to change SSO. Sign in again with MFA."
+            toastActionError(error, axios.isAxiosError(error) && error.response?.status === 403
+                ? "You need admin or security permission to manage SSO."
                 : "Failed to toggle SSO");
         } finally {
             setIsToggling(false);
@@ -87,8 +88,8 @@ export default function SsoConfigurationPage() {
             setConfig(updated);
             toast.success("OAuth2 SSO configured");
         } catch (error) {
-            toast.error(axios.isAxiosError(error) && error.response?.status === 403
-                ? "A recent MFA sign-in is required to change SSO. Sign in again with MFA."
+            toastActionError(error, axios.isAxiosError(error) && error.response?.status === 403
+                ? "You need admin or security permission to manage SSO."
                 : "Failed to configure OAuth2 SSO");
         }
     };
@@ -100,8 +101,8 @@ export default function SsoConfigurationPage() {
             setConfig(updated);
             toast.success("SAML SSO configured");
         } catch (error) {
-            toast.error(axios.isAxiosError(error) && error.response?.status === 403
-                ? "A recent MFA sign-in is required to change SSO. Sign in again with MFA."
+            toastActionError(error, axios.isAxiosError(error) && error.response?.status === 403
+                ? "You need admin or security permission to manage SSO."
                 : "Failed to configure SAML SSO");
         }
     };
