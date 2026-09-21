@@ -6,6 +6,7 @@ import { checkoutService, type CheckInDto, type CheckoutRecordDto } from "@/serv
 import { assetService } from "@/services/assetService";
 import { userService } from "@/services/userService";
 import { qk } from "@/lib/queryClient";
+import { reportApiError } from "@/lib/api-validation";
 
 export function useCheckouts(view: "all" | "overdue") {
   return useQuery({
@@ -47,7 +48,8 @@ export function useCheckOut() {
       toast.success("Asset checked out");
       invalidate();
     },
-    onError: () => toast.error("Failed to check out asset"),
+    // e.g. 409 "already checked out" — show the API's reason, not a generic line.
+    onError: (err) => reportApiError(err, { fallback: "Failed to check out asset" }),
   });
 }
 
@@ -60,6 +62,6 @@ export function useCheckIn() {
       toast.success("Asset checked in");
       invalidate();
     },
-    onError: () => toast.error("Failed to check in asset"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to check in asset" }),
   });
 }

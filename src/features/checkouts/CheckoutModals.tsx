@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { useCheckIn, useCheckOut } from "@/features/checkouts/hooks";
+import { applyApiFieldErrors } from "@/lib/api-validation";
+import { buildCheckInPayload, buildCheckOutPayload, CONDITION_MAX_LENGTH } from "@/features/checkouts/payload";
 
 interface CheckoutFormValues {
   assetId: string;
@@ -31,7 +33,7 @@ export function CheckOutModal({
   assets: Asset[];
   users: User[];
 }) {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CheckoutFormValues>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<CheckoutFormValues>();
   const checkOut = useCheckOut();
 
   useEffect(() => {
@@ -39,16 +41,17 @@ export function CheckOutModal({
   }, [isOpen, reset]);
 
   const onSubmit = async (data: CheckoutFormValues) => {
-    await checkOut.mutateAsync({
-      assetId: data.assetId,
-      userId: data.userId,
-      dto: {
-        expectedReturnDate: data.expectedReturnDate,
-        conditionOnCheckout: data.conditionOnCheckout,
-        notes: data.notes,
-      },
-    });
-    onClose();
+    try {
+      await checkOut.mutateAsync({
+        assetId: data.assetId,
+        userId: data.userId,
+        dto: buildCheckOutPayload(data),
+      });
+      onClose();
+    } catch (err) {
+      // The mutation already toasted; keep the modal open with the fields marked.
+      applyApiFieldErrors(err, setError);
+    }
   };
 
   return (
@@ -87,7 +90,8 @@ export function CheckOutModal({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="co-condition">Condition on checkout</Label>
-          <Input id="co-condition" placeholder="e.g. Good, minor scratches…" {...register("conditionOnCheckout")} />
+          <Input id="co-condition" maxLength={CONDITION_MAX_LENGTH} placeholder="e.g. Good, minor scratches…" {...register("conditionOnCheckout")} />
+          {errors.conditionOnCheckout && <p className="mt-1 text-xs text-danger">{errors.conditionOnCheckout.message}</p>}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="co-notes">Notes</Label>
@@ -111,7 +115,7 @@ export function CheckInModal({
   record: CheckoutRecordDto | null;
   onClose: () => void;
 }) {
-  const { register, handleSubmit, reset } = useForm<CheckInDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<CheckInDto>();
   const checkIn = useCheckIn();
 
   useEffect(() => {
@@ -120,8 +124,12 @@ export function CheckInModal({
 
   const onSubmit = async (data: CheckInDto) => {
     if (!record?.id) return;
-    await checkIn.mutateAsync({ recordId: record.id, dto: data });
-    onClose();
+    try {
+      await checkIn.mutateAsync({ recordId: record.id, dto: buildCheckInPayload(data) });
+      onClose();
+    } catch (err) {
+      applyApiFieldErrors(err, setError);
+    }
   };
 
   return (
@@ -134,7 +142,8 @@ export function CheckInModal({
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="ci-condition">Condition on return</Label>
-          <Input id="ci-condition" placeholder="e.g. Good, damaged screen…" {...register("conditionOnReturn")} />
+          <Input id="ci-condition" maxLength={CONDITION_MAX_LENGTH} placeholder="e.g. Good, damaged screen…" {...register("conditionOnReturn")} />
+          {errors.conditionOnReturn && <p className="mt-1 text-xs text-danger">{errors.conditionOnReturn.message}</p>}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ci-notes">Notes</Label>
