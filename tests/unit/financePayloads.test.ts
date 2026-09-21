@@ -27,6 +27,7 @@ describe("budget payload", () => {
     it("always sends the required period dates and the alert threshold", () => {
         expect(buildBudgetPayload(form)).toEqual({
             name: "IT hardware",
+            description: null,
             status: "DRAFT",
             totalAmount: 5000,
             currency: "GHS",
@@ -134,6 +135,8 @@ describe("license payload", () => {
             currency: "USD",
             expiryDate: "2027-03-31",
             autoRenew: false,
+            licenseDocumentUrl: "https://docs/eula.pdf",
+            notes: "Finance team",
         });
         expect(payload).toMatchObject({
             name: "M365 Finance",
@@ -145,6 +148,8 @@ describe("license payload", () => {
             purchaseCost: null,
             annualRenewalCost: 12000,
             expiryDate: "2027-03-31",
+            licenseDocumentUrl: "https://docs/eula.pdf",
+            notes: "Finance team",
         });
         for (const legacy of ["seats", "allocatedSeats", "monthlyCost", "supplierId"]) {
             expect(payload).not.toHaveProperty(legacy);

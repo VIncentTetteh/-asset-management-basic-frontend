@@ -37,6 +37,9 @@ export type BudgetForm = Raw<BudgetDto>;
 export function buildBudgetPayload(form: BudgetForm): BudgetDto {
     return {
         name: String(form.name ?? "").trim(),
+        // PUT replaces every field, so the description is carried even though the
+        // form does not edit it.
+        description: optionalString(form.description),
         status: (optionalString(form.status) ?? undefined) as BudgetDto["status"],
         totalAmount: Number(form.totalAmount),
         currency: optionalString(form.currency),
@@ -115,6 +118,7 @@ export function buildLicensePayload(form: LicenseForm): SoftwareLicenseDto {
         expiryDate: optionalString(form.expiryDate),
         renewalDate: optionalString(form.renewalDate),
         autoRenew: form.autoRenew === true || form.autoRenew === "true",
+        licenseDocumentUrl: optionalString(form.licenseDocumentUrl),
         notes: optionalString(form.notes),
     };
 }

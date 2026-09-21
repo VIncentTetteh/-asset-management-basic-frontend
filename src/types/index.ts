@@ -1576,6 +1576,7 @@ export interface SoftwareLicenseDto {
     expiryDate?: string | null;
     renewalDate?: string | null;
     autoRenew?: boolean | null;
+    licenseDocumentUrl?: string | null;
     notes?: string | null;
 }
 
@@ -1671,6 +1672,7 @@ export type BudgetStatus = "DRAFT" | "ACTIVE" | "EXCEEDED" | "CLOSED";
 export interface Budget {
     id: string;
     name: string;
+    description?: string | null;
     status: BudgetStatus;
     totalAmount: number;
     spentAmount: number;
@@ -1712,6 +1714,7 @@ export const BUDGET_STATUSES = ["DRAFT", "ACTIVE", "EXCEEDED", "CLOSED"] as cons
 
 export interface BudgetDto {
     name: string;
+    description?: string | null;
     status?: BudgetStatus;
     totalAmount: number;
     currency?: string | null;

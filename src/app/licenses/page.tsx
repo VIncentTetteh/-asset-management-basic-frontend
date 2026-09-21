@@ -108,6 +108,8 @@ export default function LicensesPage() {
             annualRenewalCost: editing.annualRenewalCost ?? "",
             currency: editing.currency || baseCurrency,
             autoRenew: editing.autoRenew ?? false,
+            // Not edited here, but carried so the full PUT does not clear them.
+            licenseDocumentUrl: editing.licenseDocumentUrl || "",
             notes: editing.notes || "",
           }
         : {

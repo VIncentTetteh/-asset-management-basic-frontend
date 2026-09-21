@@ -154,6 +154,7 @@ export default function BudgetsPage() {
       editing
         ? {
             name: editing.name,
+            description: editing.description || "",
             status: editing.status,
             totalAmount: editing.totalAmount,
             currency: editing.currency || baseCurrency,
