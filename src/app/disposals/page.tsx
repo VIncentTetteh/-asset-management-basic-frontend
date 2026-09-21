@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { AssetTag } from "@/components/ui/asset-tag";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
+import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 import { useDisposals, useDisposalAssets, useDeleteDisposal } from "@/features/disposals/hooks";
 import { DisposalFormModal } from "@/features/disposals/DisposalFormModal";
 
@@ -22,7 +24,7 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 export default function DisposalsPage() {
-  const { format } = useCurrency();
+  const { format, baseCurrency, sum } = useCurrency();
   const { data: disposals = [], isLoading } = useDisposals();
   const assets = useDisposalAssets();
   const remove = useDeleteDisposal();
@@ -102,7 +104,7 @@ export default function DisposalsPage() {
         header: () => <span className="block text-right">Recovered</span>,
         cell: ({ row }) => (
           <span className="data-mono block text-right">
-            {row.original.saleValue ? format(row.original.saleValue, "GHS") : "—"}
+            {row.original.saleValue ? format(row.original.saleValue, row.original.currency || baseCurrency) : "—"}
           </span>
         ),
       },
@@ -138,12 +140,13 @@ export default function DisposalsPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookups, format],
+    [lookups, format, baseCurrency],
   );
 
+  // Sale values are recorded in the disposal's currency (base currency when unset).
   const recovered = useMemo(
-    () => disposals.reduce((sum, d) => sum + (d.saleValue || 0), 0),
-    [disposals],
+    () => sum(disposals.map((d) => ({ amount: d.saleValue, currency: d.currency }))),
+    [disposals, sum],
   );
 
   return (
@@ -156,6 +159,8 @@ export default function DisposalsPage() {
         </Button>
       }
     >
+      <MissingRatesNotice incomplete={!recovered.complete} missingRates={recovered.missingRates} />
+
       <DataTable
         columns={columns}
         data={disposals}
@@ -169,7 +174,7 @@ export default function DisposalsPage() {
         }
         footerSummary={
           <span>
-            Total recovered · <span className="data-mono">{format(recovered, "GHS")}</span>
+            Total recovered · <MoneyTotalValue total={recovered} />
           </span>
         }
       />

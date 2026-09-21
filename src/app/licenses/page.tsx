@@ -22,6 +22,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { cn } from "@/lib/utils";
 
 const LICENSE_TYPES: LicenseType[] = ["SUBSCRIPTION", "PERPETUAL", "VOLUME", "NODE_LOCKED", "OPEN_SOURCE", "TRIAL", "ENTERPRISE", "OEM"];
@@ -53,7 +54,7 @@ function SeatBar({ seats, allocated }: { seats: number; allocated: number }) {
 }
 
 export default function LicensesPage() {
-  const { format } = useCurrency();
+  const { format, baseCurrency } = useCurrency();
   const [view, setView] = useState<ViewType>("all");
 
   const { data: allRows = [], isLoading: allLoading } = licenses.useList();
@@ -103,12 +104,12 @@ export default function LicensesPage() {
             purchaseDate: editing.purchaseDate || "",
             expiryDate: editing.expiryDate || "",
             monthlyCost: editing.monthlyCost ?? undefined,
-            currency: editing.currency || "GHS",
+            currency: editing.currency || baseCurrency,
             supplierId: editing.supplierId || "",
           }
-        : { productName: "", licenseType: "SUBSCRIPTION", status: "ACTIVE", seats: 1, allocatedSeats: 0, currency: "GHS" },
+        : { productName: "", licenseType: "SUBSCRIPTION", status: "ACTIVE", seats: 1, allocatedSeats: 0, currency: baseCurrency },
     );
-  }, [isModalOpen, editing, reset]);
+  }, [isModalOpen, editing, reset, baseCurrency]);
 
   const openCreate = () => {
     setEditing(null);
@@ -178,7 +179,7 @@ export default function LicensesPage() {
         header: () => <span className="block text-right">Monthly</span>,
         cell: ({ row }) => (
           <span className="data-mono block text-right">
-            {row.original.monthlyCost != null ? format(row.original.monthlyCost, row.original.currency || "GHS") : "—"}
+            {row.original.monthlyCost != null ? format(row.original.monthlyCost, row.original.currency || baseCurrency) : "—"}
           </span>
         ),
       },
@@ -230,7 +231,7 @@ export default function LicensesPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [format],
+    [format, baseCurrency],
   );
 
   return (
@@ -379,10 +380,7 @@ export default function LicensesPage() {
             <div className="space-y-2">
               <Label htmlFor="lic-currency">Currency</Label>
               <Select id="lic-currency" {...register("currency")}>
-                <option value="GHS">GHS</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
+                <CurrencyOptions current={editing?.currency} />
               </Select>
             </div>
           </div>

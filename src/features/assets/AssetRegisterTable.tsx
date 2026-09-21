@@ -9,6 +9,8 @@ import { AssetTag } from "@/components/ui/asset-tag";
 import { LifecycleTrail } from "@/components/ui/lifecycle-trail";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 
 /**
  * The asset register — direction A's reference surface. A compact table
@@ -52,10 +54,12 @@ export function AssetRegisterTable({
   canCreate: boolean;
 }) {
   const items = useMemo(() => paged?.items ?? [], [paged?.items]);
+  const { baseCurrency, sum } = useCurrency();
 
+  // Each asset is converted into the display currency; assets without a rate are excluded and flagged.
   const pageValue = useMemo(
-    () => items.reduce((sum, a) => sum + (a.purchaseCost || 0), 0),
-    [items],
+    () => sum(items.map((a) => ({ amount: a.purchaseCost, currency: a.currency }))),
+    [items, sum],
   );
 
   const columns = useMemo<ColumnDef<Asset, unknown>[]>(
@@ -109,7 +113,7 @@ export function AssetRegisterTable({
         header: () => <span className="block text-right">Book value</span>,
         cell: ({ row }) => (
           <span className="data-mono block text-right">
-            {format(row.original.purchaseCost, row.original.currency || "GHS")}
+            {format(row.original.purchaseCost, row.original.currency || baseCurrency)}
           </span>
         ),
       },
@@ -143,7 +147,7 @@ export function AssetRegisterTable({
         ),
       },
     ],
-    [lookups, format, onAssign, onEdit, onDelete],
+    [lookups, format, onAssign, onEdit, onDelete, baseCurrency],
   );
 
   const total = paged?.total ?? 0;
@@ -192,7 +196,7 @@ export function AssetRegisterTable({
       }
       footerSummary={
         <span>
-          Page total · <span className="data-mono">{format(pageValue, "GHS")}</span>
+          Page total · <MoneyTotalValue total={pageValue} />
         </span>
       }
     />

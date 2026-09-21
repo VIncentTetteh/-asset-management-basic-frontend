@@ -2,7 +2,8 @@
 // Extracted verbatim from the legacy dashboard page (Phase 4 Batch A).
 
 import { Hexagon, Wrench, ShoppingCart, DollarSign, ShieldCheck, Building2, RefreshCw, FileText, Users } from "lucide-react";
-import type { Asset, AssetsByDepartment, Budget, DepreciationSummary, PurchaseOrder, SoftwareLicense } from "@/types";
+import type { Asset, AssetsByDepartment, Budget, BudgetSummary, DepreciationSummary, MoneyAggregateMeta, PurchaseOrder, SoftwareLicense } from "@/types";
+import { readMoneyMeta } from "@/lib/currency";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -19,12 +20,17 @@ export interface DashboardStats {
     pendingTransfers: number;
 }
 
-export interface BudgetStats {
+export interface BudgetStats extends MoneyAggregateMeta {
     totalBudgetAmount: number;
     totalSpentAmount: number;
     activeBudgets: number;
     exceededBudgets: number;
     utilizationPct: number;
+    /**
+     * False when the server budget summary was unavailable. Amounts are then
+     * withheld rather than summed client-side across currencies.
+     */
+    amountsAvailable: boolean;
 }
 
 export interface AssetStatusBreakdownItem {
@@ -81,6 +87,7 @@ export const EMPTY_BUDGET_STATS: BudgetStats = {
     activeBudgets: 0,
     exceededBudgets: 0,
     utilizationPct: 0,
+    amountsAvailable: false,
 };
 
 export const STATUS_META: Record<string, { label: string; color: string }> = {
@@ -127,6 +134,14 @@ export const formatLabel = (value: string) =>
         .join(" ");
 
 // ── Normalization ─────────────────────────────────────────────────────────────
+
+/** currency/complete/missingRates of a (possibly enveloped) aggregate payload. */
+export const moneyMetaOf = (payload: unknown): MoneyAggregateMeta => {
+    const direct = asRecord(payload);
+    const unwrapped = unwrapPayloadRecord(payload);
+    const inner = readMoneyMeta(unwrapped);
+    return inner.currency || inner.complete !== undefined ? inner : readMoneyMeta(direct);
+};
 
 export const normalizeDashboardSummary = (payload: unknown): DashboardStats => {
     const raw = unwrapPayloadRecord(payload);
@@ -242,7 +257,9 @@ export const normalizeAssetsByDepartment = (payload: unknown): AssetsByDepartmen
     return {
         data,
         total: toNumber(raw?.total) || data.reduce((s, i) => s + i.count, 0),
+        // Department values arrive already converted into one currency, so summing them is safe.
         totalValue: toNumber(raw?.totalValue) || data.reduce((s, i) => s + i.value, 0),
+        ...readMoneyMeta(raw),
     };
 };
 
@@ -255,6 +272,7 @@ export const normalizeDepreciationSummary = (payload: unknown): DepreciationSumm
         assetsFullyDepreciated: toNumber(raw.assetsFullyDepreciated ?? raw.fullyDepreciatedCount),
         monthlyDepreciation: toNumber(raw.monthlyDepreciation ?? raw.depreciationThisYear),
         byMethod: raw.byMethod as DepreciationSummary["byMethod"],
+        ...readMoneyMeta(raw),
     };
 };
 
@@ -288,10 +306,13 @@ export const deriveStatsFromStatusBreakdown = (items: AssetStatusBreakdownItem[]
     totalAssetValue: items.reduce((sum, item) => sum + item.value, 0),
 });
 
-export const deriveStatsFromAssets = (assets: Asset[]): Pick<DashboardStats, "totalAssets" | "activeAssets" | "totalAssetValue"> => ({
+/**
+ * Count-only fallback. Asset value is deliberately NOT derived here: raw asset
+ * rows carry their own currencies, and summing them would mix currencies.
+ */
+export const deriveStatsFromAssets = (assets: Asset[]): Pick<DashboardStats, "totalAssets" | "activeAssets"> => ({
     totalAssets: assets.length,
     activeAssets: assets.filter(asset => String(asset.status ?? "").toUpperCase() === "IN_USE").length,
-    totalAssetValue: assets.reduce((sum, asset) => sum + (asset.purchaseCost ?? asset.currentBookValue ?? 0), 0),
 });
 
 export const deriveStatsFromPurchaseOrders = (purchaseOrders: PurchaseOrder[]): Pick<DashboardStats, "openPurchaseOrders" | "pendingApprovals"> => ({
@@ -319,18 +340,29 @@ export const countExpiredLicenses = (licenses: SoftwareLicense[]): number => {
     }).length;
 };
 
-export const computeBudgetStats = (budgets: Budget[]): BudgetStats => {
-    if (!budgets.length) return EMPTY_BUDGET_STATS;
+/**
+ * Budget KPI. Amounts come only from the server summary (GET /budgets/summary),
+ * which converts every budget into the base currency and excludes — and flags —
+ * any it has no rate for. The budget list is used for counts only.
+ */
+export const computeBudgetStats = (budgets: Budget[], summary: BudgetSummary | null): BudgetStats => {
     const activeStatuses = new Set(["ACTIVE", "OPEN", "APPROVED"]);
-    const activeBudgets = budgets.filter(b => activeStatuses.has(String(b.status ?? "").toUpperCase()));
-    const totalAmount = activeBudgets.reduce((s, b) => s + (b.totalAmount ?? 0), 0);
-    const totalSpent = activeBudgets.reduce((s, b) => s + (b.spentAmount ?? 0), 0);
+    const counts = {
+        activeBudgets: budgets.filter(b => activeStatuses.has(String(b.status ?? "").toUpperCase())).length,
+        exceededBudgets: budgets.filter(b => String(b.status ?? "").toUpperCase() === "EXCEEDED").length,
+    };
+    if (!summary) return { ...EMPTY_BUDGET_STATS, ...counts };
+    const totalAmount = toNumber(summary.totalAllocated);
+    const totalSpent = toNumber(summary.totalSpent);
     return {
+        ...counts,
         totalBudgetAmount: totalAmount,
         totalSpentAmount: totalSpent,
-        activeBudgets: activeBudgets.length,
-        exceededBudgets: budgets.filter(b => String(b.status ?? "").toUpperCase() === "EXCEEDED").length,
         utilizationPct: totalAmount > 0 ? Math.round((totalSpent / totalAmount) * 100) : 0,
+        amountsAvailable: true,
+        currency: summary.currency,
+        complete: summary.complete,
+        missingRates: summary.missingRates,
     };
 };
 

@@ -1,113 +1,197 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { exchangeRateService } from "@/services/exchangeRateService";
+import { currencyService } from "@/services/currencyService";
+import { useAuth } from "@/contexts/AuthContext";
+import { extractOrganisationId, getOrganisationIdFromStorage } from "@/lib/authContext";
+import {
+    FALLBACK_CURRENCY,
+    buildRateMap,
+    convertAmount,
+    currencySymbol,
+    formatMoney,
+    normalizeCurrencyCode,
+    ratePair,
+    sumMoney,
+    type MoneyLine,
+    type MoneyTotal,
+    type RateMap,
+    type RatePair,
+} from "@/lib/currency";
 
-export type SupportedCurrency = "USD" | "GHS";
+const DISPLAY_CURRENCY_STORAGE_KEY = "assetiq_currency";
+const SETTINGS_STALE_MS = 5 * 60_000;
 
-interface CurrencyContextValue {
-    currency: SupportedCurrency;
-    setCurrency: (c: SupportedCurrency) => void;
-    rate: number | null;    // governed GHS per 1 USD; null when unavailable
+/** Query keys owned by this context. Exchange-rate keys sit under the
+ *  "exchange-rates" prefix so the exchange-rates page's invalidation refreshes them. */
+export const currencyQueryKeys = {
+    all: ["currency"] as const,
+    settings: (orgId?: string) => ["currency", "settings", orgId] as const,
+    rates: (orgId?: string) => ["exchange-rates", "currency-context", orgId] as const,
+};
+
+export interface CurrencyContextValue {
+    /** The organisation's reporting currency; server aggregates arrive in it. */
+    baseCurrency: string;
+    /** The currency the viewer chose to display amounts in. */
+    currency: string;
+    setCurrency: (currency: string) => void;
+    /** baseCurrency plus every currency with a rate to/from it. */
+    availableCurrencies: string[];
+    /** Whether the viewer may change the base currency. */
+    canEditBaseCurrency: boolean;
+    settingsLoading: boolean;
+    settingsError: boolean;
     rateLoading: boolean;
-    rateLastUpdated: Date | null;
-    convert: (amount: number, fromCurrency?: string) => number;
-    format: (amount: number | null | undefined, fromCurrency?: string) => string;
+    rates: RateMap;
+    /** Converts into `to` (default: display currency); null when no rate exists. */
+    tryConvert: (amount: number, fromCurrency?: string | null, to?: string) => number | null;
+    /** Legacy numeric API: NaN when no rate exists. */
+    convert: (amount: number, fromCurrency?: string | null) => number;
+    /** True when `fromCurrency` (default base) can be shown in the display currency. */
+    canConvert: (fromCurrency?: string | null) => boolean;
+    /** The pair that blocks display conversion ("USD->GHS"), or null. */
+    missingRateFor: (fromCurrency?: string | null) => RatePair | null;
+    /** Formats in the display currency; falls back to the SOURCE currency, never a faked rate. */
+    format: (amount: number | null | undefined, fromCurrency?: string | null) => string;
+    formatCompact: (amount: number | null | undefined, fromCurrency?: string | null) => string;
+    /** Sums mixed-currency lines into the display currency, flagging exclusions. */
+    sum: (lines: readonly MoneyLine[]) => MoneyTotal;
     symbol: string;
 }
 
-const SYMBOLS: Record<SupportedCurrency, string> = { USD: "$", GHS: "₵" };
+const noopTotal = (currency: string): MoneyTotal => ({
+    total: 0, currency, complete: true, missingRates: [], byCurrency: {},
+});
 
 const CurrencyContext = createContext<CurrencyContextValue>({
-    currency: "USD",
+    baseCurrency: FALLBACK_CURRENCY,
+    currency: FALLBACK_CURRENCY,
     setCurrency: () => {},
-    rate: null,
+    availableCurrencies: [FALLBACK_CURRENCY],
+    canEditBaseCurrency: false,
+    settingsLoading: false,
+    settingsError: false,
     rateLoading: false,
-    rateLastUpdated: null,
-    convert: (a) => a,
-    format: (a) => `$${(a ?? 0).toFixed(2)}`,
+    rates: new Map(),
+    tryConvert: (amount) => amount,
+    convert: (amount) => amount,
+    canConvert: () => true,
+    missingRateFor: () => null,
+    format: (amount) => formatMoney(amount ?? 0, FALLBACK_CURRENCY),
+    formatCompact: (amount) => formatMoney(amount ?? 0, FALLBACK_CURRENCY, { compact: true }),
+    sum: () => noopTotal(FALLBACK_CURRENCY),
     symbol: "$",
 });
 
+const readStoredCurrency = (): string | null => {
+    try {
+        return normalizeCurrencyCode(window.localStorage.getItem(DISPLAY_CURRENCY_STORAGE_KEY));
+    } catch {
+        return null;
+    }
+};
+
+const writeStoredCurrency = (currency: string): void => {
+    try {
+        window.localStorage.setItem(DISPLAY_CURRENCY_STORAGE_KEY, currency);
+    } catch {
+        // Private mode / blocked storage: the choice simply isn't remembered.
+    }
+};
+
 export function CurrencyProvider({ children }: { children: ReactNode }) {
-    const [currency, setCurrencyState] = useState<SupportedCurrency>("USD");
-    const [rate, setRate] = useState<number | null>(null);
-    const [rateLoading, setRateLoading] = useState(false);
-    const [rateLastUpdated, setRateLastUpdated] = useState<Date | null>(null);
+    const { user, isAuthenticated } = useAuth();
+    const orgId = extractOrganisationId(user) ?? (isAuthenticated ? getOrganisationIdFromStorage() : undefined);
+    const enabled = isAuthenticated && Boolean(orgId);
 
-    // Restore saved preference
-    useEffect(() => {
-        const saved = localStorage.getItem("assetiq_currency") as SupportedCurrency | null;
-        if (saved === "USD" || saved === "GHS") setCurrencyState(saved);
+    const settingsQuery = useQuery({
+        queryKey: currencyQueryKeys.settings(orgId),
+        queryFn: currencyService.getSettings,
+        enabled,
+        staleTime: SETTINGS_STALE_MS,
+    });
+    const ratesQuery = useQuery({
+        queryKey: currencyQueryKeys.rates(orgId),
+        queryFn: exchangeRateService.listAll,
+        enabled,
+        staleTime: SETTINGS_STALE_MS,
+    });
+
+    // Lazy initializer: localStorage is only touched in the browser.
+    const [preferred, setPreferred] = useState<string | null>(() =>
+        typeof window === "undefined" ? null : readStoredCurrency(),
+    );
+
+    const baseCurrency = settingsQuery.data?.baseCurrency ?? FALLBACK_CURRENCY;
+    const availableCurrencies = useMemo(
+        () => settingsQuery.data?.availableCurrencies ?? [baseCurrency],
+        [settingsQuery.data, baseCurrency],
+    );
+    // A remembered choice only applies while it is still offered for this org.
+    const currency = preferred && availableCurrencies.includes(preferred) ? preferred : baseCurrency;
+
+    const rates = useMemo<RateMap>(() => buildRateMap(ratesQuery.data ?? []), [ratesQuery.data]);
+
+    const setCurrency = useCallback((next: string) => {
+        const code = normalizeCurrencyCode(next);
+        if (!code) return;
+        setPreferred(code);
+        writeStoredCurrency(code);
     }, []);
 
-    // Only tenant-governed, dated server rates may drive display conversion.
-    useEffect(() => {
-        const fetchRate = async () => {
-            setRateLoading(true);
-            try {
-                const rates = await exchangeRateService.listAll();
-                const direct = rates
-                    .filter(r => r.baseCurrency === "USD" && r.targetCurrency === "GHS" && (r.rate ?? 0) > 0)
-                    .sort((a, b) => (b.effectiveDate ?? "").localeCompare(a.effectiveDate ?? ""))[0];
-                const inverse = rates
-                    .filter(r => r.baseCurrency === "GHS" && r.targetCurrency === "USD" && (r.rate ?? 0) > 0)
-                    .sort((a, b) => (b.effectiveDate ?? "").localeCompare(a.effectiveDate ?? ""))[0];
-                const governed = direct?.rate ?? (inverse?.rate ? 1 / inverse.rate : null);
-                if (governed != null && Number.isFinite(governed)) {
-                    setRate(governed);
-                    setRateLastUpdated(new Date());
-                }
-            } catch {
-                setRate(null);
-            } finally {
-                setRateLoading(false);
-            }
+    const sourceOf = useCallback(
+        (from?: string | null) => normalizeCurrencyCode(from) ?? baseCurrency,
+        [baseCurrency],
+    );
+
+    const tryConvert = useCallback(
+        (amount: number, from?: string | null, to?: string) =>
+            convertAmount(amount, sourceOf(from), normalizeCurrencyCode(to) ?? currency, rates, baseCurrency),
+        [sourceOf, currency, rates, baseCurrency],
+    );
+
+    const value = useMemo<CurrencyContextValue>(() => {
+        const missingRateFor = (from?: string | null): RatePair | null => {
+            const source = sourceOf(from);
+            return convertAmount(1, source, currency, rates, baseCurrency) == null ? ratePair(source, currency) : null;
         };
-        fetchRate();
-    }, []);
-
-    const setCurrency = useCallback((c: SupportedCurrency) => {
-        setCurrencyState(c);
-        localStorage.setItem("assetiq_currency", c);
-    }, []);
-
-    const convert = useCallback((amount: number, fromCurrency?: string): number => {
-        const from = ((fromCurrency ?? "USD").toUpperCase()) as SupportedCurrency;
-        if (from === currency) return amount;
-        if (rate != null && from === "USD" && currency === "GHS") return amount * rate;
-        if (rate != null && from === "GHS" && currency === "USD") return amount / rate;
-        return Number.NaN;
-    }, [currency, rate]);
-
-    const format = useCallback((amount: number | null | undefined, fromCurrency?: string): string => {
-        if (amount == null) return "—";
-        const source = ((fromCurrency ?? "GHS").toUpperCase()) as SupportedCurrency;
-        const converted = convert(amount, source);
-        const displayCurrency = Number.isFinite(converted) ? currency : source;
-        const displayAmount = Number.isFinite(converted) ? converted : amount;
-        return new Intl.NumberFormat("en-US", {
-            style: "currency", currency: displayCurrency,
-            minimumFractionDigits: 2, maximumFractionDigits: 2,
-        }).format(displayAmount);
-    }, [convert, currency]);
-
-    return (
-        <CurrencyContext.Provider value={{
+        const render = (amount: number | null | undefined, from: string | null | undefined, compact: boolean) => {
+            if (amount == null || !Number.isFinite(amount)) return "—";
+            const converted = tryConvert(amount, from);
+            return converted == null
+                ? formatMoney(amount, sourceOf(from), { compact })
+                : formatMoney(converted, currency, { compact });
+        };
+        return {
+            baseCurrency,
             currency,
             setCurrency,
-            rate,
-            rateLoading,
-            rateLastUpdated,
-            convert,
-            format,
-            symbol: SYMBOLS[currency],
-        }}>
-            {children}
-        </CurrencyContext.Provider>
-    );
+            availableCurrencies,
+            canEditBaseCurrency: settingsQuery.data?.canEdit ?? false,
+            settingsLoading: settingsQuery.isLoading,
+            settingsError: settingsQuery.isError,
+            rateLoading: ratesQuery.isLoading,
+            rates,
+            tryConvert,
+            convert: (amount, from) => tryConvert(amount, from) ?? Number.NaN,
+            canConvert: (from) => missingRateFor(from) === null,
+            missingRateFor,
+            format: (amount, from) => render(amount, from, false),
+            formatCompact: (amount, from) => render(amount, from, true),
+            sum: (lines) => sumMoney(lines, currency, rates, { fallbackCurrency: baseCurrency, pivot: baseCurrency }),
+            symbol: currencySymbol(currency),
+        };
+    }, [
+        baseCurrency, currency, setCurrency, availableCurrencies, settingsQuery.data, settingsQuery.isLoading,
+        settingsQuery.isError, ratesQuery.isLoading, rates, tryConvert, sourceOf,
+    ]);
+
+    return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 }
 
-export function useCurrency() {
+export function useCurrency(): CurrencyContextValue {
     return useContext(CurrencyContext);
 }

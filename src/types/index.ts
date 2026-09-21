@@ -537,6 +537,8 @@ export interface DisposalRecord extends BaseEntity {
     disposalMethod: DisposalMethod | string;
     disposalDate: string;
     saleValue?: number;
+    /** Currency of saleValue when the backend reports one; otherwise the base currency. */
+    currency?: string | null;
     approvedById?: string;
     reason?: string;
     complianceDocumentUrl?: string;
@@ -646,8 +648,32 @@ export interface PaginatedResponse<T> {
     last?: boolean;
 }
 
+// ─── Currency ─────────────────────────────────────────────────────────────────
+
+/** GET/PUT /currency/settings — the organisation's reporting (base) currency. */
+export interface CurrencySettings {
+    /** ISO-4217 code every server-side money aggregate is reported in. */
+    baseCurrency: string;
+    /** baseCurrency plus every currency with an exchange rate to/from it. */
+    availableCurrencies: string[];
+    /** True for org admins, who may change baseCurrency. */
+    canEdit: boolean;
+}
+
+/**
+ * Fields the backend adds to every money aggregate (dashboard, analytics,
+ * budget summary, cloud cost summary). Amounts are already converted into
+ * `currency`; records whose currency had no exchange rate are EXCLUDED from
+ * the totals and listed in `missingRates` (e.g. "USD->GHS").
+ */
+export interface MoneyAggregateMeta {
+    currency?: string;
+    complete?: boolean;
+    missingRates?: string[];
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
-export interface DashboardSummary {
+export interface DashboardSummary extends MoneyAggregateMeta {
     totalAssets?: number;
     activeAssets?: number;
     assetsInUse?: number;
@@ -673,7 +699,7 @@ export interface DashboardSummary {
     generatedAt?: string;
 }
 
-export interface AssetsByStatus {
+export interface AssetsByStatus extends MoneyAggregateMeta {
     data: {
         name: string;
         count: number;
@@ -700,7 +726,7 @@ export interface MaintenanceAlerts {
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
-export interface AssetAnalytics {
+export interface AssetAnalytics extends MoneyAggregateMeta {
     period: string;
     groupBy: string;
     data: {
@@ -713,7 +739,7 @@ export interface AssetAnalytics {
     totalValue: number;
 }
 
-export interface FinancialAnalytics {
+export interface FinancialAnalytics extends MoneyAggregateMeta {
     period: string;
     totalAssetValue: number;
     totalDepreciation: number;
@@ -738,7 +764,7 @@ export interface FinancialAnalytics {
     };
 }
 
-export interface PurchaseOrderAnalytics {
+export interface PurchaseOrderAnalytics extends MoneyAggregateMeta {
     period: string;
     totalPOs: number;
     draftPOs: number;
@@ -977,31 +1003,47 @@ export interface ErrorMetric {
 }
 
 // ─── Billing ──────────────────────────────────────────────────────────────────
+/** Billing intervals the backend emits. */
+export type BillingInterval = "MONTHLY" | "ANNUALLY";
+
 export interface BillingPlan {
     code: string;
     name: string;
     tier: string;
-    interval: "MONTHLY" | "YEARLY" | string;
+    /** Optional so callers guard it — older payloads have omitted it. */
+    interval?: BillingInterval | null;
     amountMinor: number;
     currency: string;
     maxAssets: number;
     maxEmployees: number;
+    /** Not every backend version reports a department limit. */
+    maxDepartments?: number | null;
     analyticsEnabled: boolean;
     auditRetentionDays: number;
 }
+
+export type SubscriptionStatus = "ACTIVE" | "PAST_DUE" | "CANCELED" | "EXPIRED";
 
 export interface Subscription {
     id: string;
     organisationId: string;
     plan: BillingPlan;
-    status: string;
+    status: SubscriptionStatus;
     autoRenew: boolean;
     autoRenewEnabled?: boolean;
     currentPeriodStart: string;
     currentPeriodEnd: string;
     nextBillingAt?: string | null;
+    canceledAt?: string | null;
+    pastDueSince?: string | null;
+    /** While PAST_DUE, paid features stay on until this instant. */
+    graceEndsAt?: string | null;
+    /** A pending downgrade, applied at scheduledChangeAt (period end). */
+    scheduledPlan?: BillingPlan | null;
+    scheduledChangeAt?: string | null;
     currentAssetCount: number;
     currentEmployeeCount: number;
+    currentDepartmentCount?: number;
 }
 
 export interface CheckoutInitRequest {
@@ -1013,6 +1055,20 @@ export interface CheckoutInitResponse {
     authorizationUrl: string;
     accessCode: string;
     reference: string;
+}
+
+export interface ChangePlanRequest {
+    planCode: string;
+    callbackUrl?: string;
+}
+
+export type ChangePlanAction = "CHECKOUT" | "SCHEDULED" | "NO_CHANGE";
+
+/** POST /billing/subscription/change-plan */
+export interface ChangePlanResponse {
+    action: ChangePlanAction;
+    checkout: CheckoutInitResponse | null;
+    subscription: Subscription;
 }
 
 // ─── Audit Events ─────────────────────────────────────────────────────────────
@@ -1576,7 +1632,7 @@ export interface BudgetDepartmentSummary {
     available:      number;
 }
 
-export interface BudgetSummary {
+export interface BudgetSummary extends MoneyAggregateMeta {
     totalAllocated:  number;
     totalSpent:      number;
     totalCommitted:  number;
@@ -1701,7 +1757,7 @@ export interface SsoDiscoverResponse {
 
 // ─── Dashboard Additions ──────────────────────────────────────────────────────
 
-export interface AssetsByDepartment {
+export interface AssetsByDepartment extends MoneyAggregateMeta {
     data: {
         departmentId: string;
         departmentName: string;
@@ -1713,7 +1769,7 @@ export interface AssetsByDepartment {
     totalValue: number;
 }
 
-export interface DepreciationSummary {
+export interface DepreciationSummary extends MoneyAggregateMeta {
     totalDepreciation: number;
     netBookValue: number;
     assetsFullyDepreciated: number;
@@ -1723,7 +1779,7 @@ export interface DepreciationSummary {
 
 // ─── Analytics Additions ──────────────────────────────────────────────────────
 
-export interface MaintenanceAnalytics {
+export interface MaintenanceAnalytics extends MoneyAggregateMeta {
     period?: string;
     totalRecords?: number;
     totalMaintenanceCost: number;
@@ -1740,7 +1796,7 @@ export interface DepreciationTrendPoint {
     newDepreciation?: number;
 }
 
-export interface DepreciationTrend {
+export interface DepreciationTrend extends MoneyAggregateMeta {
     period?: string;
     data: DepreciationTrendPoint[];
 }
@@ -1838,7 +1894,7 @@ export interface CloudAssetDto {
     description?: string | null;
 }
 
-export interface CloudCostSummary {
+export interface CloudCostSummary extends MoneyAggregateMeta {
     totalMonthlyCost: number;
     currency: string;
     costByProvider: Record<string, number>;

@@ -22,6 +22,9 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
+import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
+import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 
 const CONTRACT_TYPES = ["PURCHASE", "LEASE", "MAINTENANCE", "SERVICE_LEVEL_AGREEMENT", "WARRANTY", "INSURANCE", "OTHER"];
 const CONTRACT_STATUSES = ["DRAFT", "ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATED", "RENEWED"];
@@ -29,7 +32,7 @@ const CONTRACT_STATUSES = ["DRAFT", "ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMI
 const contracts = makeCrudHooks<Contract, ContractDto>("contracts", contractService, { entity: "Contract" });
 
 export default function ContractsPage() {
-  const { format } = useCurrency();
+  const { format, baseCurrency, sum } = useCurrency();
   const [view, setView] = useState<"all" | "expiring">("all");
   const { data: allRows = [], isLoading: allLoading } = contracts.useList();
   const { data: expiringRows = [], isLoading: expiringLoading } = useQuery({
@@ -67,13 +70,13 @@ export default function ContractsPage() {
             startDate: editing.startDate || "",
             endDate: editing.endDate || "",
             value: editing.value,
-            currency: editing.currency || "GHS",
+            currency: editing.currency || baseCurrency,
             autoRenew: editing.autoRenew,
             terms: editing.terms || "",
           }
-        : { title: "", contractType: "MAINTENANCE", status: "DRAFT", value: 0, currency: "GHS", autoRenew: false },
+        : { title: "", contractType: "MAINTENANCE", status: "DRAFT", value: 0, currency: baseCurrency, autoRenew: false },
     );
-  }, [isModalOpen, editing, reset]);
+  }, [isModalOpen, editing, reset, baseCurrency]);
 
   const supplierName = useMemo(() => {
     const map = new Map(suppliers.map((s) => [s.id, s.name]));
@@ -145,7 +148,7 @@ export default function ContractsPage() {
         accessorKey: "value",
         header: () => <span className="block text-right">Value</span>,
         cell: ({ row }) => (
-          <span className="data-mono block text-right">{format(row.original.value, row.original.currency || "GHS")}</span>
+          <span className="data-mono block text-right">{format(row.original.value, row.original.currency || baseCurrency)}</span>
         ),
       },
       {
@@ -196,10 +199,14 @@ export default function ContractsPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [supplierName, format],
+    [supplierName, format, baseCurrency],
   );
 
-  const totalValue = useMemo(() => rows.reduce((sum, c) => sum + (c.value || 0), 0), [rows]);
+  // Each contract is converted into the display currency; contracts without a rate are excluded and flagged.
+  const totalValue = useMemo(
+    () => sum(rows.map((c) => ({ amount: c.value, currency: c.currency }))),
+    [rows, sum],
+  );
 
   return (
     <ListPageTemplate
@@ -226,6 +233,8 @@ export default function ContractsPage() {
         </div>
       }
     >
+      <MissingRatesNotice incomplete={!totalValue.complete} missingRates={totalValue.missingRates} />
+
       <DataTable
         columns={columns}
         data={rows}
@@ -241,7 +250,7 @@ export default function ContractsPage() {
         }
         footerSummary={
           <span>
-            Total value · <span className="data-mono">{format(totalValue, "GHS")}</span>
+            Total value · <MoneyTotalValue total={totalValue} />
           </span>
         }
       />
@@ -307,10 +316,7 @@ export default function ContractsPage() {
             <div className="space-y-2">
               <Label htmlFor="ct-currency">Currency</Label>
               <Select id="ct-currency" {...register("currency")}>
-                <option value="GHS">GHS</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
+                <CurrencyOptions current={editing?.currency} />
               </Select>
             </div>
           </div>

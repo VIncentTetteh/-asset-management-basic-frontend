@@ -16,8 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/hooks/useConfirm";
-
-const CURRENCIES = ["GHS", "USD", "EUR", "GBP", "NGN", "ZAR", "KES", "XOF"];
+import { useCurrency, currencyQueryKeys } from "@/contexts/CurrencyContext";
+import { isoCurrencyCodes } from "@/lib/currency";
 
 type FormData = Omit<ExchangeRateDto, "id" | "organisationId">;
 
@@ -25,12 +25,20 @@ export default function ExchangeRatesPage() {
   const queryClient = useQueryClient();
   const ratesKey = qk.module("exchange-rates");
   const { confirm, ConfirmDialog } = useConfirm();
+  const { baseCurrency, availableCurrencies } = useCurrency();
+  // Any ISO-4217 code may be rated; the org's own currencies are listed first.
+  const CURRENCIES = useMemo(() => isoCurrencyCodes(availableCurrencies), [availableCurrencies]);
+  const defaultSource = baseCurrency === "USD" ? "EUR" : "USD";
 
   const { data: rates = [], isLoading } = useQuery({
     queryKey: ratesKey.list(),
     queryFn: () => exchangeRateService.listAll(),
   });
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ratesKey.all });
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ratesKey.all });
+    // availableCurrencies is derived from the rates, so the settings change too.
+    void queryClient.invalidateQueries({ queryKey: currencyQueryKeys.all });
+  };
 
   const createRate = useMutation({
     mutationFn: (data: FormData) => exchangeRateService.create({ ...data, rate: Number(data.rate) }),
@@ -54,8 +62,8 @@ export default function ExchangeRatesPage() {
 
   // Converter
   const [convAmount, setConvAmount] = useState("100");
-  const [convFrom, setConvFrom] = useState("USD");
-  const [convTo, setConvTo] = useState("GHS");
+  const [convFrom, setConvFrom] = useState(defaultSource);
+  const [convTo, setConvTo] = useState(baseCurrency);
   const [convResult, setConvResult] = useState<number | null>(null);
   const [isConverting, setIsConverting] = useState(false);
 
@@ -64,13 +72,13 @@ export default function ExchangeRatesPage() {
   useEffect(() => {
     if (!isModalOpen) return;
     reset({
-      baseCurrency: "USD",
-      targetCurrency: "GHS",
+      baseCurrency: defaultSource,
+      targetCurrency: baseCurrency,
       rate: 0,
       effectiveDate: new Date().toISOString().split("T")[0],
       source: "",
     });
-  }, [isModalOpen, reset]);
+  }, [isModalOpen, reset, defaultSource, baseCurrency]);
 
   const filtered = useMemo(() => {
     if (!searchTerm) return rates;

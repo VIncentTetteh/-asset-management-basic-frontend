@@ -21,6 +21,7 @@ import { countryName } from "@/lib/countries";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { buildPatchPayload } from "@/lib/patch";
+import { CurrencySettingsCard } from "@/components/currency/CurrencySettingsCard";
 
 const SSO_PROVIDERS = ["OKTA", "AUTH0", "AZURE_AD", "GOOGLE", "CUSTOM"];
 
@@ -238,6 +239,8 @@ export default function OrganisationsPage() {
         </div>
       }
     >
+      <CurrencySettingsCard />
+
       <Card className="mb-4">
         <CardContent className="flex items-center gap-3 pt-5">
           <Building2 className="h-4 w-4 shrink-0 text-brand" />

@@ -20,13 +20,16 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { AssetTag } from "@/components/ui/asset-tag";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
+import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
+import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 
 type FormData = Omit<LeaseRecordDto, "id" | "organisationId" | "createdAt" | "status">;
 
 const LEASE_STATUSES: LeaseStatus[] = ["ACTIVE", "PENDING_RENEWAL", "EXPIRED", "TERMINATED"];
 
 export default function LeasesPage() {
-  const { format } = useCurrency();
+  const { format, baseCurrency, sum } = useCurrency();
   const queryClient = useQueryClient();
   const leasesKey = qk.module("leases");
   const { confirm, ConfirmDialog } = useConfirm();
@@ -92,7 +95,7 @@ export default function LeasesPage() {
             startDate: editing.startDate?.split("T")[0] || "",
             endDate: editing.endDate?.split("T")[0] || "",
             monthlyPayment: editing.monthlyPayment || 0,
-            currency: editing.currency || "GHS",
+            currency: editing.currency || baseCurrency,
             autoRenew: editing.autoRenew ?? false,
             noticePeriodDays: editing.noticePeriodDays || 30,
             notes: editing.notes || "",
@@ -103,13 +106,13 @@ export default function LeasesPage() {
             startDate: "",
             endDate: "",
             monthlyPayment: 0,
-            currency: "GHS",
+            currency: baseCurrency,
             autoRenew: false,
             noticePeriodDays: 30,
             notes: "",
           },
     );
-  }, [isModalOpen, editing, reset]);
+  }, [isModalOpen, editing, reset, baseCurrency]);
 
   const assetLookup = useMemo(() => {
     const map = new Map(assets.map((a) => [a.id, a]));
@@ -196,7 +199,7 @@ export default function LeasesPage() {
         header: () => <span className="block text-right">Monthly</span>,
         cell: ({ row }) => (
           <span className="data-mono block text-right">
-            {format(row.original.monthlyPayment, row.original.currency || "GHS")}
+            {format(row.original.monthlyPayment, row.original.currency || baseCurrency)}
           </span>
         ),
       },
@@ -260,12 +263,18 @@ export default function LeasesPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [assetLookup, format],
+    [assetLookup, format, baseCurrency],
   );
 
+  // Each active lease is converted into the display currency; leases without a rate are excluded and flagged.
   const monthlyTotal = useMemo(
-    () => filtered.reduce((sum, l) => sum + (l.status === "ACTIVE" ? l.monthlyPayment || 0 : 0), 0),
-    [filtered],
+    () =>
+      sum(
+        filtered
+          .filter((l) => l.status === "ACTIVE")
+          .map((l) => ({ amount: l.monthlyPayment, currency: l.currency })),
+      ),
+    [filtered, sum],
   );
 
   return (
@@ -302,6 +311,8 @@ export default function LeasesPage() {
       }
     >
       <div className="space-y-4">
+        <MissingRatesNotice incomplete={!monthlyTotal.complete} missingRates={monthlyTotal.missingRates} />
+
         {expiring.length > 0 && (
           <div className="flex items-start gap-3 rounded-card border border-warn/40 bg-warn-soft p-4">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
@@ -325,7 +336,7 @@ export default function LeasesPage() {
           }
           footerSummary={
             <span>
-              Active monthly obligations · <span className="data-mono">{format(monthlyTotal, "GHS")}</span>
+              Active monthly obligations · <MoneyTotalValue total={monthlyTotal} />
             </span>
           }
         />
@@ -374,10 +385,7 @@ export default function LeasesPage() {
             <div className="space-y-2">
               <Label htmlFor="ls-currency">Currency</Label>
               <Select id="ls-currency" {...register("currency")}>
-                <option value="GHS">GHS</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
+                <CurrencyOptions current={editing?.currency} />
               </Select>
             </div>
           </div>

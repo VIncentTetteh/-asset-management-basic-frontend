@@ -17,6 +17,9 @@ import { Plus, Pencil, Trash2, Cloud, DollarSign, RefreshCw } from "lucide-react
 import { useForm } from "react-hook-form";
 import { useConfirm } from "@/hooks/useConfirm";
 import { cn } from "@/lib/utils";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
+import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 
 const PROVIDER_COLORS: Record<string, string> = {
     AWS: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
@@ -58,6 +61,7 @@ export default function CloudAssetsPage() {
     const [isSyncing, setIsSyncing] = useState(false);
 
     const assetForm = useForm<CloudAssetDto>();
+    const { format, baseCurrency } = useCurrency();
     const costForm = useForm<CloudMonthlyCostDto>();
     const { confirm, ConfirmDialog } = useConfirm();
 
@@ -89,7 +93,7 @@ export default function CloudAssetsPage() {
 
     const handleOpenCreate = () => {
         setEditingAsset(null);
-        assetForm.reset({ name: "", provider: "AWS", region: "", resourceId: "", resourceType: "VIRTUAL_MACHINE", status: "RUNNING", environment: "PROD", currency: "GHS" });
+        assetForm.reset({ name: "", provider: "AWS", region: "", resourceId: "", resourceType: "VIRTUAL_MACHINE", status: "RUNNING", environment: "PROD", currency: baseCurrency });
         setIsModalOpen(true);
     };
 
@@ -100,7 +104,7 @@ export default function CloudAssetsPage() {
             resourceId: asset.resourceId, resourceType: asset.resourceType,
             status: asset.status, accountId: asset.accountId || "",
             monthlyCostEstimate: asset.monthlyCostEstimate ?? undefined,
-            currency: asset.currency || "GHS", environment: asset.environment,
+            currency: asset.currency || baseCurrency, environment: asset.environment,
             tags: asset.tags || "", description: asset.description || "",
         });
         setIsModalOpen(true);
@@ -182,13 +186,17 @@ export default function CloudAssetsPage() {
             />
 
             {costSummary && (
+                <MissingRatesNotice incomplete={costSummary.complete === false} missingRates={costSummary.missingRates} />
+            )}
+
+            {costSummary && (
                 <div className="grid gap-4 md:grid-cols-3">
                     <Card className="md:col-span-1">
                         <CardContent className="flex items-center gap-3 p-4">
                             <div className="rounded-control bg-brand-soft p-2"><DollarSign className="h-5 w-5 text-brand" /></div>
                             <div>
                                 <p className="text-xs text-faint-fg">Total Monthly Cost</p>
-                                <p className="data-mono text-xl font-bold text-foreground">{costSummary.currency} {costSummary.totalMonthlyCost.toLocaleString()}</p>
+                                <p className="data-mono text-xl font-bold text-foreground">{format(costSummary.totalMonthlyCost, costSummary.currency)}</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -198,7 +206,7 @@ export default function CloudAssetsPage() {
                             {Object.entries(costSummary.costByProvider || {}).map(([p, v]) => (
                                 <div key={p} className="flex justify-between text-sm">
                                     <span className={cn("rounded px-2 py-0.5 text-xs font-medium", PROVIDER_COLORS[p] || "bg-surface-muted text-faint-fg")}>{p}</span>
-                                    <span className="data-mono font-medium text-muted-fg">{costSummary.currency} {v.toLocaleString()}</span>
+                                    <span className="data-mono font-medium text-muted-fg">{format(v, costSummary.currency)}</span>
                                 </div>
                             ))}
                         </CardContent>
@@ -209,7 +217,7 @@ export default function CloudAssetsPage() {
                             {Object.entries(costSummary.costByEnvironment || {}).map(([e, v]) => (
                                 <div key={e} className="flex justify-between text-sm">
                                     <span className="text-muted-fg">{e}</span>
-                                    <span className="data-mono font-medium text-muted-fg">{costSummary.currency} {v.toLocaleString()}</span>
+                                    <span className="data-mono font-medium text-muted-fg">{format(v, costSummary.currency)}</span>
                                 </div>
                             ))}
                         </CardContent>
@@ -281,7 +289,7 @@ export default function CloudAssetsPage() {
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-fg">
-                                                    {asset.monthlyCostEstimate != null ? `${asset.currency || "GHS"} ${asset.monthlyCostEstimate.toLocaleString()}` : "—"}
+                                                    {asset.monthlyCostEstimate != null ? format(asset.monthlyCostEstimate, asset.currency || baseCurrency) : "—"}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <span className={cn("rounded-full border px-2 py-0.5 text-xs font-bold", STATUS_STYLES[asset.status] || STATUS_STYLES.UNKNOWN)}>
@@ -397,9 +405,7 @@ export default function CloudAssetsPage() {
                         <div className="space-y-2">
                             <Label>Currency</Label>
                             <Select {...assetForm.register("currency")}>
-                                <option value="USD">USD</option>
-                                <option value="GHS">GHS</option>
-                                <option value="EUR">EUR</option>
+                                <CurrencyOptions current={editingAsset?.currency} />
                             </Select>
                         </div>
                     </div>

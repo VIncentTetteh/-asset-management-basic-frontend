@@ -5,7 +5,9 @@ import {
     FinancialAnalytics,
     MaintenanceAnalytics,
     PurchaseOrderAnalytics,
+    MoneyAggregateMeta,
 } from "@/types";
+import { readMoneyMeta } from "@/lib/currency";
 
 export interface AnalyticsFilterParams {
     period?: "week" | "month" | "quarter" | "year";
@@ -38,6 +40,15 @@ const unwrapPayload = (value: unknown): Record<string, unknown> => {
         return inner as Record<string, unknown>;
     }
     return outer;
+};
+
+/**
+ * currency/complete/missingRates — the backend reports every money figure
+ * already converted into the organisation's base currency.
+ */
+const moneyMeta = (payload: unknown): MoneyAggregateMeta => {
+    const inner = readMoneyMeta(unwrapPayload(payload));
+    return inner.currency || inner.complete !== undefined ? inner : readMoneyMeta(asRecord(payload));
 };
 
 const getOptionalNumber = (raw: Record<string, unknown>, ...keys: string[]): number | undefined => {
@@ -85,6 +96,7 @@ const normalizeAssetAnalytics = (payload: unknown): AssetAnalytics => {
     const totalValue = toNumber(raw.totalValue ?? outer.totalValue) || normalizedData.reduce((sum, item) => sum + item.value, 0);
 
     return {
+        ...moneyMeta(payload),
         period: String(raw.period ?? ""),
         groupBy: String(raw.groupBy ?? ""),
         total,
@@ -114,6 +126,7 @@ const normalizeFinancialAnalytics = (payload: unknown): FinancialAnalytics => {
     const totalActualSpend = getOptionalNumber(raw, "totalActualSpend");
 
     return {
+        ...moneyMeta(payload),
         period: String(raw.period ?? ""),
         totalAssetValue: toNumber(raw.totalAssetValue ?? raw.totalPurchaseValue),
         totalDepreciation: toNumber(raw.totalDepreciation),
@@ -145,6 +158,7 @@ const normalizePurchaseOrderAnalytics = (payload: unknown): PurchaseOrderAnalyti
     const topSuppliers = Array.isArray(raw.topSuppliers) ? raw.topSuppliers : [];
 
     return {
+        ...moneyMeta(payload),
         period: String(raw.period ?? ""),
         totalPOs: toNumber(raw.totalPOs ?? raw.totalOrders),
         draftPOs: toNumber(raw.draftPOs ?? byStatus.DRAFT),
@@ -200,6 +214,7 @@ const normalizeMaintenanceAnalytics = (payload: unknown): MaintenanceAnalytics =
     }, {});
 
     return {
+        ...moneyMeta(payload),
         period: typeof raw.period === "string" ? raw.period : undefined,
         totalRecords,
         totalMaintenanceCost: totalCost,
@@ -225,6 +240,7 @@ const normalizeDepreciationTrend = (payload: unknown): DepreciationTrend => {
                 : [];
 
     return {
+        ...moneyMeta(payload),
         period: typeof raw.period === "string" ? raw.period : undefined,
         data: items.map(item => {
             const entry = asRecord(item) ?? {};

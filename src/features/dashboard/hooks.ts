@@ -16,10 +16,10 @@ import {
   mergeStoredUser,
   verifyOrganisationContext,
 } from "@/lib/authContext";
-import type { AssetsByDepartment, DepreciationSummary, Organisation } from "@/types";
+import type { AssetsByDepartment, DepreciationSummary, MoneyAggregateMeta, Organisation } from "@/types";
+import { mergeCompleteness, type CompletenessSummary } from "@/lib/currency";
 import {
   EMPTY_STATS,
-  EMPTY_BUDGET_STATS,
   type AssetStatusBreakdownItem,
   type BudgetStats,
   type DashboardMaintenanceAlerts,
@@ -31,6 +31,7 @@ import {
   deriveStatsFromStatusBreakdown,
   fillMissingStats,
   hasUsableSummary,
+  moneyMetaOf,
   normalizeAssetsByDepartment,
   normalizeAssetsByStatus,
   normalizeDashboardSummary,
@@ -46,6 +47,10 @@ export interface DashboardData {
   assetsByDepartment: AssetsByDepartment | null;
   depreciationSummary: DepreciationSummary | null;
   maintenanceAlerts: DashboardMaintenanceAlerts | null;
+  /** Currency of stats.totalAssetValue (server-converted base currency). */
+  assetValueMeta: MoneyAggregateMeta;
+  /** Whether any money aggregate on the page excluded amounts for lack of a rate. */
+  completeness: CompletenessSummary;
 }
 
 /**
@@ -92,6 +97,7 @@ async function loadDashboard(): Promise<DashboardData> {
     alertsResult,
     usersResult,
     budgetsResult,
+    budgetSummaryResult,
     transfersResult,
     purchaseOrdersResult,
     licensesResult,
@@ -103,14 +109,22 @@ async function loadDashboard(): Promise<DashboardData> {
     dashboardService.getMaintenanceAlerts(resolvedOrgId),
     userService.getAll(),
     budgetService.getAll(),
+    budgetService.getSummary(),
     assetTransferService.getAll(),
     purchaseOrderService.getAll(),
     licenseService.getAll(),
   ]);
 
+  const summaryMeta = summary.status === "fulfilled" ? moneyMetaOf(summary.value) : {};
+  const statusMeta = statusResult.status === "fulfilled" ? moneyMetaOf(statusResult.value) : {};
+  // totalAssetValue comes from the summary; the status breakdown only fills it when
+  // the summary had none, so its currency then describes the value instead.
+  let assetValueMeta: MoneyAggregateMeta = summaryMeta;
+
   let assetStatusBreakdown: AssetStatusBreakdownItem[] = [];
   if (statusResult.status === "fulfilled") {
     assetStatusBreakdown = normalizeAssetsByStatus(statusResult.value);
+    if (stats.totalAssetValue === 0) assetValueMeta = statusMeta;
     stats = fillMissingStats(stats, deriveStatsFromStatusBreakdown(assetStatusBreakdown), [
       "totalAssets",
       "activeAssets",
@@ -121,7 +135,6 @@ async function loadDashboard(): Promise<DashboardData> {
     stats = fillMissingStats(stats, deriveStatsFromAssets(assetsResult.value), [
       "totalAssets",
       "activeAssets",
-      "totalAssetValue",
     ]);
   }
 
@@ -149,8 +162,10 @@ async function loadDashboard(): Promise<DashboardData> {
     stats.totalUsers = usersResult.value.length;
   }
 
-  const budgetStats =
-    budgetsResult.status === "fulfilled" ? computeBudgetStats(budgetsResult.value) : { ...EMPTY_BUDGET_STATS };
+  const budgetStats = computeBudgetStats(
+    budgetsResult.status === "fulfilled" ? budgetsResult.value : [],
+    budgetSummaryResult.status === "fulfilled" ? budgetSummaryResult.value : null,
+  );
 
   if (transfersResult.status === "fulfilled") {
     stats.pendingTransfers = transfersResult.value.filter((t) => {
@@ -174,7 +189,19 @@ async function loadDashboard(): Promise<DashboardData> {
     console.warn("Dashboard summary fulfilled but missing expected metrics; using fallback merges.");
   }
 
-  return { stats, budgetStats, myOrg, assetStatusBreakdown, assetsByDepartment, depreciationSummary, maintenanceAlerts };
+  const completeness = mergeCompleteness(assetValueMeta, assetsByDepartment, depreciationSummary, budgetStats);
+
+  return {
+    stats,
+    budgetStats,
+    myOrg,
+    assetStatusBreakdown,
+    assetsByDepartment,
+    depreciationSummary,
+    maintenanceAlerts,
+    assetValueMeta,
+    completeness,
+  };
 }
 
 export function useDashboardData() {

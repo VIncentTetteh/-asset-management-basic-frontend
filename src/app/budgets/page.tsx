@@ -24,6 +24,9 @@ import { PageSpinner } from "@/components/ui/spinner";
 import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
+import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
+import { MoneyTotalValue, moneyTotalText } from "@/components/currency/MoneyTotalValue";
 
 function UtilisationBar({ budget }: { budget: Budget }) {
   const total = budget.totalAmount || 0;
@@ -45,7 +48,7 @@ function UtilisationBar({ budget }: { budget: Budget }) {
 }
 
 export default function BudgetsPage() {
-  const { format } = useCurrency();
+  const { format, baseCurrency, sum } = useCurrency();
   const queryClient = useQueryClient();
   const budgetsKey = qk.module("budgets");
   const { confirm, ConfirmDialog } = useConfirm();
@@ -53,6 +56,12 @@ export default function BudgetsPage() {
   const { data: budgets = [], isLoading } = useQuery({
     queryKey: budgetsKey.list(),
     queryFn: () => budgetService.getAll(),
+  });
+  // Server totals are converted into the base currency and flag budgets
+  // without an exchange rate; they are preferred over any client-side sum.
+  const { data: summary } = useQuery({
+    queryKey: [...budgetsKey.all, "summary"],
+    queryFn: () => budgetService.getSummary(),
   });
   const { data: departments = [] } = useQuery({
     queryKey: qk.module("departments").list(),
@@ -122,15 +131,15 @@ export default function BudgetsPage() {
             name: editing.name,
             status: editing.status,
             totalAmount: editing.totalAmount,
-            currency: editing.currency || "GHS",
+            currency: editing.currency || baseCurrency,
             fiscalYear: editing.fiscalYear || undefined,
             departmentId: editing.departmentId || "",
             periodStart: editing.periodStart || "",
             periodEnd: editing.periodEnd || "",
           }
-        : { name: "", status: "ACTIVE", totalAmount: 0, currency: "GHS" },
+        : { name: "", status: "ACTIVE", totalAmount: 0, currency: baseCurrency },
     );
-  }, [isModalOpen, editing, reset]);
+  }, [isModalOpen, editing, reset, baseCurrency]);
 
   const deptName = useMemo(() => {
     const map = new Map(departments.map((d) => [d.id, d.name]));
@@ -145,14 +154,23 @@ export default function BudgetsPage() {
     );
   }, [budgets, searchTerm, deptName]);
 
-  const totals = useMemo(
+  // Fallback only (summary unavailable): each budget is converted into the
+  // display currency; budgets without a rate are excluded and flagged.
+  const clientTotals = useMemo(
     () => ({
-      allocated: budgets.reduce((s, b) => s + (b.totalAmount || 0), 0),
-      spent: budgets.reduce((s, b) => s + (b.spentAmount || 0), 0),
-      remaining: budgets.reduce((s, b) => s + (b.remainingAmount || 0), 0),
+      allocated: sum(budgets.map((b) => ({ amount: b.totalAmount, currency: b.currency }))),
+      spent: sum(budgets.map((b) => ({ amount: b.spentAmount, currency: b.currency }))),
+      remaining: sum(budgets.map((b) => ({ amount: b.remainingAmount, currency: b.currency }))),
     }),
-    [budgets],
+    [budgets, sum],
   );
+  const totalsSubtitle = summary
+    ? `${format(summary.totalSpent, summary.currency)} of ${format(summary.totalAllocated, summary.currency)} spent${summary.complete === false ? " (partial)" : ""}`
+    : `${moneyTotalText(clientTotals.spent)} of ${moneyTotalText(clientTotals.allocated)} spent`;
+  const totalsIncomplete = summary ? summary.complete === false : !clientTotals.allocated.complete;
+  const totalsMissingRates = summary
+    ? summary.missingRates ?? []
+    : Array.from(new Set([...clientTotals.allocated.missingRates, ...clientTotals.spent.missingRates]));
 
   const openCreate = () => {
     setEditing(null);
@@ -219,8 +237,8 @@ export default function BudgetsPage() {
         header: () => <span className="block text-right">Spent / allocated</span>,
         cell: ({ row }) => (
           <span className="data-mono block text-right">
-            {format(row.original.spentAmount, row.original.currency || "GHS")}{" "}
-            <span className="text-faint-fg">/ {format(row.original.totalAmount, row.original.currency || "GHS")}</span>
+            {format(row.original.spentAmount, row.original.currency || baseCurrency)}{" "}
+            <span className="text-faint-fg">/ {format(row.original.totalAmount, row.original.currency || baseCurrency)}</span>
           </span>
         ),
       },
@@ -231,7 +249,7 @@ export default function BudgetsPage() {
           <span
             className={`data-mono block text-right ${(row.original.remainingAmount || 0) < 0 ? "font-bold text-danger" : ""}`}
           >
-            {format(row.original.remainingAmount, row.original.currency || "GHS")}
+            {format(row.original.remainingAmount, row.original.currency || baseCurrency)}
           </span>
         ),
       },
@@ -307,7 +325,7 @@ export default function BudgetsPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [deptName, format],
+    [deptName, format, baseCurrency],
   );
 
   return (
@@ -316,7 +334,7 @@ export default function BudgetsPage() {
       subtitle={
         isLoading
           ? "Loading budgets…"
-          : `${budgets.length} budgets · ${format(totals.spent, "GHS")} of ${format(totals.allocated, "GHS")} spent`
+          : `${budgets.length} budgets · ${totalsSubtitle}`
       }
       actions={
         <Button onClick={openCreate}>
@@ -335,6 +353,8 @@ export default function BudgetsPage() {
         </div>
       }
     >
+      <MissingRatesNotice incomplete={totalsIncomplete} missingRates={totalsMissingRates} />
+
       <DataTable
         columns={columns}
         data={filtered}
@@ -347,9 +367,16 @@ export default function BudgetsPage() {
           </Button>
         }
         footerSummary={
-          <span>
-            Remaining · <span className="data-mono">{format(totals.remaining, "GHS")}</span>
-          </span>
+          summary ? (
+            <span>
+              Available after commitments ·{" "}
+              <span className="data-mono">{format(summary.totalAvailable, summary.currency)}</span>
+            </span>
+          ) : (
+            <span>
+              Remaining · <MoneyTotalValue total={clientTotals.remaining} />
+            </span>
+          )
         }
       />
 
@@ -375,10 +402,7 @@ export default function BudgetsPage() {
             <div className="space-y-2">
               <Label htmlFor="bd-currency">Currency</Label>
               <Select id="bd-currency" {...register("currency")}>
-                <option value="GHS">GHS</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
+                <CurrencyOptions current={editing?.currency} />
               </Select>
             </div>
           </div>
@@ -485,7 +509,7 @@ export default function BudgetsPage() {
                     {e.submittedByName ? ` · ${e.submittedByName}` : ""}
                   </p>
                 </div>
-                <span className="data-mono text-sm">{format(e.amount, e.currency || "GHS")}</span>
+                <span className="data-mono text-sm">{format(e.amount, e.currency || baseCurrency)}</span>
                 <StatusBadge status={e.status ?? "DRAFT"} />
               </div>
             ))}

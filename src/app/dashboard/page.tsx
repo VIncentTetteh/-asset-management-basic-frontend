@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useDashboardData } from "@/features/dashboard/hooks";
+import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import {
   KpiRow,
   AssetHealthCard,
@@ -78,7 +79,12 @@ export default function DashboardPage() {
         }
       />
 
-      <KpiRow stats={data.stats} budgetStats={data.budgetStats} format={format} />
+      <MissingRatesNotice
+        incomplete={data.completeness.incomplete}
+        missingRates={data.completeness.missingRates}
+      />
+
+      <KpiRow stats={data.stats} budgetStats={data.budgetStats} assetValueMeta={data.assetValueMeta} format={format} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <AssetHealthCard breakdown={data.assetStatusBreakdown} />

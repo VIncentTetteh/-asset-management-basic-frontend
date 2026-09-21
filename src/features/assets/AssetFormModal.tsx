@@ -14,8 +14,10 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { buildPatchPayload } from "@/lib/patch";
 import { useSaveAsset } from "@/features/assets/hooks";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 
-function emptyForm(): AssetDto {
+function emptyForm(baseCurrency: string): AssetDto {
   return {
     name: "",
     assetTag: "",
@@ -28,7 +30,7 @@ function emptyForm(): AssetDto {
     model: "",
     purchaseDate: new Date().toISOString().split("T")[0],
     purchaseCost: 0,
-    currency: "GHS",
+    currency: baseCurrency,
     depreciationMethod: DepreciationMethod.STRAIGHT_LINE,
     usefulLifeMonths: 36,
     residualValue: 0,
@@ -43,7 +45,7 @@ function emptyForm(): AssetDto {
   } as AssetDto;
 }
 
-function formFromAsset(asset: Asset): AssetDto {
+function formFromAsset(asset: Asset, baseCurrency: string): AssetDto {
   return {
     name: asset.name,
     assetTag: asset.assetTag,
@@ -56,7 +58,7 @@ function formFromAsset(asset: Asset): AssetDto {
     model: asset.model,
     purchaseDate: asset.purchaseDate ? asset.purchaseDate.split("T")[0] : "",
     purchaseCost: asset.purchaseCost,
-    currency: asset.currency || "GHS",
+    currency: asset.currency || baseCurrency,
     depreciationMethod: asset.depreciationMethod,
     usefulLifeMonths: asset.usefulLifeMonths || 36,
     residualValue: asset.residualValue,
@@ -97,9 +99,10 @@ export function AssetFormModal({
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<AssetDto>();
   const saveAsset = useSaveAsset();
 
+  const { baseCurrency } = useCurrency();
   useEffect(() => {
-    if (isOpen) reset(editingAsset ? formFromAsset(editingAsset) : emptyForm());
-  }, [isOpen, editingAsset, reset]);
+    if (isOpen) reset(editingAsset ? formFromAsset(editingAsset, baseCurrency) : emptyForm(baseCurrency));
+  }, [isOpen, editingAsset, reset, baseCurrency]);
 
   const onSubmit = async (data: AssetDto) => {
     data.purchaseCost = Number(data.purchaseCost);
@@ -193,10 +196,7 @@ export function AssetFormModal({
             <div className="space-y-2">
               <Label htmlFor="currency">Currency</Label>
               <Select id="currency" {...register("currency")}>
-                <option value="GHS">GHS</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
+                <CurrencyOptions current={editingAsset?.currency} />
               </Select>
             </div>
           </div>

@@ -19,7 +19,7 @@ import {
 import { MaintenanceFormModal } from "@/features/maintenance/MaintenanceFormModal";
 
 export default function MaintenancePage() {
-  const { format } = useCurrency();
+  const { format, baseCurrency } = useCurrency();
   const { data: records = [], isLoading } = useMaintenanceRecords();
   const master = useMaintenanceMasterData();
   const complete = useCompleteMaintenance();
@@ -93,7 +93,7 @@ export default function MaintenancePage() {
         accessorKey: "cost",
         header: () => <span className="block text-right">Cost</span>,
         cell: ({ row }) => (
-          <span className="data-mono block text-right">{format(row.original.cost, row.original.currency || "GHS")}</span>
+          <span className="data-mono block text-right">{format(row.original.cost, row.original.currency || baseCurrency)}</span>
         ),
       },
       {
@@ -143,7 +143,7 @@ export default function MaintenancePage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookups, format],
+    [lookups, format, baseCurrency],
   );
 
   const openCount = records.filter((r) => r.status !== "COMPLETED" && r.status !== "CANCELLED").length;

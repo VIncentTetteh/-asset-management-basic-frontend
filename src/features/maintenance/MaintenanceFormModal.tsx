@@ -12,6 +12,8 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { buildPatchPayload } from "@/lib/patch";
 import { useSaveMaintenance } from "@/features/maintenance/hooks";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 
 export function MaintenanceFormModal({
   isOpen,
@@ -28,6 +30,7 @@ export function MaintenanceFormModal({
 }) {
   const { register, handleSubmit, reset, formState: { errors } } = useForm<MaintenanceDto>();
   const save = useSaveMaintenance();
+  const { baseCurrency } = useCurrency();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -40,7 +43,7 @@ export function MaintenanceFormModal({
             description: editingRecord.description || "",
             maintenanceType: editingRecord.maintenanceType,
             cost: editingRecord.cost,
-            currency: editingRecord.currency || "GHS",
+            currency: editingRecord.currency || baseCurrency,
             vendorId: editingRecord.vendorId || "",
             status: editingRecord.status,
           }
@@ -50,12 +53,12 @@ export function MaintenanceFormModal({
             description: "",
             maintenanceType: MaintenanceType.PREVENTIVE,
             cost: 0,
-            currency: "GHS",
+            currency: baseCurrency,
             vendorId: "",
             status: "SCHEDULED",
           },
     );
-  }, [isOpen, editingRecord, reset]);
+  }, [isOpen, editingRecord, reset, baseCurrency]);
 
   const onSubmit = async (data: MaintenanceDto) => {
     data.cost = Number(data.cost);
@@ -132,10 +135,7 @@ export function MaintenanceFormModal({
           <div className="space-y-2">
             <Label htmlFor="mt-currency">Currency</Label>
             <Select id="mt-currency" {...register("currency")}>
-              <option value="GHS">GHS</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-              <option value="GBP">GBP</option>
+              <CurrencyOptions current={editingRecord?.currency} />
             </Select>
           </div>
         </div>

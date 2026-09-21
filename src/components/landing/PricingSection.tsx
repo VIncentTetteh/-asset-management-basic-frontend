@@ -7,7 +7,11 @@ import Link from "next/link";
 import { BillingPlan } from "@/types";
 import { filterAndOrderPlans } from "@/lib/plan-filter";
 
-// Fallback if the public plans endpoint is not available
+/**
+ * Shown only when the public plans endpoint is unreachable. These carry plan
+ * shape and limits, not prices: billing currency depends on the customer's
+ * country, so no currency (or amount) is claimed here — see `live` below.
+ */
 const FALLBACK_PLANS: BillingPlan[] = [
     {
         code: "FREEMIUM",
@@ -15,7 +19,7 @@ const FALLBACK_PLANS: BillingPlan[] = [
         tier: "FREEMIUM",
         interval: "MONTHLY",
         amountMinor: 0,
-        currency: "GHS",
+        currency: "",
         maxAssets: 50,
         maxEmployees: 5,
         analyticsEnabled: false,
@@ -26,8 +30,8 @@ const FALLBACK_PLANS: BillingPlan[] = [
         name: "Basic",
         tier: "BASIC",
         interval: "MONTHLY",
-        amountMinor: 9900,
-        currency: "GHS",
+        amountMinor: 1,       // Paid tier marker only; never displayed (live=false)
+        currency: "",
         maxAssets: 250,
         maxEmployees: 10,
         analyticsEnabled: false,
@@ -38,8 +42,8 @@ const FALLBACK_PLANS: BillingPlan[] = [
         name: "Business",
         tier: "BUSINESS",
         interval: "MONTHLY",
-        amountMinor: 79900,
-        currency: "GHS",
+        amountMinor: 1,       // Paid tier marker only; never displayed (live=false)
+        currency: "",
         maxAssets: 10_000,
         maxEmployees: 250,
         analyticsEnabled: true,
@@ -51,7 +55,7 @@ const FALLBACK_PLANS: BillingPlan[] = [
         tier: "ENTERPRISE",
         interval: "MONTHLY",
         amountMinor: 0,       // Custom pricing
-        currency: "GHS",
+        currency: "",
         maxAssets: 999999,
         maxEmployees: 999999,
         analyticsEnabled: true,
@@ -83,8 +87,29 @@ function isEnterprise(plan: BillingPlan): boolean {
     return plan.tier.toUpperCase() === "ENTERPRISE" || (plan.amountMinor === 0 && plan.maxAssets >= 999999);
 }
 
+/** Whole-unit price in the plan's own billing currency, e.g. "GH₵799" or "$49". */
+function formatPlanPrice(amountMinor: number, currency: string): string {
+    const amount = amountMinor / 100;
+    try {
+        return new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency,
+            currencyDisplay: "narrowSymbol",
+            maximumFractionDigits: 0,
+        }).format(amount);
+    } catch {
+        return `${currency} ${Math.round(amount).toLocaleString("en-US")}`;
+    }
+}
+
+const intervalBadge = (plan: BillingPlan): string => (plan.interval === "ANNUALLY" ? "/yr" : "/mo");
+
 export function PricingSection() {
     const [plans, setPlans] = useState<BillingPlan[]>([]);
+    /** All plans from the API, annual variants included (used for "billed annually" hints). */
+    const [allPlans, setAllPlans] = useState<BillingPlan[]>([]);
+    /** False while showing FALLBACK_PLANS, which have no real prices. */
+    const [live, setLive] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -103,9 +128,14 @@ export function PricingSection() {
                     ? data.data
                     : [];
                 const cleaned = filterAndOrderPlans(list);
-                setPlans(cleaned.length > 0 ? cleaned : FALLBACK_PLANS);
+                // One card per tier: the monthly price, with any annual variant as a hint.
+                const monthly = cleaned.filter((p) => p.interval !== "ANNUALLY");
+                setAllPlans(cleaned);
+                setPlans(monthly.length > 0 ? monthly : FALLBACK_PLANS);
+                setLive(monthly.length > 0);
             } catch {
                 setPlans(FALLBACK_PLANS);
+                setLive(false);
             } finally {
                 setLoading(false);
             }
@@ -116,13 +146,16 @@ export function PricingSection() {
     const formatPrice = (plan: BillingPlan): string => {
         if (isEnterprise(plan)) return "Custom";
         if (plan.amountMinor === 0) return "Free";
-        const priceInPlanCurrency = plan.amountMinor / 100;
-        return Math.round(priceInPlanCurrency).toLocaleString("en-US");
+        if (!live || !plan.currency) return "Local pricing";
+        return formatPlanPrice(plan.amountMinor, plan.currency);
     };
 
     const altPrice = (plan: BillingPlan): string | null => {
-        if (isEnterprise(plan) || plan.amountMinor === 0) return null;
-        return null;
+        if (!live || isEnterprise(plan) || plan.amountMinor === 0) return null;
+        const annual = allPlans.find(
+            (p) => p.interval === "ANNUALLY" && p.tier.toUpperCase() === plan.tier.toUpperCase() && p.amountMinor > 0,
+        );
+        return annual ? `or ${formatPlanPrice(annual.amountMinor, annual.currency)} billed annually` : null;
     };
 
     return (
@@ -135,7 +168,11 @@ export function PricingSection() {
                         Choose the plan that fits your organisation&apos;s current scale. Upgrade as you grow — no surprises.
                     </p>
 
-                    <p className="mt-6 text-xs text-slate-300">Prices are shown in each plan&apos;s billing currency.</p>
+                    <p className="mt-6 text-xs text-slate-300">
+                        {live
+                            ? "Prices are shown in each plan's billing currency."
+                            : "Live pricing is unavailable right now. You'll see prices in your billing currency when you sign up."}
+                    </p>
                 </div>
 
                 {loading ? (
@@ -153,8 +190,6 @@ export function PricingSection() {
                             const enterprise = isEnterprise(plan);
                             const displayPrice = formatPrice(plan);
                             const alt = altPrice(plan);
-                            const showSymbol = !enterprise && plan.amountMinor !== 0;
-                            const symbol = plan.currency === "GHS" ? "₵" : "$";
 
                             return (
                                 <div
@@ -175,15 +210,14 @@ export function PricingSection() {
                                         <div className="flex items-center justify-between gap-2 mb-2">
                                             <h3 className="text-lg font-bold text-white">{plan.name}</h3>
                                             <span className="text-[10px] font-bold uppercase tracking-wider rounded-full border border-slate-700 px-2 py-0.5 text-slate-400">
-                                                {plan.interval === "MONTHLY" ? "/mo" : plan.interval === "YEARLY" ? "/yr" : plan.interval.toLowerCase()}
+                                                {intervalBadge(plan)}
                                             </span>
                                         </div>
                                         <div className="mt-5">
                                             <div className="flex items-baseline gap-1">
-                                                {showSymbol && (
-                                                    <span className="text-xl font-bold text-slate-400">{symbol}</span>
-                                                )}
-                                                <span className="text-4xl font-extrabold text-white">{displayPrice}</span>
+                                                <span className={`${live || enterprise || plan.amountMinor === 0 ? "text-4xl" : "text-2xl"} font-extrabold text-white`}>
+                                                    {displayPrice}
+                                                </span>
                                             </div>
                                             {alt && (
                                                 <p className="mt-1.5 text-xs text-slate-300">{alt}</p>

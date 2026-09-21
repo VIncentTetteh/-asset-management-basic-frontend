@@ -1,6 +1,6 @@
 import type { BillingPlan } from "@/types";
 
-const ALLOWED_PLAN_CODES = new Set(["FREEMIUM", "BASIC", "BUSINESS", "ENTERPRISE"]);
+const ALLOWED_PLAN_CODES = new Set(["FREEMIUM", "BASIC", "BUSINESS", "BUSINESS_ANNUAL", "ENTERPRISE"]);
 const ALLOWED_PLAN_TIERS = new Set(["FREEMIUM", "BASIC", "BUSINESS", "ENTERPRISE"]);
 
 const TIER_ORDER: Record<string, number> = {

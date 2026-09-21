@@ -24,6 +24,9 @@ import { buildPatchPayload } from "@/lib/patch";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
+import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
+import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 
 /** Backend may return legacy status names; fold them into the current enum. */
 const normalizePoStatus = (status?: string): string | undefined => {
@@ -34,7 +37,7 @@ const normalizePoStatus = (status?: string): string | undefined => {
 };
 
 export default function PurchaseOrdersPage() {
-  const { format } = useCurrency();
+  const { format, baseCurrency, sum } = useCurrency();
   const queryClient = useQueryClient();
   const ordersKey = qk.module("purchase-orders");
   const { confirm, ConfirmDialog } = useConfirm();
@@ -84,7 +87,7 @@ export default function PurchaseOrdersPage() {
         ? {
             poNumber: editing.poNumber,
             totalAmount: editing.totalAmount,
-            currency: editing.currency || "GHS",
+            currency: editing.currency || baseCurrency,
             status: (normalizePoStatus(editing.status) || POStatus.DRAFT) as POStatus,
             supplierId: editing.supplierId || "",
             departmentId: editing.departmentId || "",
@@ -93,14 +96,14 @@ export default function PurchaseOrdersPage() {
         : {
             poNumber: "",
             totalAmount: 0,
-            currency: "GHS",
+            currency: baseCurrency,
             status: POStatus.DRAFT,
             remarks: "",
             supplierId: "",
             departmentId: "",
           },
     );
-  }, [isModalOpen, editing, reset]);
+  }, [isModalOpen, editing, reset, baseCurrency]);
 
   const lookups = useMemo(() => {
     const supplierMap = new Map(suppliers.map((s) => [s.id, s.name]));
@@ -234,7 +237,7 @@ export default function PurchaseOrdersPage() {
         header: () => <span className="block text-right">Amount</span>,
         cell: ({ row }) => (
           <span className="data-mono block text-right">
-            {format(row.original.totalAmount, row.original.currency || "GHS")}
+            {format(row.original.totalAmount, row.original.currency || baseCurrency)}
           </span>
         ),
       },
@@ -302,11 +305,15 @@ export default function PurchaseOrdersPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookups, format],
+    [lookups, format, baseCurrency],
   );
 
   const pendingCount = orders.filter((o) => normalizePoStatus(o.status) === POStatus.SUBMITTED).length;
-  const totalValue = useMemo(() => orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0), [orders]);
+  // Each order is converted into the display currency; orders without a rate are excluded and flagged.
+  const totalValue = useMemo(
+    () => sum(orders.map((o) => ({ amount: o.totalAmount, currency: o.currency }))),
+    [orders, sum],
+  );
 
   return (
     <ListPageTemplate
@@ -323,6 +330,8 @@ export default function PurchaseOrdersPage() {
         </>
       }
     >
+      <MissingRatesNotice incomplete={!totalValue.complete} missingRates={totalValue.missingRates} />
+
       <DataTable
         columns={columns}
         data={orders}
@@ -336,7 +345,7 @@ export default function PurchaseOrdersPage() {
         }
         footerSummary={
           <span>
-            Total value · <span className="data-mono">{format(totalValue, "GHS")}</span>
+            Total value · <MoneyTotalValue total={totalValue} />
           </span>
         }
       />
@@ -392,10 +401,7 @@ export default function PurchaseOrdersPage() {
             <div className="space-y-2">
               <Label htmlFor="po-currency">Currency</Label>
               <Select id="po-currency" {...register("currency")}>
-                <option value="GHS">GHS</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
+                <CurrencyOptions current={editing?.currency} />
               </Select>
             </div>
           </div>

@@ -22,7 +22,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { usePermissions } from "@/contexts/PermissionContext";
 
 export default function DepartmentsPage() {
-  const { format } = useCurrency();
+  const { format, baseCurrency } = useCurrency();
   const { hasPermission } = usePermissions();
   const canManageDepartments = hasPermission("MANAGE_DEPARTMENTS")
     || hasPermission("MANAGE_ORGANIZATION_SETTINGS");
@@ -181,7 +181,7 @@ export default function DepartmentsPage() {
         header: () => <span className="block text-right">Budget limit</span>,
         cell: ({ row }) => (
           <span className="data-mono block text-right">
-            {row.original.budgetLimit ? format(row.original.budgetLimit, "GHS") : "—"}
+            {row.original.budgetLimit ? format(row.original.budgetLimit, baseCurrency) : "—"}
           </span>
         ),
       },
@@ -222,7 +222,7 @@ export default function DepartmentsPage() {
       } as ColumnDef<Department, unknown>] : []),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [format, canManageDepartments],
+    [format, canManageDepartments, baseCurrency],
   );
 
   return (

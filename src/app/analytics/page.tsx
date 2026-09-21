@@ -27,6 +27,8 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { cn } from "@/lib/utils";
+import { mergeCompleteness } from "@/lib/currency";
+import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 
 type Period = "week" | "month" | "quarter" | "year";
 type GroupBy = "status" | "department" | "condition";
@@ -90,15 +92,6 @@ const formatMonth = (value: string) => {
 
 const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
-const formatCompactCurrency = (amount: number, currencyCode: string) =>
-    new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: currencyCode,
-        currencyDisplay: "narrowSymbol",
-        notation: "compact",
-        maximumFractionDigits: 1,
-    }).format(amount);
-
 const EmptySection = ({ message }: { message: string }) => (
     <div className="flex min-h-44 items-center justify-center rounded-panel border border-dashed border-edge-subtle bg-surface-muted/70 p-6 text-center text-sm text-muted-fg">
         {message}
@@ -106,7 +99,7 @@ const EmptySection = ({ message }: { message: string }) => (
 );
 
 export default function AnalyticsPage() {
-    const { currency, format: formatCurrency } = useCurrency();
+    const { format: formatCurrency, formatCompact } = useCurrency();
     const router = useRouter();
     const [period, setPeriod] = useState<Period>("month");
     const [groupBy, setGroupBy] = useState<GroupBy>("status");
@@ -243,10 +236,26 @@ export default function AnalyticsPage() {
     }, [poAnalytics]);
 
     const trendRows = depreciationTrend?.data?.slice(-12) ?? [];
-    const heroAssetValue = formatCompactCurrency(financialAnalytics?.totalAssetValue ?? assetAnalytics?.totalValue ?? 0, currency);
-    const heroBookValue = formatCompactCurrency(financialAnalytics?.netBookValue ?? 0, currency);
-    const heroPoValue = formatCompactCurrency(poAnalytics?.totalPOValue ?? 0, currency);
-    const heroMaintenanceCost = formatCompactCurrency(maintenanceAnalytics?.totalMaintenanceCost ?? 0, currency);
+
+    // Every section reports its money already converted server-side into the
+    // org's base currency (`response.currency`). Each formatter converts from
+    // that currency into the viewer's display currency, so figures from
+    // different sections stay consistent with each other.
+    const fmtAsset = (amount?: number | null) => formatCurrency(amount, assetAnalytics?.currency);
+    const fmtFin = (amount?: number | null) => formatCurrency(amount, financialAnalytics?.currency);
+    const fmtPo = (amount?: number | null) => formatCurrency(amount, poAnalytics?.currency);
+    const fmtMaint = (amount?: number | null) => formatCurrency(amount, maintenanceAnalytics?.currency);
+    const fmtTrend = (amount?: number | null) => formatCurrency(amount, depreciationTrend?.currency);
+
+    const heroAssetValue = financialAnalytics
+        ? formatCompact(financialAnalytics.totalAssetValue, financialAnalytics.currency)
+        : formatCompact(assetAnalytics?.totalValue ?? 0, assetAnalytics?.currency);
+    const heroBookValue = formatCompact(financialAnalytics?.netBookValue ?? 0, financialAnalytics?.currency);
+    const heroPoValue = formatCompact(poAnalytics?.totalPOValue ?? 0, poAnalytics?.currency);
+    const heroMaintenanceCost = formatCompact(maintenanceAnalytics?.totalMaintenanceCost ?? 0, maintenanceAnalytics?.currency);
+    const completeness = mergeCompleteness(
+        assetAnalytics, financialAnalytics, poAnalytics, maintenanceAnalytics, depreciationTrend,
+    );
 
     const currentPeriod = PERIODS.find(item => item.value === period);
     const currentGroup = GROUP_BY_OPTIONS.find(item => item.value === groupBy);
@@ -311,6 +320,8 @@ export default function AnalyticsPage() {
                 )}
             </div>
 
+            <MissingRatesNotice incomplete={completeness.incomplete} missingRates={completeness.missingRates} />
+
             <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
                 <Card className="overflow-hidden border-0 shadow-sm">
                     <CardContent className="bg-gradient-to-br from-slate-950 via-slate-900 to-teal-900 p-6 text-white">
@@ -333,14 +344,14 @@ export default function AnalyticsPage() {
                                     <p className="text-xs uppercase tracking-wide text-slate-400">Asset Value</p>
                                     <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-xl font-black leading-tight sm:text-2xl">{heroAssetValue}</p>
                                     <p className="mt-1 text-xs text-slate-300">
-                                        Full value: {formatCurrency(financialAnalytics?.totalAssetValue ?? assetAnalytics?.totalValue)} · {assetAnalytics?.total?.toLocaleString() ?? "—"} assets in analysis
+                                        Full value: {financialAnalytics ? fmtFin(financialAnalytics.totalAssetValue) : fmtAsset(assetAnalytics?.totalValue)} · {assetAnalytics?.total?.toLocaleString() ?? "—"} assets in analysis
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                     <p className="text-xs uppercase tracking-wide text-slate-400">Book Value</p>
                                     <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-xl font-black leading-tight sm:text-2xl">{heroBookValue}</p>
                                     <p className="mt-1 text-xs text-slate-300">
-                                        Depreciation: {formatCurrency(financialAnalytics?.totalDepreciation)}
+                                        Depreciation: {fmtFin(financialAnalytics?.totalDepreciation)}
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -449,7 +460,7 @@ export default function AnalyticsPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="data-mono text-3xl font-black text-foreground">{assetAnalytics?.total?.toLocaleString() ?? "—"}</div>
-                                <p className="mt-1 text-xs text-faint-fg">Tracked value: {formatCurrency(assetAnalytics?.totalValue)}</p>
+                                <p className="mt-1 text-xs text-faint-fg">Tracked value: {fmtAsset(assetAnalytics?.totalValue)}</p>
                             </CardContent>
                         </Card>
 
@@ -461,7 +472,7 @@ export default function AnalyticsPage() {
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold text-foreground sm:text-xl">{formatCurrency(financialAnalytics?.netBookValue)}</div>
+                                <div className="overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold text-foreground sm:text-xl">{fmtFin(financialAnalytics?.netBookValue)}</div>
                                 <p className="mt-1 text-xs text-faint-fg">
                                     Avg age: {financialAnalytics?.averageAssetAge != null ? financialAnalytics.averageAssetAge.toFixed(1) : "Not reported"}
                                 </p>
@@ -476,7 +487,7 @@ export default function AnalyticsPage() {
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold text-foreground sm:text-xl">{formatCurrency(poAnalytics?.totalPOValue)}</div>
+                                <div className="overflow-hidden text-ellipsis whitespace-nowrap text-lg font-bold text-foreground sm:text-xl">{fmtPo(poAnalytics?.totalPOValue)}</div>
                                 <p className="mt-1 text-xs text-faint-fg">{poAnalytics?.approvedPOs ?? 0} approved orders</p>
                             </CardContent>
                         </Card>
@@ -529,7 +540,7 @@ export default function AnalyticsPage() {
                                                     style={{ width: `${width}%` }}
                                                 />
                                             </div>
-                                            <p className="mt-1 text-xs text-faint-fg">{formatCurrency(item.value)}</p>
+                                            <p className="mt-1 text-xs text-faint-fg">{fmtAsset(item.value)}</p>
                                         </div>
                                     );
                                 })}
@@ -549,9 +560,9 @@ export default function AnalyticsPage() {
                                     <>
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             {[
-                                                { label: "Total Asset Value", value: formatCurrency(financialAnalytics.totalAssetValue) },
-                                                { label: "Net Book Value", value: formatCurrency(financialAnalytics.netBookValue) },
-                                                { label: "Total Depreciation", value: formatCurrency(financialAnalytics.totalDepreciation) },
+                                                { label: "Total Asset Value", value: fmtFin(financialAnalytics.totalAssetValue) },
+                                                { label: "Net Book Value", value: fmtFin(financialAnalytics.netBookValue) },
+                                                { label: "Total Depreciation", value: fmtFin(financialAnalytics.totalDepreciation) },
                                                 { label: "Average Asset Age", value: financialAnalytics.averageAssetAge != null ? financialAnalytics.averageAssetAge.toFixed(1) : "Not reported" },
                                             ].map(item => (
                                                 <div key={item.label} className="rounded-panel border border-edge-subtle bg-surface-muted p-4">
@@ -574,7 +585,7 @@ export default function AnalyticsPage() {
                                                             <span className="truncate text-sm font-medium text-muted-fg">{category.name}</span>
                                                         </div>
                                                         <div className="shrink-0 text-right">
-                                                            <p className="text-sm font-bold text-foreground">{formatCurrency(category.value)}</p>
+                                                            <p className="text-sm font-bold text-foreground">{fmtFin(category.value)}</p>
                                                             <p className="text-xs text-faint-fg">{category.count.toLocaleString()} assets</p>
                                                         </div>
                                                     </div>
@@ -611,12 +622,12 @@ export default function AnalyticsPage() {
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             <div className="rounded-panel border border-edge-subtle bg-surface p-4">
                                                 <p className="text-xs uppercase tracking-wide text-faint-fg">Average Order Value</p>
-                                                <p className="mt-2 text-xl font-bold text-foreground">{formatCurrency(poAnalytics.averagePOValue)}</p>
+                                                <p className="mt-2 text-xl font-bold text-foreground">{fmtPo(poAnalytics.averagePOValue)}</p>
                                             </div>
                                             <div className="rounded-panel border border-edge-subtle bg-surface p-4">
                                                 <p className="text-xs uppercase tracking-wide text-faint-fg">Largest Recorded Order</p>
                                                 <p className="mt-2 text-xl font-bold text-foreground">
-                                                    {poAnalytics.largestPO != null ? formatCurrency(poAnalytics.largestPO) : "Not reported"}
+                                                    {poAnalytics.largestPO != null ? fmtPo(poAnalytics.largestPO) : "Not reported"}
                                                 </p>
                                             </div>
                                         </div>
@@ -645,7 +656,7 @@ export default function AnalyticsPage() {
                                                     <span className="truncate text-sm font-medium text-foreground">{supplier.supplier}</span>
                                                 </div>
                                                 <div className="shrink-0 text-right">
-                                                    <p className="text-sm font-bold text-brand">{formatCurrency(supplier.totalValue)}</p>
+                                                    <p className="text-sm font-bold text-brand">{fmtPo(supplier.totalValue)}</p>
                                                     <p className="text-xs text-faint-fg">{supplier.poCount.toLocaleString()} orders</p>
                                                 </div>
                                             </div>
@@ -671,11 +682,11 @@ export default function AnalyticsPage() {
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             <div className="rounded-panel border border-edge-subtle bg-surface-muted p-4">
                                                 <p className="text-xs uppercase tracking-wide text-faint-fg">Total Cost</p>
-                                                <p className="mt-2 text-xl font-bold text-foreground">{formatCurrency(maintenanceAnalytics.totalMaintenanceCost)}</p>
+                                                <p className="mt-2 text-xl font-bold text-foreground">{fmtMaint(maintenanceAnalytics.totalMaintenanceCost)}</p>
                                             </div>
                                             <div className="rounded-panel border border-edge-subtle bg-surface-muted p-4">
                                                 <p className="text-xs uppercase tracking-wide text-faint-fg">Average Cost</p>
-                                                <p className="mt-2 text-xl font-bold text-foreground">{formatCurrency(maintenanceAnalytics.averageCost)}</p>
+                                                <p className="mt-2 text-xl font-bold text-foreground">{fmtMaint(maintenanceAnalytics.averageCost)}</p>
                                             </div>
                                             <div className="rounded-panel border border-danger/30 bg-danger-soft p-4">
                                                 <p className="text-xs uppercase tracking-wide text-faint-fg">Overdue</p>
@@ -696,7 +707,7 @@ export default function AnalyticsPage() {
                                                             <span className="font-medium text-muted-fg">{titleCase(item.type)}</span>
                                                             <span className="text-faint-fg">
                                                                 {item.count.toLocaleString()}
-                                                                {item.cost > 0 ? ` · ${formatCurrency(item.cost)}` : ""}
+                                                                {item.cost > 0 ? ` · ${fmtMaint(item.cost)}` : ""}
                                                             </span>
                                                         </div>
                                                         <div className="h-2 rounded-full bg-surface-muted">
@@ -730,11 +741,11 @@ export default function AnalyticsPage() {
                                                 <div>
                                                     <p className="text-sm font-semibold text-foreground">{formatMonth(row.month)}</p>
                                                     <p className="text-xs text-faint-fg">
-                                                        Charge: {formatCurrency(row.newDepreciation ?? row.totalDepreciation)}
+                                                        Charge: {fmtTrend(row.newDepreciation ?? row.totalDepreciation)}
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-sm font-bold text-foreground">{formatCurrency(row.netBookValue)}</p>
+                                                    <p className="text-sm font-bold text-foreground">{fmtTrend(row.netBookValue)}</p>
                                                     <p className="text-xs text-faint-fg">Book value</p>
                                                 </div>
                                             </div>
@@ -774,9 +785,9 @@ export default function AnalyticsPage() {
                                                         </div>
                                                     </td>
                                                     <td className="px-5 py-3 text-right text-muted-fg">{category.count.toLocaleString()}</td>
-                                                    <td className="px-5 py-3 text-right font-semibold text-foreground">{formatCurrency(category.value)}</td>
+                                                    <td className="px-5 py-3 text-right font-semibold text-foreground">{fmtFin(category.value)}</td>
                                                     <td className="px-5 py-3 text-right text-warn">
-                                                        {category.monthlyDepreciation > 0 ? formatCurrency(category.monthlyDepreciation) : "Not provided"}
+                                                        {category.monthlyDepreciation > 0 ? fmtFin(category.monthlyDepreciation) : "Not provided"}
                                                     </td>
                                                 </tr>
                                             ))}

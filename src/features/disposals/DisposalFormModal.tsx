@@ -25,7 +25,7 @@ export function DisposalFormModal({
   editingDisposal: DisposalRecord | null;
   assets: Asset[];
 }) {
-  const { symbol } = useCurrency();
+  const { baseCurrency } = useCurrency();
   const { register, handleSubmit, reset, formState: { errors } } = useForm<DisposalsDto>();
   const save = useSaveDisposal();
 
@@ -136,7 +136,7 @@ export function DisposalFormModal({
         </div>
 
         <div className="space-y-2 border-y border-edge-subtle py-4">
-          <Label htmlFor="dp-saleValue">Value recovered ({symbol})</Label>
+          <Label htmlFor="dp-saleValue">Value recovered ({baseCurrency})</Label>
           <Input id="dp-saleValue" type="number" step="0.01" min="0" placeholder="0.00" {...register("saleValue")} />
           <p className="text-[11px] text-faint-fg">If the asset was sold or scrapped for cash.</p>
         </div>

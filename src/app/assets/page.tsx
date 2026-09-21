@@ -10,6 +10,8 @@ import { PageSpinner } from "@/components/ui/spinner";
 import { AssetDetailModal } from "@/components/assets/AssetDetailModal";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
+import { moneyTotalText } from "@/components/currency/MoneyTotalValue";
 import {
   useAssetFilters,
   usePagedAssets,
@@ -31,7 +33,7 @@ function AssetsPageInner() {
   const { data: stats } = useAssetStats();
   const master = useAssetMasterData();
   const deleteAsset = useDeleteAsset();
-  const { format } = useCurrency();
+  const { format, sum } = useCurrency();
   const { confirm, ConfirmDialog } = useConfirm();
 
   const [formAsset, setFormAsset] = useState<Asset | null>(null);
@@ -51,9 +53,10 @@ function AssetsPageInner() {
     };
   }, [master.departments, master.locations, master.users]);
 
+  // Each asset is converted into the display currency; assets without a rate are excluded and flagged.
   const pageValue = useMemo(
-    () => (paged?.items ?? []).reduce((sum, a) => sum + (a.purchaseCost || 0), 0),
-    [paged],
+    () => sum((paged?.items ?? []).map((a) => ({ amount: a.purchaseCost, currency: a.currency }))),
+    [paged, sum],
   );
 
   const handleDelete = async (asset: Asset) => {
@@ -98,7 +101,9 @@ function AssetsPageInner() {
       }
     >
       <div className="space-y-4">
-        <AssetStatsRow stats={stats} totalValueLabel={format(pageValue, "GHS")} />
+        <MissingRatesNotice incomplete={!pageValue.complete} missingRates={pageValue.missingRates} />
+
+        <AssetStatsRow stats={stats} totalValueLabel={moneyTotalText(pageValue)} />
 
         <AssetFilterBar
           stats={stats}

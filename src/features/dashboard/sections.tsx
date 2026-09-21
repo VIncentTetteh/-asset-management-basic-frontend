@@ -9,7 +9,10 @@ import { toneForStatus } from "@/components/ui/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/patterns/EmptyState";
 import { QUICK_LINKS, type AssetStatusBreakdownItem, type BudgetStats, type DashboardMaintenanceAlerts, type DashboardStats } from "@/features/dashboard/lib";
-import type { AssetsByDepartment, DepreciationSummary } from "@/types";
+import type { AssetsByDepartment, DepreciationSummary, MoneyAggregateMeta } from "@/types";
+
+/** Formats an amount given in `currency` (omitted = organisation base currency). */
+type MoneyFormatter = (amount?: number, currency?: string) => string;
 
 const TONE_VAR: Record<string, string> = {
   "in-use": "var(--status-in-use)",
@@ -28,11 +31,14 @@ const statusVar = (key: string) => TONE_VAR[toneForStatus(key)] ?? "var(--status
 export function KpiRow({
   stats,
   budgetStats,
+  assetValueMeta,
   format,
 }: {
   stats: DashboardStats;
   budgetStats: BudgetStats;
-  format: (amount?: number, currency?: string) => string;
+  /** Currency the server reported totalAssetValue in. */
+  assetValueMeta: MoneyAggregateMeta;
+  format: MoneyFormatter;
 }) {
   const utilization = stats.totalAssets ? Math.round((stats.activeAssets / stats.totalAssets) * 100) : 0;
   const maintenanceLoad = stats.overdueMaintenanceCount + stats.upcomingMaintenanceCount;
@@ -64,7 +70,7 @@ export function KpiRow({
             <Landmark className="h-4 w-4 text-brand" />
           </div>
           <p className="data-mono mt-1 truncate text-2xl font-bold text-foreground">
-            {format(stats.totalAssetValue, "GHS")}
+            {format(stats.totalAssetValue, assetValueMeta.currency)}
           </p>
           <p className="mt-0.5 text-xs text-muted-fg">{stats.totalUsers.toLocaleString()} users in workspace</p>
         </CardContent>
@@ -95,13 +101,21 @@ export function KpiRow({
               <p className="text-[11px] uppercase tracking-[0.06em] text-faint-fg">Budget health</p>
               <Wallet className="h-4 w-4 text-brand" />
             </div>
-            <p className="data-mono mt-1 text-2xl font-bold text-foreground">{budgetPct}%</p>
+            <p className="data-mono mt-1 text-2xl font-bold text-foreground">
+              {budgetStats.amountsAvailable ? `${budgetPct}%` : "—"}
+            </p>
             <div className="progress-bar mt-2">
               <div className="progress-bar-fill" style={{ width: `${Math.min(budgetPct, 100)}%`, background: budgetBar }} />
             </div>
             <p className="mt-1.5 text-xs text-muted-fg">
-              <span className="data-mono">{format(budgetStats.totalSpentAmount, "GHS")}</span> of{" "}
-              <span className="data-mono">{format(budgetStats.totalBudgetAmount, "GHS")}</span>
+              {budgetStats.amountsAvailable ? (
+                <>
+                  <span className="data-mono">{format(budgetStats.totalSpentAmount, budgetStats.currency)}</span> of{" "}
+                  <span className="data-mono">{format(budgetStats.totalBudgetAmount, budgetStats.currency)}</span>
+                </>
+              ) : (
+                "Budget totals unavailable"
+              )}
             </p>
           </CardContent>
         </Card>
@@ -203,7 +217,7 @@ export function DepartmentsCard({
   format,
 }: {
   assetsByDepartment: AssetsByDepartment | null;
-  format: (amount?: number, currency?: string) => string;
+  format: MoneyFormatter;
 }) {
   const rows = assetsByDepartment?.data?.slice(0, 6) ?? [];
   const max = Math.max(...rows.map((r) => r.count), 1);
@@ -222,7 +236,7 @@ export function DepartmentsCard({
                 <div className="flex items-baseline justify-between gap-3 text-[13px]">
                   <span className="truncate text-foreground">{d.departmentName}</span>
                   <span className="data-mono shrink-0 text-xs text-muted-fg">
-                    {d.count} · {format(d.value, "GHS")}
+                    {d.count} · {format(d.value, assetsByDepartment?.currency)}
                   </span>
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
@@ -247,7 +261,7 @@ export function DepreciationCard({
   format,
 }: {
   summary: DepreciationSummary | null;
-  format: (amount?: number, currency?: string) => string;
+  format: MoneyFormatter;
 }) {
   return (
     <Card>
@@ -261,18 +275,18 @@ export function DepreciationCard({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-[11px] uppercase tracking-[0.06em] text-faint-fg">Net book value</p>
-              <p className="data-mono mt-0.5 text-lg font-bold text-foreground">{format(summary.netBookValue, "GHS")}</p>
+              <p className="data-mono mt-0.5 text-lg font-bold text-foreground">{format(summary.netBookValue, summary.currency)}</p>
             </div>
             <div>
               <p className="text-[11px] uppercase tracking-[0.06em] text-faint-fg">Total depreciation</p>
               <p className="data-mono mt-0.5 flex items-center gap-1 text-lg font-bold text-foreground">
                 <TrendingDown className="h-4 w-4 text-danger" />
-                {format(summary.totalDepreciation, "GHS")}
+                {format(summary.totalDepreciation, summary.currency)}
               </p>
             </div>
             <div>
               <p className="text-[11px] uppercase tracking-[0.06em] text-faint-fg">Monthly charge</p>
-              <p className="data-mono mt-0.5 text-lg font-bold text-foreground">{format(summary.monthlyDepreciation, "GHS")}</p>
+              <p className="data-mono mt-0.5 text-lg font-bold text-foreground">{format(summary.monthlyDepreciation, summary.currency)}</p>
             </div>
             <div>
               <p className="text-[11px] uppercase tracking-[0.06em] text-faint-fg">Fully depreciated</p>

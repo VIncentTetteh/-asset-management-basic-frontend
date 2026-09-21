@@ -21,6 +21,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
+import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
+import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 
 const CATEGORY_LABELS: Record<string, string> = {
   MAINTENANCE: "Maintenance",
@@ -41,7 +44,7 @@ const fmtDate = (d?: string) =>
   d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
 
 export default function ExpensesPage() {
-  const { format } = useCurrency();
+  const { format, baseCurrency, sum } = useCurrency();
   const queryClient = useQueryClient();
   const expensesKey = qk.module("expenses");
   const { confirm, ConfirmDialog } = useConfirm();
@@ -135,13 +138,13 @@ export default function ExpensesPage() {
       title: "",
       description: "",
       amount: 0,
-      currency: "GHS",
+      currency: baseCurrency,
       category: "OTHER",
       linkedAssetId: "",
       linkedBudgetId: "",
       expenseDate: new Date().toISOString().split("T")[0],
     });
-  }, [isModalOpen, reset]);
+  }, [isModalOpen, reset, baseCurrency]);
 
   const lookups = useMemo(() => {
     const assetMap = new Map(assets.map((a) => [a.id, a.name]));
@@ -209,7 +212,7 @@ export default function ExpensesPage() {
         accessorKey: "amount",
         header: () => <span className="block text-right">Amount</span>,
         cell: ({ row }) => (
-          <span className="data-mono block text-right">{format(row.original.amount, row.original.currency || "GHS")}</span>
+          <span className="data-mono block text-right">{format(row.original.amount, row.original.currency || baseCurrency)}</span>
         ),
       },
       {
@@ -261,12 +264,13 @@ export default function ExpensesPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookups, format],
+    [lookups, format, baseCurrency],
   );
 
   const rows = paged?.items ?? [];
   const total = paged?.total ?? 0;
-  const pageAmount = rows.reduce((s, e) => s + (e.amount || 0), 0);
+  // Each expense is converted into the display currency; expenses without a rate are excluded and flagged.
+  const pageAmount = sum(rows.map((e) => ({ amount: e.amount, currency: e.currency })));
 
   return (
     <ListPageTemplate
@@ -319,6 +323,8 @@ export default function ExpensesPage() {
         </>
       }
     >
+      <MissingRatesNotice incomplete={!pageAmount.complete} missingRates={pageAmount.missingRates} />
+
       <DataTable
         columns={columns}
         data={rows}
@@ -340,7 +346,7 @@ export default function ExpensesPage() {
         }
         footerSummary={
           <span>
-            Page total · <span className="data-mono">{format(pageAmount, "GHS")}</span>
+            Page total · <MoneyTotalValue total={pageAmount} />
           </span>
         }
       />
@@ -365,10 +371,7 @@ export default function ExpensesPage() {
             <div className="space-y-2">
               <Label htmlFor="ex-currency">Currency</Label>
               <Select id="ex-currency" {...register("currency")}>
-                <option value="GHS">GHS</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
+                <CurrencyOptions />
               </Select>
             </div>
           </div>
@@ -401,7 +404,7 @@ export default function ExpensesPage() {
                 <p className="text-xs text-muted-fg">
                   Remaining ·{" "}
                   <span className="data-mono">
-                    {format(selectedBudget.remainingAmount ?? (selectedBudget.totalAmount || 0) - (selectedBudget.spentAmount || 0), selectedBudget.currency || "GHS")}
+                    {format(selectedBudget.remainingAmount ?? (selectedBudget.totalAmount || 0) - (selectedBudget.spentAmount || 0), selectedBudget.currency || baseCurrency)}
                   </span>
                 </p>
               ) : null}
