@@ -1,6 +1,9 @@
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { assetService } from "@/services/assetService";
 import { Search, FileSpreadsheet, PackagePlus } from "lucide-react";
 import type { Asset } from "@/types";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
@@ -40,6 +43,23 @@ function AssetsPageInner() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [assignAsset, setAssignAsset] = useState<Asset | null>(null);
   const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
+
+  // Deep link (`/assets?id=<uuid>`, used by scanned QR labels and notifications):
+  // open that asset's detail once, until the user closes it.
+  const deepLinkId = useSearchParams().get("id");
+  const [dismissedDeepLink, setDismissedDeepLink] = useState<string | null>(null);
+  const { data: deepLinkAsset } = useQuery({
+    queryKey: ["assets", "detail", deepLinkId],
+    queryFn: () => assetService.get(deepLinkId as string),
+    enabled: Boolean(deepLinkId),
+    retry: false,
+  });
+  const shownAsset =
+    detailAsset ?? (deepLinkAsset && dismissedDeepLink !== deepLinkId ? deepLinkAsset : null);
+  const closeDetail = () => {
+    setDetailAsset(null);
+    setDismissedDeepLink(deepLinkId);
+  };
   const [isImportOpen, setIsImportOpen] = useState(false);
 
   const lookups = useMemo(() => {
@@ -159,9 +179,9 @@ function AssetsPageInner() {
       <ImportAssetsModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} />
 
       <AssetDetailModal
-        isOpen={detailAsset !== null}
-        onClose={() => setDetailAsset(null)}
-        asset={detailAsset}
+        isOpen={shownAsset !== null}
+        onClose={closeDetail}
+        asset={shownAsset}
         departments={master.departments}
         locations={master.locations}
         categories={master.categories}
