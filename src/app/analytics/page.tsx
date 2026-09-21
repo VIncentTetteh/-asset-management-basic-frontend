@@ -30,7 +30,8 @@ import { cn } from "@/lib/utils";
 import { mergeCompleteness } from "@/lib/currency";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 
-type Period = "week" | "month" | "quarter" | "year";
+/** Activity window: filters acquisitions, POs, maintenance and disposals, never portfolio value. */
+type Period = "week" | "month" | "quarter" | "year" | "all";
 type GroupBy = "status" | "department" | "condition";
 
 type AnalyticsKey =
@@ -41,11 +42,14 @@ type AnalyticsKey =
     | "depreciation trends";
 
 const PERIODS: { value: Period; label: string; description: string }[] = [
-    { value: "week", label: "This Week", description: "Most recent operational shifts" },
-    { value: "month", label: "This Month", description: "Short-term portfolio movement" },
-    { value: "quarter", label: "This Quarter", description: "Broader finance and procurement view" },
-    { value: "year", label: "This Year", description: "Long-range asset and spend trends" },
+    { value: "week", label: "Last 7 days", description: "Activity in the last 7 days" },
+    { value: "month", label: "This month", description: "Activity since the start of this month" },
+    { value: "quarter", label: "Last 3 months", description: "Activity in the last 3 months" },
+    { value: "year", label: "Last 12 months", description: "Activity in the last 12 months" },
+    { value: "all", label: "All time", description: "All recorded activity" },
 ];
+
+const DEFAULT_PERIOD: Period = "year";
 
 const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
     { value: "status", label: "Status" },
@@ -58,6 +62,7 @@ const TREND_MONTHS_BY_PERIOD: Record<Period, number> = {
     month: 1,
     quarter: 3,
     year: 12,
+    all: 24,
 };
 
 const BAR_COLORS = [
@@ -100,7 +105,7 @@ const EmptySection = ({ message }: { message: string }) => (
 
 export default function AnalyticsPage() {
     const { format: formatCurrency, formatCompact } = useCurrency();
-    const [period, setPeriod] = useState<Period>("month");
+    const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD);
     const [groupBy, setGroupBy] = useState<GroupBy>("status");
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -290,7 +295,7 @@ export default function AnalyticsPage() {
         <div className="space-y-6">
             <PageHeader
                 title="Analytics"
-                subtitle="Backend-driven portfolio, finance, procurement, maintenance, and depreciation insights for the selected period."
+                subtitle="Portfolio value, book value and depreciation are as of today across all non-disposed assets. The activity period filters acquisitions, purchase orders, maintenance and disposals."
                 actions={
                     <Button
                         variant="outline"
@@ -305,7 +310,7 @@ export default function AnalyticsPage() {
             />
             <div className="-mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-fg">
                 <span className="rounded-full border border-edge-subtle bg-surface px-2.5 py-1 font-medium">
-                    Period: {currentPeriod?.label}
+                    Activity: {currentPeriod?.label}
                 </span>
                 <span className="rounded-full border border-edge-subtle bg-surface px-2.5 py-1 font-medium">
                     Grouped by: {currentGroup?.label}
@@ -328,20 +333,20 @@ export default function AnalyticsPage() {
                                     Analytics Overview
                                 </p>
                                 <h2 className="text-2xl font-semibold">
-                                    {currentPeriod?.label} performance across asset, finance, and procurement services
+                                    Portfolio today, activity for {currentPeriod?.label.toLowerCase()}
                                 </h2>
                                 <p className="max-w-2xl text-sm leading-6 text-slate-300">
-                                    {currentPeriod?.description}. Each panel below is populated from its matching backend analytics service, with partial
-                                    availability handled section by section instead of failing the whole dashboard.
+                                    Asset and book values cover every asset still on the books. {currentPeriod?.description} drives the
+                                    acquisition, procurement and maintenance panels.
                                 </p>
                             </div>
 
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                                    <p className="text-xs uppercase tracking-wide text-slate-400">Asset Value</p>
+                                    <p className="text-xs uppercase tracking-wide text-slate-400">Portfolio Value</p>
                                     <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-xl font-black leading-tight sm:text-2xl">{heroAssetValue}</p>
                                     <p className="mt-1 text-xs text-slate-300">
-                                        Full value: {financialAnalytics ? fmtFin(financialAnalytics.totalAssetValue) : fmtAsset(assetAnalytics?.totalValue)} · {assetAnalytics?.total?.toLocaleString() ?? "—"} assets in analysis
+                                        Full value: {financialAnalytics ? fmtFin(financialAnalytics.totalAssetValue) : fmtAsset(assetAnalytics?.totalValue)} · {financialAnalytics?.totalAssets?.toLocaleString() ?? "—"} assets on the books
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -376,7 +381,10 @@ export default function AnalyticsPage() {
                     </CardHeader>
                     <CardContent className="space-y-4 p-5">
                         <div>
-                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint-fg">Period</p>
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint-fg">Activity period</p>
+                            <p className="mb-2 text-xs text-muted-fg">
+                                Filters acquisitions, purchase orders, maintenance and disposals. Portfolio and book values are always as of today.
+                            </p>
                             <div className="flex flex-wrap gap-2">
                                 {PERIODS.map(item => (
                                     <button
@@ -512,12 +520,12 @@ export default function AnalyticsPage() {
                                     <CardTitle className="text-sm font-semibold text-foreground">
                                         Asset Breakdown by {currentGroup?.label}
                                     </CardTitle>
-                                    <span className="text-xs text-faint-fg">{currentPeriod?.label}</span>
+                                    <span className="text-xs text-faint-fg">Acquired: {currentPeriod?.label}</span>
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-3 p-5">
                                 {assetBreakdown.length === 0 ? (
-                                    <EmptySection message="The backend did not return asset breakdown data for this selection." />
+                                    <EmptySection message={`No assets were acquired in this period (${currentPeriod?.label.toLowerCase()}). Try a longer period.`} />
                                 ) : assetBreakdown.map((item, index) => {
                                     const width = Math.round((item.count / maxAssetCount) * 100);
                                     return (
@@ -560,7 +568,12 @@ export default function AnalyticsPage() {
                                                 { label: "Total Asset Value", value: fmtFin(financialAnalytics.totalAssetValue) },
                                                 { label: "Net Book Value", value: fmtFin(financialAnalytics.netBookValue) },
                                                 { label: "Total Depreciation", value: fmtFin(financialAnalytics.totalDepreciation) },
-                                                { label: "Average Asset Age", value: financialAnalytics.averageAssetAge != null ? financialAnalytics.averageAssetAge.toFixed(1) : "Not reported" },
+                                                { label: "Average Asset Age", value: financialAnalytics.averageAssetAge != null ? `${financialAnalytics.averageAssetAge.toFixed(1)} months` : "Not reported" },
+                                                {
+                                                    label: `Acquired (${currentPeriod?.label.toLowerCase()})`,
+                                                    value: `${fmtFin(financialAnalytics.totalAcquisition)} · ${financialAnalytics.acquisitionsInPeriod?.toLocaleString() ?? "—"} assets`,
+                                                },
+                                                { label: "Monthly Depreciation", value: fmtFin(financialAnalytics.monthlyDepreciation) },
                                             ].map(item => (
                                                 <div key={item.label} className="rounded-panel border border-edge-subtle bg-surface-muted p-4">
                                                     <p className="text-xs uppercase tracking-wide text-faint-fg">{item.label}</p>
@@ -569,11 +582,18 @@ export default function AnalyticsPage() {
                                             ))}
                                         </div>
 
+                                        {financialAnalytics.assetsMissingDepreciationSetup ? (
+                                            <p className="rounded-panel border border-edge-subtle bg-surface-muted p-3 text-xs text-muted-fg">
+                                                {financialAnalytics.assetsMissingDepreciationSetup.toLocaleString()} asset(s) have no useful life set and
+                                                are carried at cost. Assign a depreciation policy on the Categories page or set a useful life on the asset.
+                                            </p>
+                                        ) : null}
+
                                         {categoryBreakdown.length > 0 && (
                                             <div className="space-y-3 rounded-panel border border-edge-subtle bg-surface p-4">
                                                 <div className="flex items-center justify-between">
                                                     <p className="text-sm font-semibold text-foreground">Top Categories</p>
-                                                    <span className="text-xs text-faint-fg">By backend category values</span>
+                                                    <span className="text-xs text-faint-fg">By cost, assets on the books</span>
                                                 </div>
                                                 {categoryBreakdown.map((category, index) => (
                                                     <div key={category.name} className="flex items-center justify-between gap-3">
@@ -583,7 +603,10 @@ export default function AnalyticsPage() {
                                                         </div>
                                                         <div className="shrink-0 text-right">
                                                             <p className="text-sm font-bold text-foreground">{fmtFin(category.value)}</p>
-                                                            <p className="text-xs text-faint-fg">{category.count.toLocaleString()} assets</p>
+                                                            <p className="text-xs text-faint-fg">
+                                                                {category.count.toLocaleString()} assets
+                                                                {category.netBookValue != null ? ` · NBV ${fmtFin(category.netBookValue)}` : ""}
+                                                            </p>
                                                         </div>
                                                     </div>
                                                 ))}

@@ -10,7 +10,8 @@ import {
 import { readMoneyMeta } from "@/lib/currency";
 
 export interface AnalyticsFilterParams {
-    period?: "week" | "month" | "quarter" | "year";
+    /** Activity window (acquisitions, POs, maintenance, disposals); portfolio figures ignore it. */
+    period?: "week" | "month" | "quarter" | "year" | "all";
     groupBy?: "status" | "department" | "condition";
 }
 
@@ -117,6 +118,7 @@ const normalizeFinancialAnalytics = (payload: unknown): FinancialAnalytics => {
         acc[name] = {
             count: toNumber(item.count),
             value: toNumber(item.value),
+            netBookValue: getOptionalNumber(item, "netBookValue"),
             monthlyDepreciation: toNumber(item.monthlyDepreciation ?? item.depreciation),
         };
         return acc;
@@ -131,6 +133,8 @@ const normalizeFinancialAnalytics = (payload: unknown): FinancialAnalytics => {
         totalAssetValue: toNumber(raw.totalAssetValue ?? raw.totalPurchaseValue),
         totalDepreciation: toNumber(raw.totalDepreciation),
         netBookValue: toNumber(raw.netBookValue ?? raw.totalCurrentBookValue),
+        totalAssets: getOptionalNumber(raw, "totalAssets"),
+        acquisitionsInPeriod: getOptionalNumber(raw, "acquisitionsInPeriod"),
         totalAcquisition: getOptionalNumber(raw, "totalAcquisition"),
         totalDisposal: getOptionalNumber(raw, "totalDisposal"),
         totalMaintenance: getOptionalNumber(raw, "totalMaintenance"),
@@ -145,6 +149,7 @@ const normalizeFinancialAnalytics = (payload: unknown): FinancialAnalytics => {
         averageAssetAge: getOptionalNumber(raw, "averageAssetAge", "averageAssetAgeMonths"),
         depreciationMethod: typeof raw.depreciationMethod === "string" ? raw.depreciationMethod : undefined,
         assetsFullyDepreciated: getOptionalNumber(raw, "assetsFullyDepreciated"),
+        assetsMissingDepreciationSetup: getOptionalNumber(raw, "assetsMissingDepreciationSetup"),
         monthlyDepreciation: getOptionalNumber(raw, "monthlyDepreciation"),
         breakdown: {
             byCategory: categoryEntries,
