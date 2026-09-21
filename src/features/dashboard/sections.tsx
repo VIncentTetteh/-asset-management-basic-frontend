@@ -292,6 +292,17 @@ export function DepreciationCard({
               <p className="text-[11px] uppercase tracking-[0.06em] text-faint-fg">Fully depreciated</p>
               <p className="data-mono mt-0.5 text-lg font-bold text-foreground">{summary.assetsFullyDepreciated}</p>
             </div>
+            {summary.assetsMissingDepreciationSetup ? (
+              <p className="col-span-2 rounded-control border border-edge-subtle bg-surface-muted px-3 py-2 text-xs text-muted-fg">
+                {summary.assetsMissingDepreciationSetup} asset
+                {summary.assetsMissingDepreciationSetup === 1 ? " has" : "s have"} no useful life set, so{" "}
+                {summary.assetsMissingDepreciationSetup === 1 ? "it is" : "they are"} carried at cost.{" "}
+                <Link href="/categories" className="ea-focus rounded-sm font-semibold text-brand hover:underline">
+                  Assign a depreciation policy to the category
+                </Link>{" "}
+                or set a useful life on the asset.
+              </p>
+            ) : null}
           </div>
         )}
       </CardContent>

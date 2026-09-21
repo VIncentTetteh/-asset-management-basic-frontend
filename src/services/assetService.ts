@@ -30,6 +30,28 @@ export interface AssetStats {
     missing: number;
     assigned: number;
     unassigned: number;
+    /** Register value: purchase cost of every non-disposed asset, in `currency`. */
+    totalValue?: number;
+    currency?: string;
+    complete?: boolean;
+    missingRates?: string[];
+}
+
+/** GET /assets/{id}/tco — every component is in the asset's own currency. */
+export interface AssetTco {
+    assetId: string;
+    assetName: string;
+    assetTag: string;
+    acquisitionCost: number;
+    totalMaintenanceCost: number;
+    totalInsuranceCost: number;
+    totalDowntimeCost: number;
+    disposalRecovery: number;
+    netTco: number;
+    currency: string;
+    calculatedAt: string;
+    maintenanceRecordCount: number;
+    downtimeDays: number;
 }
 
 export interface PagedAssets {
@@ -140,22 +162,8 @@ export const assetService = {
     },
 
     /** GET /assets/{id}/tco — Total Cost of Ownership breakdown. */
-    getTco: async (id: string): Promise<{
-        assetId: string;
-        assetName: string;
-        assetTag: string;
-        acquisitionCost: number;
-        totalMaintenanceCost: number;
-        totalInsuranceCost: number;
-        totalDowntimeCost: number;
-        disposalRecovery: number;
-        netTco: number;
-        currency: string;
-        calculatedAt: string;
-        maintenanceRecordCount: number;
-        downtimeDays: number;
-    }> => {
-        const response = await api.get(`/assets/${id}/tco`);
+    getTco: async (id: string): Promise<AssetTco> => {
+        const response = await api.get<AssetTco>(`/assets/${id}/tco`);
         return response.data;
     },
 

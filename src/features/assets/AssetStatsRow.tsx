@@ -4,13 +4,17 @@ import { Package, PackageCheck, CheckCircle2, Wrench, TrendingDown } from "lucid
 import type { AssetStats } from "@/services/assetService";
 import { Skeleton } from "@/components/ui/skeleton";
 
-/** Compact KPI strip above the register. */
+/**
+ * Compact KPI strip above the register. The value tile is register-wide (every
+ * non-disposed asset, server-aggregated), not the current page.
+ */
 export function AssetStatsRow({
   stats,
   totalValueLabel,
 }: {
   stats: AssetStats | undefined;
-  totalValueLabel: string;
+  /** Formatted register value, or undefined while stats load. */
+  totalValueLabel: string | undefined;
 }) {
   const items = [
     { label: "Total assets", value: stats?.total, icon: Package, tone: "text-muted-fg" },
@@ -37,8 +41,17 @@ export function AssetStatsRow({
       <div className="flex items-center gap-3 rounded-card border border-edge bg-surface p-3.5">
         <TrendingDown className="h-4.5 w-4.5 shrink-0 text-brand" />
         <div className="min-w-0">
-          <p className="truncate text-[11px] uppercase tracking-[0.06em] text-faint-fg">Page value</p>
-          <p className="data-mono truncate text-lg font-bold leading-6 text-foreground">{totalValueLabel}</p>
+          <p
+            className="truncate text-[11px] uppercase tracking-[0.06em] text-faint-fg"
+            title="Purchase cost of every asset in the register, excluding disposed assets"
+          >
+            Register value
+          </p>
+          {totalValueLabel === undefined ? (
+            <Skeleton className="mt-1 h-5 w-20" />
+          ) : (
+            <p className="data-mono truncate text-lg font-bold leading-6 text-foreground">{totalValueLabel}</p>
+          )}
         </div>
       </div>
     </div>

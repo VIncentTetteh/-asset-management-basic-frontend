@@ -129,7 +129,12 @@ function AssetSummary({ assetId }: { assetId: string }) {
                             {data.purchaseCost != null ? formatMoney(data.purchaseCost, currency) : "—"}
                         </Fact>
                         {data.currentBookValue != null ? (
-                            <Fact label="Current book value">{formatMoney(data.currentBookValue, currency)}</Fact>
+                            <Fact label="Current book value">
+                                {formatMoney(data.currentBookValue, currency)}
+                                {data.depreciationConfigured === false ? (
+                                    <span className="ml-1 text-xs text-muted-fg">(at cost, depreciation not set up)</span>
+                                ) : null}
+                            </Fact>
                         ) : null}
                         <Fact label="Warranty expiry">{formatDate(data.warrantyExpiryDate)}</Fact>
                         {nextMaintenance ? <Fact label="Next maintenance">{formatDate(nextMaintenance)}</Fact> : null}

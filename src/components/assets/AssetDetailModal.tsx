@@ -9,10 +9,11 @@ import { formatRelativeTime } from "@/lib/time";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import {
-    History, QrCode, Info, Loader2, Download, Clock, User as UserIcon, Copy, Printer
+    History, QrCode, Info, Loader2, Download, Clock, User as UserIcon, Copy, Printer, Wallet
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { printAssetLabel } from "@/features/assets/printLabel";
+import { AssetFinancials } from "@/features/assets/AssetFinancials";
 
 interface Props {
     isOpen: boolean;
@@ -25,7 +26,7 @@ interface Props {
     organisations?: Organisation[];
 }
 
-type Tab = "overview" | "history" | "qrcode";
+type Tab = "overview" | "financials" | "history" | "qrcode";
 
 const resolveQrPayload = (payload: Blob | Record<string, unknown> | string): string => {
     if (payload instanceof Blob) {
@@ -138,6 +139,7 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
 
     const tabs = [
         { id: "overview", label: "Overview", icon: Info },
+        { id: "financials", label: "Financials", icon: Wallet },
         { id: "history", label: "History", icon: History },
         { id: "qrcode", label: "QR Code", icon: QrCode },
     ];
@@ -193,6 +195,10 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {activeTab === "financials" && (
+                        <AssetFinancials asset={asset} category={categories.find(c => c.id === asset.categoryId)} />
                     )}
 
                     {activeTab === "history" && (

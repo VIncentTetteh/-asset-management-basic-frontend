@@ -14,7 +14,6 @@ import { AssetDetailModal } from "@/components/assets/AssetDetailModal";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
-import { moneyTotalText } from "@/components/currency/MoneyTotalValue";
 import {
   useAssetFilters,
   usePagedAssets,
@@ -36,7 +35,7 @@ function AssetsPageInner() {
   const { data: stats } = useAssetStats();
   const master = useAssetMasterData();
   const deleteAsset = useDeleteAsset();
-  const { format, sum } = useCurrency();
+  const { format } = useCurrency();
   const { confirm, ConfirmDialog } = useConfirm();
 
   const [formAsset, setFormAsset] = useState<Asset | null>(null);
@@ -73,11 +72,9 @@ function AssetsPageInner() {
     };
   }, [master.departments, master.locations, master.users]);
 
-  // Each asset is converted into the display currency; assets without a rate are excluded and flagged.
-  const pageValue = useMemo(
-    () => sum((paged?.items ?? []).map((a) => ({ amount: a.purchaseCost, currency: a.currency }))),
-    [paged, sum],
-  );
+  // Register-wide value, aggregated server-side in the base currency (not just this page).
+  const registerValueLabel =
+    stats?.totalValue === undefined ? undefined : format(stats.totalValue, stats.currency);
 
   const handleDelete = async (asset: Asset) => {
     if (!(await confirm({ message: `Delete "${asset.name}"? This cannot be undone.`, variant: "danger" }))) return;
@@ -121,9 +118,9 @@ function AssetsPageInner() {
       }
     >
       <div className="space-y-4">
-        <MissingRatesNotice incomplete={!pageValue.complete} missingRates={pageValue.missingRates} />
+        <MissingRatesNotice incomplete={stats?.complete === false} missingRates={stats?.missingRates ?? []} />
 
-        <AssetStatsRow stats={stats} totalValueLabel={moneyTotalText(pageValue)} />
+        <AssetStatsRow stats={stats} totalValueLabel={registerValueLabel} />
 
         <AssetFilterBar
           stats={stats}

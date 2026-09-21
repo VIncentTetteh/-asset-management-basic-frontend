@@ -270,6 +270,7 @@ export const normalizeDepreciationSummary = (payload: unknown): DepreciationSumm
         totalDepreciation: toNumber(raw.totalDepreciation ?? raw.accumulatedDepreciation),
         netBookValue: toNumber(raw.netBookValue),
         assetsFullyDepreciated: toNumber(raw.assetsFullyDepreciated ?? raw.fullyDepreciatedCount),
+        assetsMissingDepreciationSetup: toNumber(raw.assetsMissingDepreciationSetup),
         monthlyDepreciation: toNumber(raw.monthlyDepreciation ?? raw.depreciationThisYear),
         byMethod: raw.byMethod as DepreciationSummary["byMethod"],
         ...readMoneyMeta(raw),
