@@ -194,8 +194,26 @@ export interface Asset extends BaseEntity {
     departmentId?: string;
     purchaseOrderId?: string;
     organisationId?: string;
+    /** Net book value as of today, computed server-side by the depreciation engine. */
     currentBookValue?: number;
+    // Read-only depreciation figures (asset currency), computed as of today.
+    accumulatedDepreciation?: number;
+    /** Charge for the month of service in progress; 0 when fully depreciated or disposed. */
+    monthlyDepreciation?: number;
+    /** False when no useful life (asset or category policy) or purchase date is set. */
+    depreciationConfigured?: boolean;
+    fullyDepreciated?: boolean;
+    /** Method/life/residual actually applied (asset field, else the category policy). */
+    effectiveDepreciationMethod?: DepreciationMethod | string;
+    effectiveUsefulLifeMonths?: number | null;
+    effectiveResidualValue?: number | null;
 }
+
+/** Optional relations an asset update can clear (a missing/null field means "unchanged"). */
+export const CLEARABLE_ASSET_FIELDS = [
+    "departmentId", "locationId", "supplierId", "purchaseOrderId", "assignedUserId",
+] as const;
+export type ClearableAssetField = (typeof CLEARABLE_ASSET_FIELDS)[number];
 
 export interface AssetDto {
     id?: string;
@@ -227,6 +245,8 @@ export interface AssetDto {
     departmentId?: string;
     purchaseOrderId?: string;
     currentBookValue?: number;
+    /** Update only: relations to clear explicitly. */
+    clearFields?: ClearableAssetField[];
 }
 
 // ─── Asset History ────────────────────────────────────────────────────────────
@@ -308,6 +328,8 @@ export interface CategoryDto {
     parentCategoryId?: string | null;
     depreciationPolicyId?: string;
     defaultWarrantyPeriodMonths?: number;
+    /** Update only: relations to clear explicitly. */
+    clearFields?: ("depreciationPolicyId" | "parentCategoryId")[];
 }
 
 // ─── Role ─────────────────────────────────────────────────────────────────────
@@ -677,7 +699,10 @@ export interface DashboardSummary extends MoneyAggregateMeta {
     totalAssets?: number;
     activeAssets?: number;
     assetsInUse?: number;
+    /** Purchase cost of every non-disposed asset, in `currency`. */
     totalAssetValue?: number;
+    /** Book value of every non-disposed asset, in `currency`. */
+    netBookValue?: number;
     inMaintenanceAssets?: number;
     disposedAssets?: number;
     totalOrganisations?: number;
@@ -739,11 +764,18 @@ export interface AssetAnalytics extends MoneyAggregateMeta {
     totalValue: number;
 }
 
+/**
+ * Portfolio figures (totalAssets, totalAssetValue, netBookValue, depreciation,
+ * breakdown) are as of today across every non-disposed asset; `period` only
+ * filters activity (acquisitions, maintenance, disposals).
+ */
 export interface FinancialAnalytics extends MoneyAggregateMeta {
     period: string;
+    totalAssets?: number;
     totalAssetValue: number;
     totalDepreciation: number;
     netBookValue: number;
+    acquisitionsInPeriod?: number;
     totalAcquisition?: number;
     totalDisposal?: number;
     totalMaintenance?: number;
@@ -754,11 +786,13 @@ export interface FinancialAnalytics extends MoneyAggregateMeta {
     averageAssetAge?: number;
     depreciationMethod?: string;
     assetsFullyDepreciated?: number;
+    assetsMissingDepreciationSetup?: number;
     monthlyDepreciation?: number;
     breakdown: {
         byCategory: Record<string, {
             count: number;
             value: number;
+            netBookValue?: number;
             monthlyDepreciation: number;
         }>;
     };
@@ -1776,9 +1810,12 @@ export interface AssetsByDepartment extends MoneyAggregateMeta {
 }
 
 export interface DepreciationSummary extends MoneyAggregateMeta {
+    totalAssetValue?: number;
     totalDepreciation: number;
     netBookValue: number;
     assetsFullyDepreciated: number;
+    /** Non-disposed assets with a cost but no useful life anywhere (carried at cost). */
+    assetsMissingDepreciationSetup?: number;
     monthlyDepreciation: number;
     byMethod?: Record<string, { count: number; totalDepreciation: number }>;
 }

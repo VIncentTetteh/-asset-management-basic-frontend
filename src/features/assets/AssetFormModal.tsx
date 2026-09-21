@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { buildPatchPayload } from "@/lib/patch";
+import { buildAssetUpdate, normaliseAssetForm } from "@/features/assets/assetPayload";
 import { useSaveAsset } from "@/features/assets/hooks";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
@@ -31,9 +31,10 @@ function emptyForm(baseCurrency: string): AssetDto {
     purchaseDate: new Date().toISOString().split("T")[0],
     purchaseCost: 0,
     currency: baseCurrency,
-    depreciationMethod: DepreciationMethod.STRAIGHT_LINE,
-    usefulLifeMonths: 36,
-    residualValue: 0,
+    // Blank = inherit the category's depreciation policy.
+    depreciationMethod: "",
+    usefulLifeMonths: "",
+    residualValue: "",
     warrantyExpiryDate: "",
     status: AssetStatus.IN_STOCK,
     condition: AssetCondition.NEW,
@@ -42,7 +43,7 @@ function emptyForm(baseCurrency: string): AssetDto {
     supplierId: "",
     purchaseOrderId: "",
     assignedUserId: "",
-  } as AssetDto;
+  } as unknown as AssetDto;
 }
 
 function formFromAsset(asset: Asset, baseCurrency: string): AssetDto {
@@ -59,9 +60,10 @@ function formFromAsset(asset: Asset, baseCurrency: string): AssetDto {
     purchaseDate: asset.purchaseDate ? asset.purchaseDate.split("T")[0] : "",
     purchaseCost: asset.purchaseCost,
     currency: asset.currency || baseCurrency,
-    depreciationMethod: asset.depreciationMethod,
-    usefulLifeMonths: asset.usefulLifeMonths || 36,
-    residualValue: asset.residualValue,
+    depreciationMethod: asset.depreciationMethod ?? "",
+    // Never invent a useful life: a blank field inherits the category policy.
+    usefulLifeMonths: asset.usefulLifeMonths ?? "",
+    residualValue: asset.residualValue ?? "",
     warrantyExpiryDate: asset.warrantyExpiryDate ? asset.warrantyExpiryDate.split("T")[0] : "",
     status: asset.status as AssetStatus,
     condition: asset.condition,
@@ -70,7 +72,29 @@ function formFromAsset(asset: Asset, baseCurrency: string): AssetDto {
     supplierId: asset.supplierId || "",
     purchaseOrderId: asset.purchaseOrderId || "",
     assignedUserId: asset.assignedUserId || "",
-  } as AssetDto;
+  } as unknown as AssetDto;
+}
+
+/** Options for a relation select, keeping the current value selectable even if it is not in the list. */
+function RelationOptions({
+  items,
+  current,
+  label,
+}: {
+  items: { id?: string; label: string }[];
+  current?: string;
+  label: string;
+}) {
+  const missing = Boolean(current) && !items.some((i) => i.id === current);
+  return (
+    <>
+      <option value="">None</option>
+      {missing ? <option value={current}>Current {label} (not in list)</option> : null}
+      {items.map((i) => (
+        <option key={i.id} value={i.id}>{i.label}</option>
+      ))}
+    </>
+  );
 }
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
@@ -105,22 +129,16 @@ export function AssetFormModal({
   }, [isOpen, editingAsset, reset, baseCurrency]);
 
   const onSubmit = async (data: AssetDto) => {
-    data.purchaseCost = Number(data.purchaseCost);
-    data.usefulLifeMonths = Number(data.usefulLifeMonths);
-    data.residualValue = Number(data.residualValue);
-    (Object.keys(data) as (keyof AssetDto)[]).forEach((key) => {
-      if (data[key] === "") delete (data as unknown as Record<string, unknown>)[key];
-    });
-
     if (editingAsset) {
-      const patch = buildPatchPayload<AssetDto>(editingAsset as unknown as Partial<AssetDto>, data);
+      // Emptied relation selects are sent as explicit clears; untouched fields are omitted.
+      const patch = buildAssetUpdate(editingAsset, data);
       if (Object.keys(patch).length === 0) {
         toast("No changes to update");
         return;
       }
       await saveAsset.mutateAsync({ id: editingAsset.id!, data: patch });
     } else {
-      await saveAsset.mutateAsync({ data });
+      await saveAsset.mutateAsync({ data: normaliseAssetForm(data) });
     }
     onClose();
   };
@@ -204,6 +222,7 @@ export function AssetFormModal({
             <div className="space-y-2">
               <Label htmlFor="depreciationMethod">Depreciation</Label>
               <Select id="depreciationMethod" {...register("depreciationMethod")}>
+                <option value="">Category policy</option>
                 {Object.values(DepreciationMethod).map((m) => (
                   <option key={m} value={m}>{m.replace(/_/g, " ")}</option>
                 ))}
@@ -211,13 +230,30 @@ export function AssetFormModal({
             </div>
             <div className="space-y-2">
               <Label htmlFor="usefulLifeMonths">Useful life (months)</Label>
-              <Input id="usefulLifeMonths" type="number" min="1" {...register("usefulLifeMonths")} />
+              <Input
+                id="usefulLifeMonths"
+                type="number"
+                min="1"
+                placeholder="Category policy"
+                {...register("usefulLifeMonths")}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="residualValue">Residual value</Label>
-              <Input id="residualValue" type="number" min="0" step="0.01" {...register("residualValue")} />
+              <Input
+                id="residualValue"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Category policy"
+                {...register("residualValue")}
+              />
             </div>
           </div>
+          <p className="text-xs text-muted-fg">
+            Leave depreciation blank to use the category&apos;s depreciation policy. Assets with no useful life
+            anywhere are carried at cost.
+          </p>
         </div>
 
         <div className="space-y-4">
@@ -252,37 +288,25 @@ export function AssetFormModal({
             <div className="space-y-2">
               <Label htmlFor="departmentId">Department</Label>
               <Select id="departmentId" {...register("departmentId")}>
-                <option value="">None</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
+                <RelationOptions items={departments.map((d) => ({ id: d.id, label: d.name }))} current={editingAsset?.departmentId} label="department" />
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="locationId">Location</Label>
               <Select id="locationId" {...register("locationId")}>
-                <option value="">None</option>
-                {locations.map((l) => (
-                  <option key={l.id} value={l.id}>{l.name}</option>
-                ))}
+                <RelationOptions items={locations.map((l) => ({ id: l.id, label: l.name }))} current={editingAsset?.locationId} label="location" />
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="supplierId">Supplier</Label>
               <Select id="supplierId" {...register("supplierId")}>
-                <option value="">None</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
+                <RelationOptions items={suppliers.map((s) => ({ id: s.id, label: s.name }))} current={editingAsset?.supplierId} label="supplier" />
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="purchaseOrderId">Purchase order</Label>
               <Select id="purchaseOrderId" {...register("purchaseOrderId")}>
-                <option value="">None</option>
-                {purchaseOrders.map((po) => (
-                  <option key={po.id} value={po.id}>{po.poNumber}</option>
-                ))}
+                <RelationOptions items={purchaseOrders.map((po) => ({ id: po.id, label: po.poNumber }))} current={editingAsset?.purchaseOrderId} label="purchase order" />
               </Select>
             </div>
           </div>
