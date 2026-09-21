@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import toast from "react-hot-toast";
 import type { Asset, DisposalRecord, DisposalsDto } from "@/types";
 import { Modal } from "@/components/ui/modal";
@@ -12,7 +12,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { buildPatchPayload } from "@/lib/patch";
 import { useSaveDisposal } from "@/features/disposals/hooks";
-import { useCurrency } from "@/contexts/CurrencyContext";
+import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 
 export function DisposalFormModal({
   isOpen,
@@ -25,8 +25,7 @@ export function DisposalFormModal({
   editingDisposal: DisposalRecord | null;
   assets: Asset[];
 }) {
-  const { baseCurrency } = useCurrency();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<DisposalsDto>();
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<DisposalsDto>();
   const save = useSaveDisposal();
 
   useEffect(() => {
@@ -39,6 +38,7 @@ export function DisposalFormModal({
             reason: editingDisposal.reason || "",
             disposalMethod: editingDisposal.disposalMethod || "SCRAP",
             saleValue: editingDisposal.saleValue || 0,
+            currency: editingDisposal.currency || "",
             complianceDocumentUrl: editingDisposal.complianceDocumentUrl || "",
           }
         : {
@@ -47,10 +47,14 @@ export function DisposalFormModal({
             reason: "",
             disposalMethod: "SCRAP",
             saleValue: 0,
+            currency: "",
             complianceDocumentUrl: "",
           },
     );
   }, [isOpen, editingDisposal, reset]);
+
+  const watchedAssetId = useWatch({ control, name: "assetId" });
+  const selectedAsset = assets.find((a) => a.id === watchedAssetId);
 
   const onSubmit = async (data: DisposalsDto) => {
     const rawSaleValue = data.saleValue as unknown;
@@ -68,6 +72,8 @@ export function DisposalFormModal({
       disposalMethod: data.disposalMethod,
       reason: data.reason || undefined,
       saleValue,
+      // Empty = the asset's own currency (the API fills it in).
+      currency: data.currency || undefined,
       complianceDocumentUrl: data.complianceDocumentUrl || undefined,
     };
 
@@ -135,10 +141,19 @@ export function DisposalFormModal({
           <Textarea id="dp-reason" placeholder="e.g. End of life, irreparable damage, obsolete" {...register("reason", { required: true })} />
         </div>
 
-        <div className="space-y-2 border-y border-edge-subtle py-4">
-          <Label htmlFor="dp-saleValue">Value recovered ({baseCurrency})</Label>
-          <Input id="dp-saleValue" type="number" step="0.01" min="0" placeholder="0.00" {...register("saleValue")} />
-          <p className="text-[11px] text-faint-fg">If the asset was sold or scrapped for cash.</p>
+        <div className="grid grid-cols-2 gap-4 border-y border-edge-subtle py-4">
+          <div className="space-y-2">
+            <Label htmlFor="dp-saleValue">Value recovered</Label>
+            <Input id="dp-saleValue" type="number" step="0.01" min="0" placeholder="0.00" {...register("saleValue")} />
+            <p className="text-[11px] text-faint-fg">If the asset was sold or scrapped for cash.</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dp-currency">Currency</Label>
+            <Select id="dp-currency" {...register("currency")}>
+              <option value="">{selectedAsset?.currency ? `Asset's currency (${selectedAsset.currency})` : "Asset's currency"}</option>
+              <CurrencyOptions current={editingDisposal?.currency ?? undefined} />
+            </Select>
+          </div>
         </div>
 
         <div className="space-y-2">
