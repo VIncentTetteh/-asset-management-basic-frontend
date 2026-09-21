@@ -6,12 +6,11 @@ import Link from "next/link";
 import { matchesRoute } from "@/lib/route-path";
 import { PageSpinner } from "@/components/ui/spinner";
 import { Sidebar } from "@/components/Sidebar";
-import { Button } from "@/components/ui/button";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { QueryProvider } from "@/components/QueryProvider";
-import { Modal } from "@/components/ui/modal";
+import { usePlanLimitNotices } from "@/components/billing/planLimitNotice";
 import { billingService } from "@/services/billingService";
 import { authService } from "@/services/authService";
 import { organisationService } from "@/services/organisationService";
@@ -84,8 +83,6 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const [orgName, setOrgName] = useState<string>("AssetIQ");
     const [userRole, setUserRole] = useState<string>("ROLE_USER");
     const [subscription, setSubscription] = useState<Subscription | null>(null);
-    const [isPlanLimitOpen, setIsPlanLimitOpen] = useState(false);
-    const [planLimitMessage, setPlanLimitMessage] = useState("");
 
     const { loading: permLoading, hasPermission } = usePermissions();
     const { isAuthenticated, isReady } = useAuth();
@@ -198,15 +195,9 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         return () => window.clearTimeout(timer);
     }, [pathname, router, isPublicPage, isMounted, isReady, isAuthenticated]);
 
-    useEffect(() => {
-        const onPlanLimit = (event: Event) => {
-            const detail = (event as CustomEvent<{ message?: string }>).detail;
-            setPlanLimitMessage(detail?.message || "You have reached your plan limits.");
-            setIsPlanLimitOpen(true);
-        };
-        window.addEventListener("plan-limit-error", onPlanLimit as EventListener);
-        return () => window.removeEventListener("plan-limit-error", onPlanLimit as EventListener);
-    }, []);
+    // Plan-limit 403s are a nudge, never a blocking modal: a toast with an
+    // Upgrade link, or (analytics) an inline card rendered by the page itself.
+    usePlanLimitNotices();
 
     // After permissions load, redirect away from any page this user isn't allowed to see.
     // This covers direct URL entry, page refresh, and Ctrl+K quick navigation.
@@ -332,20 +323,6 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                 </main>
             </div>
 
-            <Modal
-                isOpen={isPlanLimitOpen}
-                onClose={() => setIsPlanLimitOpen(false)}
-                title="Plan Limit Reached"
-                description="Your current subscription limits this action."
-            >
-                <div className="space-y-4">
-                    <p className="text-sm text-muted-fg">{planLimitMessage || "Upgrade your plan to continue this operation."}</p>
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setIsPlanLimitOpen(false)}>Close</Button>
-                        <Button onClick={() => { setIsPlanLimitOpen(false); router.push("/billing"); }}>Upgrade Plan</Button>
-                    </div>
-                </div>
-            </Modal>
             {commercialFeatures.governedAi ? <AiAssistant /> : null}
         </div>
     );

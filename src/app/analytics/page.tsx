@@ -1,14 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
     AlertTriangle,
     ArrowUpRight,
     BarChart3,
     DollarSign,
-    Lock,
     RefreshCw,
     ShoppingCart,
     TrendingUp,
@@ -25,6 +23,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { UpgradeCard } from "@/components/billing/UpgradeCard";
+import { isPlanLimitError } from "@/lib/plan-limit";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { cn } from "@/lib/utils";
 import { mergeCompleteness } from "@/lib/currency";
@@ -100,7 +100,6 @@ const EmptySection = ({ message }: { message: string }) => (
 
 export default function AnalyticsPage() {
     const { format: formatCurrency, formatCompact } = useCurrency();
-    const router = useRouter();
     const [period, setPeriod] = useState<Period>("month");
     const [groupBy, setGroupBy] = useState<GroupBy>("status");
     const [loading, setLoading] = useState(true);
@@ -136,11 +135,16 @@ export default function AnalyticsPage() {
             ] = results;
 
             const requiredResults = [assetResult, financialResult, purchaseOrderResult];
+            // A plan-limit 403 (Freemium) swaps the charts for an inline upgrade
+            // card; a permission 403 falls through to per-section "unavailable".
             const required403 = requiredResults.every(
                 result => result.status === "rejected" && getErrorStatus(result.reason) === 403
             );
+            const planLimited = requiredResults.some(
+                result => result.status === "rejected" && isPlanLimitError(result.reason)
+            );
 
-            if (required403) {
+            if (required403 && planLimited) {
                 setPaywall(true);
                 return;
             }
@@ -269,22 +273,15 @@ export default function AnalyticsPage() {
 
     if (paywall) {
         return (
-            <div className="flex h-[60vh] items-center justify-center">
-                <Card className="max-w-md border-warn/40 bg-warn-soft">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-warn">
-                            <Lock className="h-5 w-5" /> Analytics requires a paid plan
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <p className="text-sm text-warn">
-                            Upgrade your plan to unlock backend analytics for assets, finance, procurement, and trends.
-                        </p>
-                        <Button onClick={() => router.push("/billing")} className="bg-warn text-white hover:bg-warn/90">
-                            Go to Billing
-                        </Button>
-                    </CardContent>
-                </Card>
+            <div className="space-y-6">
+                <PageHeader
+                    title="Analytics"
+                    subtitle="Portfolio, finance, procurement, maintenance, and depreciation insights."
+                />
+                <UpgradeCard
+                    title="Analytics is available on paid plans"
+                    body="Upgrade to unlock analytics for assets, finance, procurement, maintenance, and depreciation trends. Everything else in your workspace keeps working on your current plan."
+                />
             </div>
         );
     }

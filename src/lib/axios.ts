@@ -1,5 +1,6 @@
 import axios from "axios";
 import { clearVerifiedOrganisationId, getOrganisationIdFromStorage } from "@/lib/authContext";
+import { PLAN_LIMIT_EVENT, isPlanLimitError, type PlanLimitDetail } from "@/lib/plan-limit";
 
 /**
  * Axios instance for all API requests.
@@ -94,15 +95,15 @@ async function refreshToken(): Promise<boolean> {
 api.interceptors.response.use((response) => response, async (error) => {
     const originalRequest = error.config;
 
-    if (typeof window !== "undefined" && error.response?.status === 403) {
-        const message = String(error.response?.data?.message || "").toLowerCase();
-        if (message.includes("plan") || message.includes("subscription") || message.includes("limit")) {
-            window.dispatchEvent(new CustomEvent("plan-limit-error", {
-                detail: { message: error.response?.data?.message || "Plan limit reached" },
-            }));
-            return Promise.reject(error);
-        }
-
+    if (typeof window !== "undefined" && isPlanLimitError(error)) {
+        // Announce it; the app shell decides how (never a blocking modal).
+        const detail: PlanLimitDetail = {
+            message: error.response?.data?.message || "Plan limit reached",
+            url: originalRequest?.url,
+            method: originalRequest?.method?.toUpperCase(),
+        };
+        window.dispatchEvent(new CustomEvent<PlanLimitDetail>(PLAN_LIMIT_EVENT, { detail }));
+        return Promise.reject(error);
     }
 
     const isRefreshRequest = String(originalRequest?.url ?? "").includes("/auth/refresh");
