@@ -10,28 +10,13 @@ const withOrgParams = (params?: Record<string, string | number | boolean | undef
     organisationId: getOrgId(),
 });
 
-type LicenseApiRecord = SoftwareLicense & { name?: string };
+// The API returns SoftwareLicenseDto verbatim (name, vendor, totalSeats, usedSeats,
+// purchaseCost, annualRenewalCost, ...); these pass it through unchanged.
+const normalizeLicense = (license: SoftwareLicense): SoftwareLicense => license;
 
-const normalizeLicense = (license: LicenseApiRecord): SoftwareLicense => {
-    return {
-        ...license,
-        productName: license.productName ?? license.name ?? "",
-    };
-};
+const normalizeLicenseList = (data: unknown): SoftwareLicense[] => extractList<SoftwareLicense>(data);
 
-const normalizeLicenseList = (data: unknown): SoftwareLicense[] => {
-    const list = extractList<LicenseApiRecord>(data);
-    return list.map(normalizeLicense);
-};
-
-const normalizePayload = (data: Partial<SoftwareLicenseDto>) => {
-    const payload: Record<string, unknown> = { ...data };
-    if (payload.productName && !payload.name) {
-        payload.name = payload.productName;
-    }
-    delete payload.productName;
-    return payload;
-};
+const normalizePayload = (data: Partial<SoftwareLicenseDto>) => ({ ...data });
 
 export const licenseService = {
     /** POST /licenses */

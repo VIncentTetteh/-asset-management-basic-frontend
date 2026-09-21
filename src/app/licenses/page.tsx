@@ -2,13 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import toast from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Key, AlertTriangle, Users } from "lucide-react";
-import type { SoftwareLicense, SoftwareLicenseDto, LicenseType, LicenseStatus } from "@/types";
+import { LICENSE_TYPES, type SoftwareLicense, type SoftwareLicenseDto, type LicenseStatus } from "@/types";
 import { licenseService } from "@/services/licenseService";
-import { supplierService } from "@/services/supplierService";
-import { qk } from "@/lib/queryClient";
+import { applyApiFieldErrors } from "@/lib/api-validation";
+import { buildLicensePayload, type LicenseForm } from "@/features/finance/payloads";
 import { makeCrudHooks } from "@/features/shared/crudHooks";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -19,18 +18,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { cn } from "@/lib/utils";
 
-const LICENSE_TYPES: LicenseType[] = ["SUBSCRIPTION", "PERPETUAL", "VOLUME", "NODE_LOCKED", "OPEN_SOURCE", "TRIAL", "ENTERPRISE", "OEM"];
 const LICENSE_STATUSES: LicenseStatus[] = ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "SUSPENDED", "CANCELLED"];
 
 type ViewType = "all" | "expiring" | "over-allocated";
 
-const licenses = makeCrudHooks<SoftwareLicense, SoftwareLicenseDto>("licenses", licenseService, { entity: "License" });
+// Edits are a full PUT (replace) so emptied fields clear; see licenseService.update.
+const licenses = makeCrudHooks<SoftwareLicense, SoftwareLicenseDto>("licenses", {
+  ...licenseService,
+  update: (id, data) => licenseService.replace(id, data as SoftwareLicenseDto),
+}, {
+  entity: "License",
+  fields: { name: "License name", totalSeats: "Total seats", usedSeats: "Seats in use" },
+});
 
 function SeatBar({ seats, allocated }: { seats: number; allocated: number }) {
   const pct = seats > 0 ? Math.min((allocated / seats) * 100, 100) : 0;
@@ -72,12 +76,6 @@ export default function LicensesPage() {
     queryKey: [...licenses.key.all, "utilization"],
     queryFn: () => licenseService.getUtilization(),
   });
-  const { data: suppliers = [] } = useQuery({
-    queryKey: qk.module("suppliers").list(),
-    queryFn: () => supplierService.getAll(),
-    staleTime: 300_000,
-  });
-
   const rows = view === "expiring" ? expiringRows : view === "over-allocated" ? overRows : allRows;
   const isLoading = view === "expiring" ? expLoading : view === "over-allocated" ? overLoading : allLoading;
 
@@ -88,26 +86,41 @@ export default function LicensesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<SoftwareLicense | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<SoftwareLicenseDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<LicenseForm>();
 
   useEffect(() => {
     if (!isModalOpen) return;
     reset(
       editing
         ? {
-            productName: editing.productName,
+            name: editing.name,
+            vendor: editing.vendor || "",
+            productName: editing.productName || "",
+            version: editing.version || "",
             licenseType: editing.licenseType,
             status: editing.status,
-            vendor: editing.vendor || "",
-            seats: editing.seats,
-            allocatedSeats: editing.allocatedSeats,
+            totalSeats: editing.totalSeats ?? "",
+            usedSeats: editing.usedSeats ?? "",
             purchaseDate: editing.purchaseDate || "",
             expiryDate: editing.expiryDate || "",
-            monthlyCost: editing.monthlyCost ?? undefined,
+            renewalDate: editing.renewalDate || "",
+            purchaseCost: editing.purchaseCost ?? "",
+            annualRenewalCost: editing.annualRenewalCost ?? "",
             currency: editing.currency || baseCurrency,
-            supplierId: editing.supplierId || "",
+            autoRenew: editing.autoRenew ?? false,
+            notes: editing.notes || "",
           }
-        : { productName: "", licenseType: "SUBSCRIPTION", status: "ACTIVE", seats: 1, allocatedSeats: 0, currency: baseCurrency },
+        : {
+            name: "",
+            vendor: "",
+            productName: "",
+            licenseType: "SUBSCRIPTION",
+            status: "ACTIVE",
+            totalSeats: 1,
+            usedSeats: 0,
+            currency: baseCurrency,
+            autoRenew: false,
+          },
     );
   }, [isModalOpen, editing, reset, baseCurrency]);
 
@@ -117,44 +130,31 @@ export default function LicensesPage() {
   };
 
   const handleDelete = async (license: SoftwareLicense) => {
-    if (!(await confirm({ message: `Delete "${license.productName}"?`, variant: "danger" }))) return;
+    if (!(await confirm({ message: `Delete "${license.name}"?`, variant: "danger" }))) return;
     remove.mutate(license.id);
   };
 
-  const onSubmit = async (data: SoftwareLicenseDto) => {
-    const payload: SoftwareLicenseDto = {
-      ...data,
-      seats: Number(data.seats),
-      allocatedSeats: Number(data.allocatedSeats),
-      monthlyCost: data.monthlyCost != null && String(data.monthlyCost) !== "" ? Number(data.monthlyCost) : undefined,
-    };
-    (Object.keys(payload) as (keyof SoftwareLicenseDto)[]).forEach((k) => {
-      if (payload[k] === "") delete (payload as unknown as Record<string, unknown>)[k];
-    });
-
-    if (editing) {
-      const patch = buildPatchPayload<SoftwareLicenseDto>(editing as unknown as Partial<SoftwareLicenseDto>, payload);
-      if (Object.keys(patch).length === 0) {
-        toast("No changes to update");
-        return;
-      }
-      await save.mutateAsync({ id: editing.id, data: patch as SoftwareLicenseDto });
-    } else {
-      await save.mutateAsync({ data: payload });
+  const onSubmit = async (data: LicenseForm) => {
+    try {
+      await save.mutateAsync({ id: editing?.id, data: buildLicensePayload(data) });
+      setIsModalOpen(false);
+    } catch (err) {
+      applyApiFieldErrors(err, setError); // the save hook already toasted the field list
     }
-    setIsModalOpen(false);
   };
 
   const columns = useMemo<ColumnDef<SoftwareLicense, unknown>[]>(
     () => [
       {
-        accessorKey: "productName",
-        header: "Product",
+        accessorKey: "name",
+        header: "License",
         cell: ({ row }) => (
           <div className="min-w-0 max-w-56">
-            <p className="truncate font-semibold text-foreground">{row.original.productName}</p>
+            <p className="truncate font-semibold text-foreground">{row.original.name}</p>
             <p className="truncate text-xs text-faint-fg">
-              {row.original.vendor || "—"} · {String(row.original.licenseType ?? "").replace(/_/g, " ").toLowerCase()}
+              {row.original.vendor || "—"}
+              {row.original.productName ? ` · ${row.original.productName}` : ""} ·{" "}
+              {String(row.original.licenseType ?? "").replace(/_/g, " ").toLowerCase()}
             </p>
           </div>
         ),
@@ -163,7 +163,12 @@ export default function LicensesPage() {
         id: "seats",
         header: "Seats",
         enableSorting: false,
-        cell: ({ row }) => <SeatBar seats={row.original.seats} allocated={row.original.allocatedSeats} />,
+        cell: ({ row }) =>
+          row.original.totalSeats != null ? (
+            <SeatBar seats={row.original.totalSeats} allocated={row.original.usedSeats ?? 0} />
+          ) : (
+            <span className="text-faint-fg">—</span>
+          ),
       },
       {
         accessorKey: "expiryDate",
@@ -175,11 +180,22 @@ export default function LicensesPage() {
         ),
       },
       {
-        accessorKey: "monthlyCost",
-        header: () => <span className="block text-right">Monthly</span>,
+        accessorKey: "annualRenewalCost",
+        header: () => <span className="block text-right">Annual renewal</span>,
         cell: ({ row }) => (
           <span className="data-mono block text-right">
-            {row.original.monthlyCost != null ? format(row.original.monthlyCost, row.original.currency || baseCurrency) : "—"}
+            {row.original.annualRenewalCost != null
+              ? format(row.original.annualRenewalCost, row.original.currency || baseCurrency)
+              : "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "purchaseCost",
+        header: () => <span className="block text-right">Purchase cost</span>,
+        cell: ({ row }) => (
+          <span className="data-mono block text-right text-muted-fg">
+            {row.original.purchaseCost != null ? format(row.original.purchaseCost, row.original.currency || baseCurrency) : "—"}
           </span>
         ),
       },
@@ -273,9 +289,9 @@ export default function LicensesPage() {
                 </div>
               </div>
               <div>
-                <p className="text-[11px] uppercase tracking-[0.06em] text-faint-fg">Allocated / total seats</p>
+                <p className="text-[11px] uppercase tracking-[0.06em] text-faint-fg">Seats in use / total</p>
                 <p className="data-mono text-lg font-bold text-foreground">
-                  {utilization.totalAllocated} / {utilization.totalSeats}
+                  {utilization.usedSeats} / {utilization.totalSeats}
                 </p>
               </div>
             </CardContent>
@@ -306,15 +322,27 @@ export default function LicensesPage() {
       >
         <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
-            <Label htmlFor="lic-name">Product name <span className="text-danger">*</span></Label>
-            <Input id="lic-name" placeholder="Microsoft 365 E3" {...register("productName", { required: "Product name is required" })} />
-            {errors.productName && <p className="text-sm text-danger">{errors.productName.message as string}</p>}
+            <Label htmlFor="lic-name">License name <span className="text-danger">*</span></Label>
+            <Input id="lic-name" placeholder="Microsoft 365 E3 — Finance" {...register("name", { required: "License name is required" })} />
+            {errors.name && <p className="text-sm text-danger">{errors.name.message as string}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="lic-type">Type</Label>
-              <Select id="lic-type" {...register("licenseType")}>
+              <Label htmlFor="lic-vendor">Vendor <span className="text-danger">*</span></Label>
+              <Input id="lic-vendor" placeholder="Microsoft" {...register("vendor", { required: "Vendor is required" })} />
+              {errors.vendor && <p className="text-sm text-danger">{errors.vendor.message as string}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lic-product">Product</Label>
+              <Input id="lic-product" placeholder="Microsoft 365 E3" {...register("productName")} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="lic-type">Type <span className="text-danger">*</span></Label>
+              <Select id="lic-type" {...register("licenseType", { required: "License type is required" })}>
                 {LICENSE_TYPES.map((t) => (
                   <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
                 ))}
@@ -330,38 +358,20 @@ export default function LicensesPage() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="lic-key">License key</Label>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="lic-vendor">Vendor</Label>
-              <Input id="lic-vendor" placeholder="Microsoft" {...register("vendor")} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lic-supplier">Supplier</Label>
-              <Select id="lic-supplier" {...register("supplierId")}>
-                <option value="">— None —</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </Select>
-            </div>
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="lic-seats">Total seats</Label>
-              <Input id="lic-seats" type="number" min="1" {...register("seats", { required: true, min: 1 })} />
+              <Input id="lic-seats" type="number" min="0" {...register("totalSeats", { min: { value: 0, message: "Cannot be negative" } })} />
+              {errors.totalSeats && <p className="text-sm text-danger">{errors.totalSeats.message as string}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lic-alloc">Allocated seats</Label>
-              <Input id="lic-alloc" type="number" min="0" {...register("allocatedSeats", { min: 0 })} />
+              <Label htmlFor="lic-used">Seats in use</Label>
+              <Input id="lic-used" type="number" min="0" {...register("usedSeats", { min: { value: 0, message: "Cannot be negative" } })} />
+              {errors.usedSeats && <p className="text-sm text-danger">{errors.usedSeats.message as string}</p>}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="lic-purchase">Purchase date</Label>
               <Input id="lic-purchase" type="date" {...register("purchaseDate")} />
@@ -370,12 +380,20 @@ export default function LicensesPage() {
               <Label htmlFor="lic-expiry">Expiry date</Label>
               <Input id="lic-expiry" type="date" {...register("expiryDate")} />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="lic-renewal">Renewal date</Label>
+              <Input id="lic-renewal" type="date" {...register("renewalDate")} />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="lic-cost">Monthly cost</Label>
-              <Input id="lic-cost" type="number" step="0.01" min="0" {...register("monthlyCost")} />
+              <Label htmlFor="lic-cost">Purchase cost</Label>
+              <Input id="lic-cost" type="number" step="0.01" min="0" {...register("purchaseCost")} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lic-renewal-cost">Annual renewal</Label>
+              <Input id="lic-renewal-cost" type="number" step="0.01" min="0" {...register("annualRenewalCost")} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lic-currency">Currency</Label>
@@ -383,6 +401,16 @@ export default function LicensesPage() {
                 <CurrencyOptions current={editing?.currency} />
               </Select>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="lic-autorenew"
+              className="ea-focus rounded border-edge accent-[var(--primary)]"
+              {...register("autoRenew")}
+            />
+            <Label htmlFor="lic-autorenew" className="cursor-pointer">Auto-renews</Label>
           </div>
 
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">

@@ -419,23 +419,33 @@ export interface PurchaseOrder extends BaseEntity {
     poNumber: string;
     totalAmount: number;
     currency?: string;
+    /** Server-owned: changed only through submit/approve/reject/receive/cancel. */
     status?: POStatus | string;
     remarks?: string;
     organisationId?: string;
     departmentId?: string;
     supplierId?: string;
+    /** Budget the order commits against on approval and spends on receipt. */
+    linkedBudgetId?: string | null;
+    requestedById?: string | null;
+    approvedById?: string | null;
+    rejectedById?: string | null;
+    approvedAt?: string | null;
+    rejectedAt?: string | null;
 }
 
+/** Create/replace body. Status is not client-editable; use the workflow endpoints. */
 export interface PurchaseOrderDto {
     id?: string;
     poNumber: string;             // required, unique within org
     totalAmount: number;          // required
     currency?: string;
-    status?: POStatus | string;
     remarks?: string;
     departmentId: string;         // required
     supplierId: string;           // required
-    organisationId: string;
+    /** null unlinks the budget on PUT. */
+    linkedBudgetId?: string | null;
+    organisationId?: string;
 }
 
 // ─── Maintenance ──────────────────────────────────────────────────────────────
@@ -573,6 +583,8 @@ export interface DisposalsDto {
     disposalMethod: DisposalMethod | string;  // required
     disposalDate: string;         // required
     saleValue?: number;
+    /** ISO code of saleValue; the API defaults it to the asset's currency. */
+    currency?: string;
     approvedById?: string;        // server-assigned from the authenticated session
     reason?: string;
     complianceDocumentUrl?: string;
@@ -1516,47 +1528,67 @@ export interface RegulatoryFilingDto {
 
 // ─── Software Licenses ───────────────────────────────────────────────────────
 
-export type LicenseType = "SUBSCRIPTION" | "PERPETUAL" | "VOLUME" | "NODE_LOCKED" | "OPEN_SOURCE" | "TRIAL" | "ENTERPRISE" | "OEM";
+/** Mirrors com.assetiq.enums.LicenseType. */
+export const LICENSE_TYPES = ["PERPETUAL", "SUBSCRIPTION", "VOLUME", "OPEN_SOURCE", "TRIAL", "ENTERPRISE", "OEM"] as const;
+export type LicenseType = (typeof LICENSE_TYPES)[number];
 export type LicenseStatus = "ACTIVE" | "EXPIRING_SOON" | "EXPIRED" | "SUSPENDED" | "CANCELLED";
 
+/** Mirrors com.assetiq.dto.SoftwareLicenseDto. */
 export interface SoftwareLicense {
     id: string;
-    productName: string;
+    name: string;
+    vendor: string;
+    productName?: string | null;
+    version?: string | null;
     licenseType: LicenseType;
     status: LicenseStatus;
-    vendor?: string | null;
-    seats: number;
-    allocatedSeats: number;
+    totalSeats?: number | null;
+    usedSeats?: number | null;
+    /** Computed by the API: totalSeats - usedSeats. */
+    availableSeats?: number | null;
+    purchaseCost?: number | null;
+    annualRenewalCost?: number | null;
+    currency?: string | null;
     purchaseDate?: string | null;
     expiryDate?: string | null;
-    monthlyCost?: number | null;
-    currency?: string | null;
-    supplierId?: string | null;
+    renewalDate?: string | null;
+    autoRenew?: boolean | null;
+    licenseDocumentUrl?: string | null;
+    notes?: string | null;
+    assetId?: string | null;
     organisationId?: string | null;
-    createdAt: string;
-    updatedAt: string;
+    daysUntilExpiry?: number | null;
 }
 
 export interface SoftwareLicenseDto {
-    productName: string;
-    licenseType: LicenseType;
+    name: string;                 // required
+    vendor: string;               // required
+    productName?: string | null;
+    version?: string | null;
+    licenseType: LicenseType;     // required
     status?: LicenseStatus;
-    vendor?: string | null;
-    seats: number;
-    allocatedSeats?: number;
+    totalSeats?: number | null;
+    usedSeats?: number | null;
+    purchaseCost?: number | null;
+    annualRenewalCost?: number | null;
+    currency?: string | null;
     purchaseDate?: string | null;
     expiryDate?: string | null;
-    monthlyCost?: number | null;
-    currency?: string | null;
-    supplierId?: string | null;
+    renewalDate?: string | null;
+    autoRenew?: boolean | null;
+    notes?: string | null;
 }
 
+/** GET /licenses/utilization */
 export interface LicenseUtilization {
     totalLicenses: number;
+    activeLicenses: number;
     totalSeats: number;
-    totalAllocated: number;
+    usedSeats: number;
+    availableSeats: number;
     utilizationPct: number;
-    overAllocatedCount: number;
+    expiringSoon30Days: number;
+    overAllocated: number;
 }
 
 // ─── Contracts ────────────────────────────────────────────────────────────────
@@ -1576,7 +1608,8 @@ export interface Contract {
     value: number;
     currency?: string | null;
     autoRenew: boolean;
-    terms?: string | null;
+    /** Key terms / free-text notes (API field `notes`). */
+    notes?: string | null;
     organisationId?: string | null;
     createdAt: string;
     updatedAt: string;
@@ -1592,7 +1625,7 @@ export interface ContractDto {
     value: number;
     currency?: string | null;
     autoRenew?: boolean;
-    terms?: string | null;
+    notes?: string | null;
 }
 
 // ─── Expenses ─────────────────────────────────────────────────────────────────
@@ -1674,6 +1707,9 @@ export interface BudgetSummary extends MoneyAggregateMeta {
     byDepartment:    BudgetDepartmentSummary[];
 }
 
+/** Mirrors com.assetiq.enums.BudgetStatus. EXCEEDED is set by the API from the figures. */
+export const BUDGET_STATUSES = ["DRAFT", "ACTIVE", "EXCEEDED", "CLOSED"] as const;
+
 export interface BudgetDto {
     name: string;
     status?: BudgetStatus;
@@ -1681,8 +1717,31 @@ export interface BudgetDto {
     currency?: string | null;
     fiscalYear?: number | null;
     departmentId?: string | null;
-    periodStart?: string | null;
-    periodEnd?: string | null;
+    periodStart: string;          // required by the API
+    periodEnd: string;            // required by the API
+    alertThresholdPct?: number | null;
+}
+
+export type BudgetLedgerKind =
+    | "ADJUSTMENT"
+    | "PO_COMMIT" | "PO_RELEASE" | "PO_SPEND" | "PO_SPEND_REVERSAL"
+    | "EXPENSE_COMMIT" | "EXPENSE_RELEASE" | "EXPENSE_SPEND" | "EXPENSE_SPEND_REVERSAL";
+
+/** GET /budgets/{id}/ledger row. amount is positive; the deltas are signed. */
+export interface BudgetLedgerEntry {
+    id: string;
+    kind: BudgetLedgerKind;
+    amount: number;
+    currency: string;
+    spentDelta: number;
+    committedDelta: number;
+    spentAfter: number;
+    committedAfter: number;
+    sourceType: "PURCHASE_ORDER" | "EXPENSE" | "ADJUSTMENT" | string;
+    sourceId?: string | null;
+    actorEmail?: string | null;
+    note?: string | null;
+    createdAt: string;
 }
 
 export interface BudgetSpendDto {

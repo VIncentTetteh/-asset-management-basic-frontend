@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { Budget, BudgetDto, BudgetSpendDto, BudgetSummary, Expense } from "@/types";
+import { Budget, BudgetDto, BudgetLedgerEntry, BudgetSpendDto, BudgetSummary, Expense } from "@/types";
 import { extractList } from "@/services/responseUtils";
 
 export const budgetService = {
@@ -54,6 +54,12 @@ export const budgetService = {
     getExpenses: async (id: string, page = 0, size = 20): Promise<{ total: number; limit: number; offset: number; items: Expense[] }> => {
         const response = await api.get(`/budgets/${id}/expenses`, { params: { page, size } });
         return response.data;
+    },
+
+    /** GET /budgets/{id}/ledger — commitments, spend, releases and adjustments, oldest first. */
+    getLedger: async (id: string): Promise<BudgetLedgerEntry[]> => {
+        const response = await api.get(`/budgets/${id}/ledger`);
+        return extractList<BudgetLedgerEntry>(response.data);
     },
 
     /** POST /budgets/{id}/adjustment */

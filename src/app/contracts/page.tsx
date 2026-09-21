@@ -20,6 +20,8 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { buildPatchPayload } from "@/lib/patch";
+import { applyApiFieldErrors } from "@/lib/api-validation";
+import { buildContractPayload, type ContractForm } from "@/features/finance/payloads";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
@@ -29,7 +31,10 @@ import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 const CONTRACT_TYPES = ["PURCHASE", "LEASE", "MAINTENANCE", "SERVICE_LEVEL_AGREEMENT", "WARRANTY", "INSURANCE", "OTHER"];
 const CONTRACT_STATUSES = ["DRAFT", "ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATED", "RENEWED"];
 
-const contracts = makeCrudHooks<Contract, ContractDto>("contracts", contractService, { entity: "Contract" });
+const contracts = makeCrudHooks<Contract, ContractDto>("contracts", contractService, {
+  entity: "Contract",
+  fields: { notes: "Key terms", startDate: "Start date", endDate: "End date" },
+});
 
 export default function ContractsPage() {
   const { format, baseCurrency, sum } = useCurrency();
@@ -56,7 +61,7 @@ export default function ContractsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ContractDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<ContractForm>();
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -72,9 +77,19 @@ export default function ContractsPage() {
             value: editing.value,
             currency: editing.currency || baseCurrency,
             autoRenew: editing.autoRenew,
-            terms: editing.terms || "",
+            notes: editing.notes || "",
           }
-        : { title: "", contractType: "MAINTENANCE", status: "DRAFT", value: 0, currency: baseCurrency, autoRenew: false },
+        : {
+            title: "",
+            contractType: "MAINTENANCE",
+            status: "DRAFT",
+            value: 0,
+            currency: baseCurrency,
+            autoRenew: false,
+            startDate: "",
+            endDate: "",
+            notes: "",
+          },
     );
   }, [isModalOpen, editing, reset, baseCurrency]);
 
@@ -93,22 +108,23 @@ export default function ContractsPage() {
     remove.mutate(contract.id);
   };
 
-  const onSubmit = async (data: ContractDto) => {
-    const payload = { ...data, value: Number(data.value) };
-    (Object.keys(payload) as (keyof ContractDto)[]).forEach((k) => {
-      if (payload[k] === "") delete (payload as Partial<ContractDto>)[k];
-    });
-    if (editing) {
-      const patch = buildPatchPayload<ContractDto>(editing as unknown as Partial<ContractDto>, payload);
-      if (Object.keys(patch).length === 0) {
-        toast("No changes to update");
-        return;
+  const onSubmit = async (data: ContractForm) => {
+    const payload = buildContractPayload(data);
+    try {
+      if (editing) {
+        const patch = buildPatchPayload<ContractDto>(editing as unknown as Partial<ContractDto>, payload);
+        if (Object.keys(patch).length === 0) {
+          toast("No changes to update");
+          return;
+        }
+        await save.mutateAsync({ id: editing.id, data: patch as ContractDto });
+      } else {
+        await save.mutateAsync({ data: payload });
       }
-      await save.mutateAsync({ id: editing.id, data: patch as ContractDto });
-    } else {
-      await save.mutateAsync({ data: payload });
+      setIsModalOpen(false);
+    } catch (err) {
+      applyApiFieldErrors(err, setError); // the save hook already toasted the field list
     }
-    setIsModalOpen(false);
   };
 
   const columns = useMemo<ColumnDef<Contract, unknown>[]>(
@@ -299,12 +315,22 @@ export default function ContractsPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="ct-start">Start date</Label>
-              <Input id="ct-start" type="date" {...register("startDate")} />
+              <Label htmlFor="ct-start">Start date <span className="text-danger">*</span></Label>
+              <Input id="ct-start" type="date" {...register("startDate", { required: "Start date is required" })} />
+              {errors.startDate && <p className="text-sm text-danger">{errors.startDate.message as string}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ct-end">End date</Label>
-              <Input id="ct-end" type="date" {...register("endDate")} />
+              <Label htmlFor="ct-end">End date <span className="text-danger">*</span></Label>
+              <Input
+                id="ct-end"
+                type="date"
+                {...register("endDate", {
+                  required: "End date is required",
+                  validate: (end, form) =>
+                    !end || !form.startDate || String(end) >= String(form.startDate) || "Must be on or after the start date",
+                })}
+              />
+              {errors.endDate && <p className="text-sm text-danger">{errors.endDate.message as string}</p>}
             </div>
           </div>
 
@@ -335,7 +361,7 @@ export default function ContractsPage() {
 
           <div className="space-y-2">
             <Label htmlFor="ct-terms">Key terms</Label>
-            <Textarea id="ct-terms" placeholder="Coverage, exclusions, notice period…" {...register("terms")} />
+            <Textarea id="ct-terms" placeholder="Coverage, exclusions, notice period…" {...register("notes")} />
           </div>
 
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">

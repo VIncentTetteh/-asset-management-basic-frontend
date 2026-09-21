@@ -7,6 +7,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Home, AlertTriangle, Ban, Search } from "lucide-react";
 import { leaseRecordService, type LeaseRecordDto, type LeaseStatus } from "@/services/leaseRecordService";
 import { assetService } from "@/services/assetService";
+import { supplierService } from "@/services/supplierService";
+import { reportApiError } from "@/lib/api-validation";
+import { buildLeasePayload, type LeaseForm } from "@/features/finance/payloads";
 import { qk } from "@/lib/queryClient";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -24,7 +27,6 @@ import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 
-type FormData = Omit<LeaseRecordDto, "id" | "organisationId" | "createdAt" | "status">;
 
 const LEASE_STATUSES: LeaseStatus[] = ["ACTIVE", "PENDING_RENEWAL", "EXPIRED", "TERMINATED"];
 
@@ -47,17 +49,22 @@ export default function LeasesPage() {
     queryFn: () => assetService.getAll(),
     staleTime: 300_000,
   });
+  // The lessor is a supplier record, not free text: the API needs its id.
+  const { data: suppliers = [] } = useQuery({
+    queryKey: qk.module("suppliers").list(),
+    queryFn: () => supplierService.getAll(),
+    staleTime: 300_000,
+  });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: leasesKey.all });
 
   const saveLease = useMutation({
-    mutationFn: ({ id, data }: { id?: string; data: FormData }) =>
+    mutationFn: ({ id, data }: { id?: string; data: Partial<LeaseRecordDto> }) =>
       id ? leaseRecordService.update(id, data) : leaseRecordService.create(data),
     onSuccess: (_res, vars) => {
       toast.success(vars.id ? "Lease updated" : "Lease created");
       invalidate();
     },
-    onError: () => toast.error("Failed to save lease"),
   });
   const deleteLease = useMutation({
     mutationFn: (id: string) => leaseRecordService.delete(id),
@@ -65,7 +72,7 @@ export default function LeasesPage() {
       toast.success("Lease deleted");
       invalidate();
     },
-    onError: () => toast.error("Failed to delete lease"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to delete lease" }),
   });
   const terminateLease = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) => leaseRecordService.terminate(id, reason),
@@ -73,7 +80,7 @@ export default function LeasesPage() {
       toast.success("Lease terminated");
       invalidate();
     },
-    onError: () => toast.error("Failed to terminate lease"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to terminate lease" }),
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -83,7 +90,7 @@ export default function LeasesPage() {
   const [terminating, setTerminating] = useState<LeaseRecordDto | null>(null);
   const [terminateReason, setTerminateReason] = useState("");
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<LeaseForm>();
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -91,7 +98,7 @@ export default function LeasesPage() {
       editing
         ? {
             assetId: editing.assetId || "",
-            lessorName: editing.lessorName || "",
+            lessorId: editing.lessorId || "",
             startDate: editing.startDate?.split("T")[0] || "",
             endDate: editing.endDate?.split("T")[0] || "",
             monthlyPayment: editing.monthlyPayment || 0,
@@ -102,7 +109,7 @@ export default function LeasesPage() {
           }
         : {
             assetId: "",
-            lessorName: "",
+            lessorId: "",
             startDate: "",
             endDate: "",
             monthlyPayment: 0,
@@ -143,12 +150,13 @@ export default function LeasesPage() {
     deleteLease.mutate(lease.id!);
   };
 
-  const onSubmit = async (data: FormData) => {
-    await saveLease.mutateAsync({
-      id: editing?.id,
-      data: { ...data, monthlyPayment: Number(data.monthlyPayment), noticePeriodDays: Number(data.noticePeriodDays) },
-    });
-    setIsModalOpen(false);
+  const onSubmit = async (data: LeaseForm) => {
+    try {
+      await saveLease.mutateAsync({ id: editing?.id, data: buildLeasePayload(data) });
+      setIsModalOpen(false);
+    } catch (err) {
+      reportApiError(err, { fallback: "Failed to save lease", setError, labels: { lessorId: "Lessor" } });
+    }
   };
 
   const handleTerminate = async () => {
@@ -362,18 +370,36 @@ export default function LeasesPage() {
 
           <div className="space-y-2">
             <Label htmlFor="ls-lessor">Lessor <span className="text-danger">*</span></Label>
-            <Input id="ls-lessor" placeholder="Leasing company name" {...register("lessorName", { required: "Lessor is required" })} />
-            {errors.lessorName && <p className="text-sm text-danger">{errors.lessorName.message as string}</p>}
+            <Select id="ls-lessor" {...register("lessorId", { required: "Choose the supplier you lease from" })}>
+              <option value="">Select supplier</option>
+              {suppliers.map((sup) => (
+                <option key={sup.id} value={sup.id}>{sup.name}</option>
+              ))}
+            </Select>
+            {suppliers.length === 0 ? (
+              <p className="text-xs text-muted-fg">Add the leasing company under Suppliers first.</p>
+            ) : null}
+            {errors.lessorId && <p className="text-sm text-danger">{errors.lessorId.message as string}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ls-start">Start date <span className="text-danger">*</span></Label>
-              <Input id="ls-start" type="date" {...register("startDate", { required: true })} />
+              <Input id="ls-start" type="date" {...register("startDate", { required: "Start date is required" })} />
+              {errors.startDate && <p className="text-sm text-danger">{errors.startDate.message as string}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="ls-end">End date <span className="text-danger">*</span></Label>
-              <Input id="ls-end" type="date" {...register("endDate", { required: true })} />
+              <Input
+                id="ls-end"
+                type="date"
+                {...register("endDate", {
+                  required: "End date is required",
+                  validate: (end, form) =>
+                    !end || !form.startDate || String(end) >= String(form.startDate) || "Must be on or after the start date",
+                })}
+              />
+              {errors.endDate && <p className="text-sm text-danger">{errors.endDate.message as string}</p>}
             </div>
           </div>
 

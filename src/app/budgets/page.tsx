@@ -5,10 +5,11 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Wallet, Receipt, History, Search, ListTree } from "lucide-react";
-import type { Budget, BudgetDto, Expense, AuditEvent } from "@/types";
+import { BUDGET_STATUSES, type Budget, type BudgetLedgerKind, type Expense } from "@/types";
 import { budgetService } from "@/services/budgetService";
 import { departmentService } from "@/services/departmentService";
-import { auditEventService } from "@/services/auditEventService";
+import { reportApiError } from "@/lib/api-validation";
+import { buildBudgetPayload, budgetAvailable, type BudgetForm } from "@/features/finance/payloads";
 import { qk } from "@/lib/queryClient";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -21,27 +22,51 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PageSpinner } from "@/components/ui/spinner";
-import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue, moneyTotalText } from "@/components/currency/MoneyTotalValue";
 
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Draft (not open for spend)",
+  ACTIVE: "Active",
+  EXCEEDED: "Exceeded (set automatically)",
+  CLOSED: "Closed",
+};
+
+const LEDGER_LABELS: Record<BudgetLedgerKind, string> = {
+  ADJUSTMENT: "Adjustment",
+  PO_COMMIT: "PO approved — committed",
+  PO_RELEASE: "PO cancelled — commitment released",
+  PO_SPEND: "PO received — spent",
+  PO_SPEND_REVERSAL: "PO deleted — spend reversed",
+  EXPENSE_COMMIT: "Expense submitted — committed",
+  EXPENSE_RELEASE: "Expense rejected/deleted — released",
+  EXPENSE_SPEND: "Expense approved — spent",
+  EXPENSE_SPEND_REVERSAL: "Expense deleted — spend reversed",
+};
+
+/** Spent (solid) and committed (lighter) against the allocation. */
 function UtilisationBar({ budget }: { budget: Budget }) {
   const total = budget.totalAmount || 0;
   const spent = budget.spentAmount || 0;
-  const pct = total > 0 ? Math.min((spent / total) * 100, 100) : 0;
+  const committed = budget.committedAmount || 0;
+  const spentPct = total > 0 ? Math.min((spent / total) * 100, 100) : 0;
+  const committedPct = total > 0 ? Math.min((committed / total) * 100, 100 - spentPct) : 0;
+  const usedPct = total > 0 ? ((spent + committed) / total) * 100 : 0;
   const threshold = budget.alertThresholdPct || 80;
   const color =
-    spent > total ? "var(--danger)" : pct >= threshold ? "var(--warning)" : "var(--primary)";
+    spent > total ? "var(--danger)" : spentPct >= threshold ? "var(--warning)" : "var(--primary)";
   return (
-    <div className="min-w-32">
+    <div className="min-w-32" title={`${spentPct.toFixed(0)}% spent, ${committedPct.toFixed(0)}% committed`}>
       <div className="mb-1 flex items-baseline justify-between gap-2 text-xs">
-        <span className="data-mono text-muted-fg">{pct.toFixed(0)}%</span>
+        <span className="data-mono text-muted-fg">{usedPct.toFixed(0)}%</span>
+        {committed > 0 ? <span className="text-faint-fg">incl. committed</span> : null}
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+      <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
+        <div className="h-full" style={{ width: `${spentPct}%`, background: color }} />
+        <div className="h-full opacity-40" style={{ width: `${committedPct}%`, background: color }} />
       </div>
     </div>
   );
@@ -71,14 +96,15 @@ export default function BudgetsPage() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: budgetsKey.all });
 
+  // Edits are a full PUT: spent/committed are never sent (the ledger owns them),
+  // so a replace cannot disturb them, and emptied fields really clear.
   const saveBudget = useMutation({
-    mutationFn: ({ id, data }: { id?: string; data: Partial<BudgetDto> }) =>
-      id ? budgetService.update(id, data) : budgetService.create(data as BudgetDto),
+    mutationFn: ({ id, data }: { id?: string; data: ReturnType<typeof buildBudgetPayload> }) =>
+      id ? budgetService.replace(id, data) : budgetService.create(data),
     onSuccess: (_res, vars) => {
       toast.success(vars.id ? "Budget updated" : "Budget created");
       invalidate();
     },
-    onError: () => toast.error("Failed to save budget"),
   });
   const deleteBudget = useMutation({
     mutationFn: (id: string) => budgetService.delete(id),
@@ -86,7 +112,7 @@ export default function BudgetsPage() {
       toast.success("Budget deleted");
       invalidate();
     },
-    onError: () => toast.error("Failed to delete budget"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to delete budget" }),
   });
   const recordAdjustment = useMutation({
     mutationFn: ({ id, amount, note }: { id: string; amount: number; note: string }) =>
@@ -95,7 +121,7 @@ export default function BudgetsPage() {
       toast.success("Adjustment recorded");
       invalidate();
     },
-    onError: () => toast.error("Failed to record adjustment"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to record adjustment" }),
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -115,13 +141,12 @@ export default function BudgetsPage() {
     enabled: !!drillBudget,
   });
   const { data: history = [], isLoading: historyLoading } = useQuery({
-    queryKey: [...budgetsKey.all, "history", historyBudget?.id],
-    queryFn: () =>
-      auditEventService.getAll({ path: `/budgets/${historyBudget!.id}/spend`, success: true }) as Promise<AuditEvent[]>,
+    queryKey: [...budgetsKey.all, "ledger", historyBudget?.id],
+    queryFn: () => budgetService.getLedger(historyBudget!.id),
     enabled: !!historyBudget,
   });
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<BudgetDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<BudgetForm>();
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -136,8 +161,18 @@ export default function BudgetsPage() {
             departmentId: editing.departmentId || "",
             periodStart: editing.periodStart || "",
             periodEnd: editing.periodEnd || "",
+            alertThresholdPct: editing.alertThresholdPct ?? 80,
           }
-        : { name: "", status: "ACTIVE", totalAmount: 0, currency: baseCurrency },
+        : {
+            name: "",
+            status: "ACTIVE",
+            totalAmount: 0,
+            currency: baseCurrency,
+            departmentId: "",
+            periodStart: "",
+            periodEnd: "",
+            alertThresholdPct: 80,
+          },
     );
   }, [isModalOpen, editing, reset, baseCurrency]);
 
@@ -160,7 +195,7 @@ export default function BudgetsPage() {
     () => ({
       allocated: sum(budgets.map((b) => ({ amount: b.totalAmount, currency: b.currency }))),
       spent: sum(budgets.map((b) => ({ amount: b.spentAmount, currency: b.currency }))),
-      remaining: sum(budgets.map((b) => ({ amount: b.remainingAmount, currency: b.currency }))),
+      available: sum(budgets.map((b) => ({ amount: budgetAvailable(b), currency: b.currency }))),
     }),
     [budgets, sum],
   );
@@ -187,28 +222,24 @@ export default function BudgetsPage() {
     if (!amount || amount <= 0) return void toast.error("Enter a valid amount");
     if (!adjustNote.trim()) return void toast.error("Note is required");
     if (!adjusting) return;
-    await recordAdjustment.mutateAsync({ id: adjusting.id, amount, note: adjustNote.trim() });
+    try {
+      await recordAdjustment.mutateAsync({ id: adjusting.id, amount, note: adjustNote.trim() });
+    } catch {
+      return; // reported by the mutation
+    }
     setAdjusting(null);
     setAdjustAmount("");
     setAdjustNote("");
   };
 
-  const onSubmit = async (data: BudgetDto) => {
-    const payload = { ...data, totalAmount: Number(data.totalAmount) };
-    (Object.keys(payload) as (keyof BudgetDto)[]).forEach((k) => {
-      if (payload[k] === "" || payload[k] === undefined) delete (payload as Partial<BudgetDto>)[k];
-    });
-    if (editing) {
-      const patch = buildPatchPayload<BudgetDto>(editing as unknown as Partial<BudgetDto>, payload);
-      if (Object.keys(patch).length === 0) {
-        toast("No changes to update");
-        return;
-      }
-      await saveBudget.mutateAsync({ id: editing.id, data: patch });
-    } else {
-      await saveBudget.mutateAsync({ data: payload });
+  const onSubmit = async (data: BudgetForm) => {
+    const payload = buildBudgetPayload(data);
+    try {
+      await saveBudget.mutateAsync({ id: editing?.id, data: payload });
+      setIsModalOpen(false);
+    } catch (err) {
+      reportApiError(err, { fallback: "Failed to save budget", setError });
     }
-    setIsModalOpen(false);
   };
 
   const columns = useMemo<ColumnDef<Budget, unknown>[]>(
@@ -243,15 +274,26 @@ export default function BudgetsPage() {
         ),
       },
       {
-        accessorKey: "remainingAmount",
-        header: () => <span className="block text-right">Remaining</span>,
+        accessorKey: "committedAmount",
+        header: () => <span className="block text-right">Committed</span>,
         cell: ({ row }) => (
-          <span
-            className={`data-mono block text-right ${(row.original.remainingAmount || 0) < 0 ? "font-bold text-danger" : ""}`}
-          >
-            {format(row.original.remainingAmount, row.original.currency || baseCurrency)}
+          <span className="data-mono block text-right text-muted-fg">
+            {format(row.original.committedAmount || 0, row.original.currency || baseCurrency)}
           </span>
         ),
+      },
+      {
+        id: "available",
+        accessorFn: (b) => budgetAvailable(b),
+        header: () => <span className="block text-right">Available</span>,
+        cell: ({ row }) => {
+          const available = budgetAvailable(row.original);
+          return (
+            <span className={`data-mono block text-right ${available < 0 ? "font-bold text-danger" : ""}`}>
+              {format(available, row.original.currency || baseCurrency)}
+            </span>
+          );
+        },
       },
       {
         accessorKey: "status",
@@ -293,8 +335,8 @@ export default function BudgetsPage() {
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              title="Expenditure history"
-              aria-label="View expenditure history"
+              title="Budget ledger"
+              aria-label="View budget ledger"
               onClick={() => setHistoryBudget(row.original)}
             >
               <History className="h-3.5 w-3.5" />
@@ -374,7 +416,7 @@ export default function BudgetsPage() {
             </span>
           ) : (
             <span>
-              Remaining · <MoneyTotalValue total={clientTotals.remaining} />
+              Available after commitments · <MoneyTotalValue total={clientTotals.available} />
             </span>
           )
         }
@@ -385,7 +427,7 @@ export default function BudgetsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editing ? "Edit budget" : "New budget"}
-        description="A spending envelope tracked against approved expenses and adjustments."
+        description="A spending envelope. Approved purchase orders and submitted expenses commit against it; receipts, approvals and adjustments spend it."
       >
         <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
@@ -397,7 +439,17 @@ export default function BudgetsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="bd-amount">Allocated amount <span className="text-danger">*</span></Label>
-              <Input id="bd-amount" type="number" step="0.01" min="0" {...register("totalAmount", { required: true })} />
+              <Input
+                id="bd-amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                {...register("totalAmount", {
+                  required: "Allocated amount is required",
+                  validate: (v) => Number(v) > 0 || "Must be greater than 0",
+                })}
+              />
+              {errors.totalAmount && <p className="text-sm text-danger">{errors.totalAmount.message as string}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="bd-currency">Currency</Label>
@@ -425,22 +477,48 @@ export default function BudgetsPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="bd-start">Period start</Label>
-              <Input id="bd-start" type="date" {...register("periodStart")} />
+              <Label htmlFor="bd-start">Period start <span className="text-danger">*</span></Label>
+              <Input id="bd-start" type="date" {...register("periodStart", { required: "Period start is required" })} />
+              {errors.periodStart && <p className="text-sm text-danger">{errors.periodStart.message as string}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="bd-end">Period end</Label>
-              <Input id="bd-end" type="date" {...register("periodEnd")} />
+              <Label htmlFor="bd-end">Period end <span className="text-danger">*</span></Label>
+              <Input
+                id="bd-end"
+                type="date"
+                {...register("periodEnd", {
+                  required: "Period end is required",
+                  validate: (end, form) =>
+                    !end || !form.periodStart || String(end) >= String(form.periodStart) || "Must be on or after the start",
+                })}
+              />
+              {errors.periodEnd && <p className="text-sm text-danger">{errors.periodEnd.message as string}</p>}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="bd-status">Status</Label>
-            <Select id="bd-status" {...register("status")}>
-              <option value="ACTIVE">Active</option>
-              <option value="EXCEEDED">Exceeded</option>
-              <option value="CLOSED">Closed</option>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="bd-status">Status</Label>
+              <Select id="bd-status" {...register("status")}>
+                {BUDGET_STATUSES.map((s) => (
+                  // EXCEEDED follows the figures; it can be kept but not chosen.
+                  <option key={s} value={s} disabled={s === "EXCEEDED" && editing?.status !== "EXCEEDED"}>
+                    {STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bd-threshold">Alert at % spent</Label>
+              <Input
+                id="bd-threshold"
+                type="number"
+                min="1"
+                max="100"
+                {...register("alertThresholdPct", { min: { value: 1, message: "1–100" }, max: { value: 100, message: "1–100" } })}
+              />
+              {errors.alertThresholdPct && <p className="text-sm text-danger">{errors.alertThresholdPct.message as string}</p>}
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
@@ -517,27 +595,44 @@ export default function BudgetsPage() {
         )}
       </Modal>
 
-      {/* History */}
+      {/* Ledger */}
       <Modal
         isOpen={historyBudget !== null}
         onClose={() => setHistoryBudget(null)}
-        title={historyBudget ? `Expenditure history — ${historyBudget.name}` : "History"}
-        description="Successful spend/adjustment calls from the audit log."
+        title={historyBudget ? `Budget ledger — ${historyBudget.name}` : "Budget ledger"}
+        description="Every commitment, spend, release and adjustment, oldest first. Movements made before the ledger existed are not itemised."
       >
         {historyLoading ? (
-          <PageSpinner label="Loading history…" />
+          <PageSpinner label="Loading ledger…" />
         ) : history.length === 0 ? (
-          <EmptyState title="No recorded expenditure events" description="Adjustments recorded against this budget will appear here." />
+          <EmptyState title="No ledger entries yet" description="Adjustments, purchase orders and expenses against this budget will appear here." />
         ) : (
           <div className="max-h-[50vh] divide-y divide-edge-subtle overflow-y-auto">
-            {history.map((event) => (
-              <div key={event.id} className="py-2.5">
-                <p className="text-sm text-foreground">{event.actorEmail || "System"}</p>
-                <p className="text-xs text-faint-fg">
-                  {event.createdAt ? new Date(event.createdAt).toLocaleString() : "—"}
-                </p>
-              </div>
-            ))}
+            {history.map((entry) => {
+              const delta = entry.spentDelta !== 0 ? entry.spentDelta : entry.committedDelta;
+              return (
+                <div key={entry.id} className="flex items-start gap-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-foreground">{LEDGER_LABELS[entry.kind] ?? entry.kind}</p>
+                    <p className="truncate text-xs text-faint-fg">
+                      {entry.createdAt ? new Date(entry.createdAt).toLocaleString() : "—"}
+                      {entry.actorEmail ? ` · ${entry.actorEmail}` : ""}
+                      {entry.note ? ` · ${entry.note}` : ""}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`data-mono text-sm ${delta < 0 ? "text-ok" : ""}`}>
+                      {delta < 0 ? "−" : "+"}
+                      {format(entry.amount, entry.currency || historyBudget?.currency || baseCurrency)}
+                    </p>
+                    <p className="data-mono text-xs text-faint-fg">
+                      spent {format(entry.spentAfter, entry.currency || baseCurrency)} · committed{" "}
+                      {format(entry.committedAfter, entry.currency || baseCurrency)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </Modal>

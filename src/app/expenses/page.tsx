@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
-import { toastActionError } from "@/lib/step-up";
+import { reportApiError } from "@/lib/api-validation";
+import { budgetAvailable, expenseCurrencyFor } from "@/features/finance/payloads";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Receipt, ThumbsUp, XCircle, Search } from "lucide-react";
 import type { Expense, ExpenseStatus } from "@/types";
@@ -104,7 +105,6 @@ export default function ExpensesPage() {
       toast.success("Expense submitted for approval");
       invalidate();
     },
-    onError: () => toast.error("Failed to submit expense"),
   });
   const approveExpense = useMutation({
     mutationFn: (id: string) => expenseService.approve(id),
@@ -112,7 +112,7 @@ export default function ExpensesPage() {
       toast.success("Expense approved");
       invalidate();
     },
-    onError: (err) => toastActionError(err, "Failed to approve expense"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to approve expense" }),
   });
   const rejectExpense = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) => expenseService.reject(id, reason),
@@ -120,7 +120,7 @@ export default function ExpensesPage() {
       toast.success("Expense rejected");
       invalidate();
     },
-    onError: (err) => toastActionError(err, "Failed to reject expense"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to reject expense" }),
   });
   const deleteExpense = useMutation({
     mutationFn: (id: string) => expenseService.delete(id),
@@ -128,10 +128,10 @@ export default function ExpensesPage() {
       toast.success("Expense deleted");
       invalidate();
     },
-    onError: () => toast.error("Failed to delete expense"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to delete expense" }),
   });
 
-  const { register, handleSubmit, reset, watch } = useForm<FormData>();
+  const { register, handleSubmit, reset, watch, setValue, setError, formState: { errors } } = useForm<FormData>();
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -159,16 +159,32 @@ export default function ExpensesPage() {
   const watchedBudgetId = watch("linkedBudgetId");
   const selectedBudget = budgets.find((b) => b.id === watchedBudgetId);
 
+  // A budget's committed/spent figures stay in its own currency, so an expense
+  // linked to it must use that currency: pre-fill and lock the select.
+  useEffect(() => {
+    if (selectedBudget?.currency) setValue("currency", selectedBudget.currency);
+  }, [selectedBudget?.currency, setValue]);
+
   const onSubmit = async (data: FormData) => {
+    const { currency, error } = expenseCurrencyFor(selectedBudget, data.currency);
+    if (error) {
+      setError("currency", { type: "budget", message: error });
+      return;
+    }
     const payload: Partial<ExpenseDto> = {
       ...data,
+      currency,
       amount: Number(data.amount),
     };
     (Object.keys(payload) as (keyof ExpenseDto)[]).forEach((k) => {
       if (payload[k] === "") delete payload[k];
     });
-    await submitExpense.mutateAsync(payload);
-    setIsModalOpen(false);
+    try {
+      await submitExpense.mutateAsync(payload);
+      setIsModalOpen(false);
+    } catch (err) {
+      reportApiError(err, { fallback: "Failed to submit expense", setError, labels: { linkedBudgetId: "Linked budget" } });
+    }
   };
 
   const handleDelete = async (expense: Expense) => {
@@ -371,9 +387,18 @@ export default function ExpensesPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="ex-currency">Currency</Label>
-              <Select id="ex-currency" {...register("currency")}>
-                <CurrencyOptions />
+              <Select
+                id="ex-currency"
+                disabled={!!selectedBudget?.currency}
+                title={selectedBudget?.currency ? `Locked to the budget's currency (${selectedBudget.currency})` : undefined}
+                {...register("currency")}
+              >
+                <CurrencyOptions current={selectedBudget?.currency ?? undefined} />
               </Select>
+              {selectedBudget?.currency ? (
+                <p className="text-xs text-muted-fg">Locked to the budget&apos;s currency.</p>
+              ) : null}
+              {errors.currency && <p className="text-sm text-danger">{errors.currency.message as string}</p>}
             </div>
           </div>
 
@@ -397,16 +422,28 @@ export default function ExpensesPage() {
               <Label htmlFor="ex-budget">Linked budget</Label>
               <Select id="ex-budget" {...register("linkedBudgetId")}>
                 <option value="">None</option>
-                {budgets.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
+                {budgets
+                  .filter((b) => b.status === "ACTIVE" || b.status === "EXCEEDED")
+                  .map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.currency || baseCurrency})
+                    </option>
+                  ))}
               </Select>
               {selectedBudget ? (
                 <p className="text-xs text-muted-fg">
-                  Remaining ·{" "}
+                  Available after commitments ·{" "}
                   <span className="data-mono">
-                    {format(selectedBudget.remainingAmount ?? (selectedBudget.totalAmount || 0) - (selectedBudget.spentAmount || 0), selectedBudget.currency || baseCurrency)}
+                    {format(budgetAvailable(selectedBudget), selectedBudget.currency || baseCurrency)}
                   </span>
+                  {selectedBudget.committedAmount ? (
+                    <>
+                      {" "}· committed{" "}
+                      <span className="data-mono">
+                        {format(selectedBudget.committedAmount, selectedBudget.currency || baseCurrency)}
+                      </span>
+                    </>
+                  ) : null}
                 </p>
               ) : null}
             </div>
