@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { DiscoveredDevice, DiscoveryScanDto, DiscoverySummary } from "@/types";
+import { DiscoveredDevice, DiscoverySummary } from "@/types";
 import { discoveryService } from "@/services/discoveryService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,9 @@ import {
 import { useForm } from "react-hook-form";
 import { useConfirm } from "@/hooks/useConfirm";
 import { cn } from "@/lib/utils";
+import { reportApiError } from "@/lib/api-validation";
+import { usePermissions } from "@/contexts/PermissionContext";
+import { buildScanPayload, deviceTypeKey, type ScanForm } from "@/features/discovery/lib";
 
 // ── Port → Service map ────────────────────────────────────────────────────────
 
@@ -78,16 +81,7 @@ const getDeviceMeta = (type?: string) =>
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const inferDeviceType = (device: DiscoveredDevice): string => {
-    if (device.deviceType) return device.deviceType;
-    const ports = device.openPorts ?? [];
-    if (ports.includes(3389) || ports.includes(5985)) return "WORKSTATION";
-    if (ports.includes(3306) || ports.includes(5432) || ports.includes(1433) || ports.includes(1521)) return "SERVER";
-    if (ports.includes(22) && ports.includes(80)) return "SERVER";
-    if (ports.includes(9100)) return "PRINTER";
-    if (ports.includes(161)) return "ROUTER";
-    return "UNKNOWN";
-};
+const inferDeviceType = (device: DiscoveredDevice): string => deviceTypeKey(device.deviceType, device.openPorts);
 
 const riskBadge = (ports: number[]) => {
     const risky = ports.filter(p => [23, 21, 3389, 5900, 445].includes(p));
@@ -129,7 +123,10 @@ export default function DiscoveryPage() {
     const [statusFilter, setStatusFilter] = useState<"ALL" | "ONLINE" | "OFFLINE" | "PROMOTED">("ALL");
     const [lastScanned, setLastScanned] = useState<Date | null>(null);
 
-    const { register, handleSubmit, formState: { isSubmitting } } = useForm<DiscoveryScanDto & { portsInput?: string; ipAddressesInput?: string }>({
+    const { hasPermission } = usePermissions();
+    // Mirrors the API: scanning, promoting and removing need MANAGE_NETWORK_DISCOVERY.
+    const canManage = hasPermission("MANAGE_NETWORK_DISCOVERY");
+    const { register, handleSubmit, formState: { isSubmitting } } = useForm<ScanForm>({
         defaultValues: { cidrRange: "192.168.1.0/24", portScan: true, timeoutMs: 1000 },
     });
 
@@ -144,6 +141,8 @@ export default function DiscoveryPage() {
             if (devicesResult.status === "fulfilled") {
                 setDevices(devicesResult.value.items ?? devicesResult.value.content ?? []);
                 setTotalPages(devicesResult.value.totalPages ?? 0);
+            } else {
+                reportApiError(devicesResult.reason, { fallback: "Failed to load discovered devices" });
             }
             if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
         } catch {
@@ -155,27 +154,17 @@ export default function DiscoveryPage() {
 
     useEffect(() => { fetchDevices(page); }, [page, fetchDevices]);
 
-    const onScan = async (data: DiscoveryScanDto & { portsInput?: string; ipAddressesInput?: string }) => {
-        const payload: DiscoveryScanDto = {
-            cidrRange: data.cidrRange || null,
-            portScan: data.portScan,
-            timeoutMs: data.timeoutMs,
-        };
-        if (data.portsInput) {
-            payload.ports = data.portsInput.split(",").map(p => parseInt(p.trim())).filter(n => !isNaN(n));
-        }
-        if (data.ipAddressesInput) {
-            payload.ipAddresses = data.ipAddressesInput.split("\n").map(ip => ip.trim()).filter(Boolean);
-            payload.cidrRange = null;
-        }
+    const onScan = async (data: ScanForm) => {
+        const payload = buildScanPayload(data);
         try {
             const res = await discoveryService.scan(payload);
             setIsScanModalOpen(false);
             setLastScanned(new Date());
             toast.success(`Scan completed: ${res.length} device${res.length === 1 ? "" : "s"} discovered.`);
             setTimeout(() => { setPage(0); fetchDevices(0); }, 2000);
-        } catch {
-            toast.error("Scan failed — check your network range and try again.");
+        } catch (err) {
+            // e.g. a range wider than /24 or a blocked address — the API says which.
+            reportApiError(err, { fallback: "Scan failed — check your network range and try again." });
         }
     };
 
@@ -188,8 +177,9 @@ export default function DiscoveryPage() {
             if (res.assetId && await confirm({ message: `Open "${res.assetName}" in the asset registry?`, variant: "info" })) {
                 router.push(`/assets?id=${res.assetId}`);
             }
-        } catch {
-            toast.error("Failed to promote device to asset");
+        } catch (err) {
+            // e.g. the plan's asset limit is reached.
+            reportApiError(err, { fallback: "Failed to promote device to asset" });
         } finally {
             setPromotingId(null);
         }
@@ -202,8 +192,8 @@ export default function DiscoveryPage() {
             await discoveryService.deleteDevice(id);
             toast.success("Device removed");
             fetchDevices(page);
-        } catch {
-            toast.error("Failed to remove device");
+        } catch (err) {
+            reportApiError(err, { fallback: "Failed to remove device" });
         } finally {
             setDeletingId(null);
         }
@@ -233,9 +223,11 @@ export default function DiscoveryPage() {
                     <Button variant="outline" onClick={() => fetchDevices(page)} className="gap-2">
                         <RefreshCw className="h-4 w-4" /> Refresh
                     </Button>
-                    <Button onClick={() => setIsScanModalOpen(true)} className="gap-2">
-                        <ScanLine className="h-4 w-4" /> Scan Network
-                    </Button>
+                    {canManage && (
+                        <Button onClick={() => setIsScanModalOpen(true)} className="gap-2">
+                            <ScanLine className="h-4 w-4" /> Scan Network
+                        </Button>
+                    )}
                 </>}
             />
 
@@ -298,7 +290,7 @@ export default function DiscoveryPage() {
                                     ? "Run a network scan to discover IT assets on your network."
                                     : `Try selecting a different status filter.`}
                             </p>
-                            {devices.length === 0 && (
+                            {canManage && devices.length === 0 && (
                                 <Button onClick={() => setIsScanModalOpen(true)} className="mt-4 gap-2">
                                     <ScanLine className="h-4 w-4" /> Start Scan
                                 </Button>
@@ -375,18 +367,21 @@ export default function DiscoveryPage() {
                                                     className="rounded-control p-1.5 text-faint-fg transition-colors hover:bg-surface-muted hover:text-foreground">
                                                     {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                                 </button>
-                                                {device.status !== "PROMOTED" && (
+                                                {canManage && device.status !== "PROMOTED" && (
                                                     <Button variant="outline" size="sm" onClick={() => handlePromote(device.id)}
                                                         isLoading={promotingId === device.id}
                                                         className="h-7 border-brand/30 px-2 text-xs text-brand hover:bg-brand-soft">
                                                         <ArrowUpRight className="mr-1 h-3 w-3" /> Promote
                                                     </Button>
                                                 )}
-                                                <button onClick={() => handleDelete(device.id)}
-                                                    disabled={deletingId === device.id}
-                                                    className="rounded-control p-1.5 text-danger/70 transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40">
-                                                    <Trash2 className={cn("h-4 w-4", deletingId === device.id && "animate-pulse")} />
-                                                </button>
+                                                {canManage && (
+                                                    <button onClick={() => handleDelete(device.id)}
+                                                        disabled={deletingId === device.id}
+                                                        aria-label="Remove device"
+                                                        className="rounded-control p-1.5 text-danger/70 transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40">
+                                                        <Trash2 className={cn("h-4 w-4", deletingId === device.id && "animate-pulse")} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
 
@@ -506,7 +501,7 @@ export default function DiscoveryPage() {
                     <div className="space-y-2">
                         <Label htmlFor="cidrRange">CIDR Range</Label>
                         <Input id="cidrRange" placeholder="192.168.1.0/24" {...register("cidrRange")} />
-                        <p className="text-xs text-faint-fg">Common ranges: 10.0.0.0/24, 172.16.0.0/24, 192.168.1.0/24. Leave blank to use individual IPs below.</p>
+                        <p className="text-xs text-faint-fg">Up to a /24 (256 addresses), e.g. 10.0.0.0/24 or 192.168.1.0/24. Individual IPs below take precedence.</p>
                     </div>
 
                     <div className="space-y-2">
@@ -525,7 +520,7 @@ export default function DiscoveryPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="timeoutMs">Timeout per host (ms)</Label>
-                            <Input id="timeoutMs" type="number" min={100} max={10000} {...register("timeoutMs", { valueAsNumber: true })} />
+                            <Input id="timeoutMs" type="number" min={100} max={5000} {...register("timeoutMs", { valueAsNumber: true })} />
                         </div>
                     </div>
 
