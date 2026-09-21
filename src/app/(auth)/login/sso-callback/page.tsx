@@ -6,6 +6,7 @@ import { ssoAuthService, SsoCallbackResponse } from "@/services/ssoAuthService";
 import { authService } from "@/services/authService";
 import { clearVerifiedOrganisationId, setStoredUser, verifyOrganisationContext } from "@/lib/authContext";
 import toast from "react-hot-toast";
+import { extractErrorMessage } from "@/lib/error";
 import { Loader2, ShieldCheck } from "lucide-react";
 
 export default function SsoCallbackPage() {
@@ -63,9 +64,9 @@ export default function SsoCallbackPage() {
                 } else {
                     throw new Error("Failed to retrieve authentication token");
                 }
-            } catch (error: any) {
+            } catch (error: unknown) {
                 setStatus("error");
-                toast.error(error.response?.data?.message || error.message || "SSO authentication failed");
+                toast.error(extractErrorMessage(error, "SSO authentication failed"));
                 
                 setTimeout(() => {
                     router.push("/login");

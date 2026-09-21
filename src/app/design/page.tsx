@@ -9,6 +9,7 @@
  */
 
 import * as React from "react";
+import { notFound } from "next/navigation";
 import { PackagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,6 +72,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function DesignSandboxPage() {
+  if (process.env.NODE_ENV === "production") notFound();
   const [tableLoading, setTableLoading] = React.useState(false);
 
   return (

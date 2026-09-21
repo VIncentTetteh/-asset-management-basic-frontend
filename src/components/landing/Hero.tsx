@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, PlayCircle, ShieldCheck, Package, CheckCircle2, TrendingUp, AlertTriangle } from "lucide-react";
-import { useCurrency } from "@/contexts/CurrencyContext";
 
 const mockAssets = [
     { name: 'MacBook Pro 16" M3', tag: "IT-0421", dept: "Engineering", status: "Active", statusClass: "text-emerald-400 bg-emerald-500/10" },
@@ -13,19 +12,11 @@ const mockAssets = [
 ];
 
 export function Hero() {
-    const { currency, convert } = useCurrency();
-
-    // AUM is $2B USD; convert to active currency for display
-    const aumUSD = 2_000_000_000;
-    const aumDisplay = currency === "GHS"
-        ? `₵${(convert(aumUSD, "USD") / 1_000_000_000).toFixed(1)}B+`
-        : "$2B+";
-
     const socialProof = [
-        { value: "50K+", label: "Assets Tracked" },
-        { value: "1,200+", label: "Organizations" },
-        { value: "99.9%", label: "Uptime SLA" },
-        { value: aumDisplay, label: "Assets Under Management" },
+        { value: "Web", label: "Supported client" },
+        { value: "API", label: "Integration surface" },
+        { value: "SSO + MFA", label: "Identity controls" },
+        { value: "Audit", label: "Tracked activity" },
     ];
 
     return (
@@ -39,7 +30,7 @@ export function Hero() {
                 <div className="animate-fade-in space-y-6">
                     <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/20 bg-teal-500/5 px-4 py-1.5 text-xs font-medium text-teal-400">
                         <ShieldCheck className="h-3.5 w-3.5" />
-                        <span>v2.0 is now live for enterprise customers</span>
+                        <span>Controlled enterprise evaluations available</span>
                     </div>
 
                     <h1 className="mx-auto max-w-4xl text-5xl font-extrabold tracking-tight text-white md:text-7xl lg:leading-[1.1]">
@@ -51,14 +42,13 @@ export function Hero() {
                     </p>
 
                     <div className="flex flex-col items-center justify-center gap-4 pt-4 sm:flex-row">
-                        <Button size="lg" asChild className="h-12 px-8 bg-teal-600 hover:bg-teal-700 text-lg shadow-lg shadow-teal-900/20">
+                        <Button size="lg" asChild className="h-12 px-8 bg-teal-700 hover:bg-teal-800 text-lg shadow-lg shadow-teal-900/20">
                             <Link href="/register-tenant">
                                 Register Organisation <ArrowRight className="ml-2 h-5 w-5" />
                             </Link>
                         </Button>
-                        <Button size="lg" variant="outline" className="h-12 px-8 border-slate-700 bg-transparent text-slate-100 hover:bg-slate-800 text-lg">
-                            <PlayCircle className="mr-2 h-5 w-5" />
-                            Watch Demo
+                        <Button size="lg" variant="outline" asChild className="h-12 px-8 border-slate-700 bg-transparent text-slate-100 hover:bg-slate-800 text-lg">
+                            <Link href="/contact"><PlayCircle className="mr-2 h-5 w-5" />Request a guided demo</Link>
                         </Button>
                     </div>
 
@@ -67,7 +57,7 @@ export function Hero() {
                         {socialProof.map((s, i) => (
                             <div key={i} className="text-center">
                                 <p className="text-2xl font-extrabold text-white">{s.value}</p>
-                                <p className="text-xs text-slate-500 uppercase tracking-wider mt-0.5">{s.label}</p>
+                                <p className="text-xs text-slate-300 uppercase tracking-wider mt-0.5">{s.label}</p>
                             </div>
                         ))}
                     </div>
@@ -82,7 +72,7 @@ export function Hero() {
                                     <div className="h-2.5 w-2.5 rounded-full bg-yellow-500/60" />
                                     <div className="h-2.5 w-2.5 rounded-full bg-green-500/60" />
                                     <div className="flex-1 mx-4 h-6 rounded-md bg-slate-800/80 flex items-center px-3">
-                                        <span className="text-[10px] text-slate-500 font-mono">app.assetiq.io/dashboard</span>
+                                        <span className="text-[10px] text-slate-300 font-mono">app.assetiq.io/dashboard</span>
                                     </div>
                                 </div>
 
@@ -99,7 +89,7 @@ export function Hero() {
                                                 <div className={`inline-flex h-8 w-8 items-center justify-center rounded-lg ${card.bg} ${card.color} mb-3`}>
                                                     <card.icon className="h-4 w-4" />
                                                 </div>
-                                                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{card.label}</p>
+                                                <p className="text-[10px] text-slate-300 uppercase tracking-wider mb-1">{card.label}</p>
                                                 <div className="flex items-end justify-between gap-1">
                                                     <span className="text-xl font-bold text-white">{card.value}</span>
                                                     <span className={`text-[10px] font-semibold ${card.up ? "text-emerald-400" : "text-red-400"}`}>{card.trend}</span>
@@ -122,7 +112,7 @@ export function Hero() {
                                                     </div>
                                                     <div className="flex-1 min-w-0 text-left">
                                                         <p className="text-slate-200 font-medium truncate">{asset.name}</p>
-                                                        <p className="text-slate-500 text-[10px]">{asset.tag} · {asset.dept}</p>
+                                                        <p className="text-slate-300 text-[10px]">{asset.tag} · {asset.dept}</p>
                                                     </div>
                                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${asset.statusClass}`}>{asset.status}</span>
                                                 </div>

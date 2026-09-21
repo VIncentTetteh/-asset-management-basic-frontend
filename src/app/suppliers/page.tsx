@@ -46,7 +46,6 @@ export default function SuppliersPage() {
             contactPerson: editing.contactPerson || "",
             taxId: editing.taxId || "",
             registrationNumber: editing.registrationNumber || "",
-            bankDetails: editing.bankDetails || "",
             status: editing.status || "ACTIVE",
           }
         : {
@@ -57,7 +56,6 @@ export default function SuppliersPage() {
             contactPerson: "",
             taxId: "",
             registrationNumber: "",
-            bankDetails: "",
             status: "ACTIVE",
           },
     );
@@ -264,10 +262,6 @@ export default function SuppliersPage() {
             <Textarea id="sup-address" {...register("address")} />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="sup-bank">Bank details</Label>
-            <Textarea id="sup-bank" placeholder="Bank, account name, account number…" {...register("bankDetails")} />
-          </div>
 
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { PredictiveInsight, InsightSummary, InsightType, InsightSeverity } from "@/types";
 import { aiInsightsService } from "@/services/aiInsightsService";
@@ -100,7 +100,7 @@ export default function AiInsightsPage() {
     const [resolvingId, setResolvingId] = useState<string | null>(null);
     const [activeView, setActiveView] = useState<"timeline" | "priority" | "byType" | "list">("priority");
 
-    const fetchAll = async () => {
+    const fetchAll = useCallback(async () => {
         try {
             setIsLoading(true);
             const [insightsResult, summaryResult] = await Promise.allSettled([
@@ -118,9 +118,9 @@ export default function AiInsightsPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [filterType, filterSeverity, unresolvedOnly]);
 
-    useEffect(() => { fetchAll(); }, [filterType, filterSeverity, unresolvedOnly]);
+    useEffect(() => { void fetchAll(); }, [fetchAll]);
 
     const handleGenerate = async () => {
         setIsGenerating(true);

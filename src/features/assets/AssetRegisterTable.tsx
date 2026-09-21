@@ -51,7 +51,7 @@ export function AssetRegisterTable({
   isFirstRun?: boolean;
   canCreate: boolean;
 }) {
-  const items = paged?.items ?? [];
+  const items = useMemo(() => paged?.items ?? [], [paged?.items]);
 
   const pageValue = useMemo(
     () => items.reduce((sum, a) => sum + (a.purchaseCost || 0), 0),

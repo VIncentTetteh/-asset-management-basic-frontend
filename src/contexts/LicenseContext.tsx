@@ -125,9 +125,12 @@ export function LicenseProvider({ children }: { children: ReactNode }) {
         // In cloud mode nothing runs — no polling, no side effects.
         if (APP_MODE === "cloud") return;
 
-        fetchStatus();
+        const initial = window.setTimeout(fetchStatus, 0);
         const timer = setInterval(fetchStatus, POLL_INTERVAL_MS);
-        return () => clearInterval(timer);
+        return () => {
+            window.clearTimeout(initial);
+            clearInterval(timer);
+        };
     }, [fetchStatus]);
 
     return (

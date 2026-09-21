@@ -24,6 +24,17 @@ const FIELDS: FieldSpec<PatchRecordDto>[] = [
 
 const CREATE_DEFAULTS = { assetId: "", patchName: "", status: "PLANNED", testEnvironmentValidated: false } as const;
 
+function usePatchOptions() {
+  const { data: assets = [] } = useQuery({
+    queryKey: qk.module("assets-all").list(),
+    queryFn: () => assetService.getAll(),
+    staleTime: 300_000,
+  });
+  return {
+    assetId: assets.map((a) => ({ value: a.id!, label: `${a.name} (${a.assetTag || "no tag"})` })),
+  };
+}
+
 export default function PatchRecordsPage() {
   return (
     <ComplianceCrudPage<PatchRecord, PatchRecordDto>
@@ -44,16 +55,7 @@ export default function PatchRecordsPage() {
       toFormDefaults={(e) => defaultsFrom(e, FIELDS, CREATE_DEFAULTS)}
       searchKeys={["patchName", "assetName", "version"]}
       emptyDescription="Track patch rollout across the estate — planned, applied, or rolled back."
-      useOptions={() => {
-        const { data: assets = [] } = useQuery({
-          queryKey: qk.module("assets-all").list(),
-          queryFn: () => assetService.getAll(),
-          staleTime: 300_000,
-        });
-        return {
-          assetId: assets.map((a) => ({ value: a.id!, label: `${a.name} (${a.assetTag || "no tag"})` })),
-        };
-      }}
+      useOptions={usePatchOptions}
     />
   );
 }

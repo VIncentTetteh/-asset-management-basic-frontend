@@ -1,4 +1,4 @@
-# Multi-stage build for assetiq-frontend (Next.js 14, standalone output)
+# Multi-stage build for the statically exported AssetIQ frontend.
 
 FROM node:20-alpine AS deps
 WORKDIR /app
@@ -11,22 +11,13 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Build args become NEXT_PUBLIC_ env vars baked into the bundle
 ARG NEXT_PUBLIC_APP_MODE=standalone
-ARG NEXT_PUBLIC_API_URL=http://backend:8080
+ARG NEXT_PUBLIC_API_URL=/api/v1
 ENV NEXT_PUBLIC_APP_MODE=$NEXT_PUBLIC_APP_MODE
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+FROM nginx:1.27-alpine AS runner
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/out /usr/share/nginx/html
 
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
 EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-CMD ["node", "server.js"]

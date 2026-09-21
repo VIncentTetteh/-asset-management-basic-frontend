@@ -20,8 +20,7 @@ export interface TenantRegistrationResponse {
     lastName: string;
     email: string;
     role: string;
-    token: string;
-    expiresIn: number;
+    verificationRequired: boolean;
 }
 
 export const authService = {

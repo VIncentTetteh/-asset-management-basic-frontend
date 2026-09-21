@@ -19,9 +19,13 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { usePermissions } from "@/contexts/PermissionContext";
 
 export default function DepartmentsPage() {
   const { format } = useCurrency();
+  const { hasPermission } = usePermissions();
+  const canManageDepartments = hasPermission("MANAGE_DEPARTMENTS")
+    || hasPermission("MANAGE_ORGANIZATION_SETTINGS");
   const { confirm, ConfirmDialog } = useConfirm();
   const queryClient = useQueryClient();
   const departmentsKey = qk.module("departments");
@@ -186,7 +190,7 @@ export default function DepartmentsPage() {
         header: "Status",
         cell: ({ row }) => <StatusBadge status={row.original.status ?? "ACTIVE"} />,
       },
-      {
+      ...(canManageDepartments ? [{
         id: "actions",
         header: "",
         enableSorting: false,
@@ -215,21 +219,21 @@ export default function DepartmentsPage() {
             </Button>
           </div>
         ),
-      },
+      } as ColumnDef<Department, unknown>] : []),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [format],
+    [format, canManageDepartments],
   );
 
   return (
     <ListPageTemplate
       title="Departments"
       subtitle={isLoading ? "Loading departments…" : `${departments.length} departments and cost centers`}
-      actions={
+      actions={canManageDepartments ? (
         <Button onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" /> New department
         </Button>
-      }
+      ) : undefined}
       toolbar={
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-faint-fg" />
@@ -248,11 +252,11 @@ export default function DepartmentsPage() {
         isLoading={isLoading}
         emptyTitle="No departments yet"
         emptyDescription="Structure your organisation into departments with codes and budget limits."
-        emptyAction={
+        emptyAction={canManageDepartments ? (
           <Button size="sm" onClick={openCreate}>
             <Layers className="mr-1.5 h-4 w-4" /> New department
           </Button>
-        }
+        ) : undefined}
       />
 
       <Modal

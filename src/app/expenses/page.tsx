@@ -156,12 +156,9 @@ export default function ExpensesPage() {
   const selectedBudget = budgets.find((b) => b.id === watchedBudgetId);
 
   const onSubmit = async (data: FormData) => {
-    const currentUser = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("user") || "{}") : {};
     const payload: Partial<ExpenseDto> = {
       ...data,
       amount: Number(data.amount),
-      submittedById: currentUser?.id,
-      submittedByName: currentUser?.name,
     };
     (Object.keys(payload) as (keyof ExpenseDto)[]).forEach((k) => {
       if (payload[k] === "") delete payload[k];

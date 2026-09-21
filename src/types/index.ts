@@ -518,7 +518,7 @@ export interface AssetTransferDto {
     toDepartmentId: string;       // required
     fromLocationId?: string;
     toLocationId?: string;
-    requestedById: string;        // required
+    requestedById?: string;       // server-assigned from the authenticated session
     reason?: string;
 }
 
@@ -549,7 +549,7 @@ export interface DisposalsDto {
     disposalMethod: DisposalMethod | string;  // required
     disposalDate: string;         // required
     saleValue?: number;
-    approvedById: string;         // required
+    approvedById?: string;        // server-assigned from the authenticated session
     reason?: string;
     complianceDocumentUrl?: string;
     organisationId?: string;
@@ -566,7 +566,6 @@ export interface Supplier extends BaseEntity {
     contactPerson?: string;
     taxId?: string;
     registrationNumber?: string;
-    bankDetails?: string;
     status?: SupplierStatus | string;
     organisationId?: string;
 }
@@ -580,7 +579,6 @@ export interface SupplierDto {
     contactPerson?: string;
     taxId?: string;
     registrationNumber?: string;
-    bankDetails?: string;
     status?: SupplierStatus | string;
     organisationId?: string;
 }
@@ -1436,7 +1434,6 @@ export interface SoftwareLicense {
     productName: string;
     licenseType: LicenseType;
     status: LicenseStatus;
-    licenseKey?: string | null;
     vendor?: string | null;
     seats: number;
     allocatedSeats: number;
@@ -1454,7 +1451,6 @@ export interface SoftwareLicenseDto {
     productName: string;
     licenseType: LicenseType;
     status?: LicenseStatus;
-    licenseKey?: string | null;
     vendor?: string | null;
     seats: number;
     allocatedSeats?: number;

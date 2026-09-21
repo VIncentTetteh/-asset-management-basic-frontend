@@ -61,6 +61,7 @@ import {
     getStoredUser,
 } from "@/lib/authContext";
 import { authService } from "@/services/authService";
+import { commercialFeatures } from "@/config/commercialFeatures";
 
 export function Sidebar() {
     const router = useRouter();
@@ -121,7 +122,7 @@ export function Sidebar() {
                 { href: "/employees", label: "Employees", icon: UserCheck, active: pathname.startsWith("/employees"), permission: "VIEW_EMPLOYEES" },
                 { href: "/users", label: "Users", icon: Users, active: pathname.startsWith("/users"), permission: "VIEW_USERS" },
                 { href: "/roles", label: "Roles", icon: Shield, active: pathname.startsWith("/roles"), permission: "VIEW_ROLES" },
-                { href: "/departments", label: "Departments", icon: Layers, active: pathname.startsWith("/departments"), permission: "MANAGE_ORGANIZATION_SETTINGS" },
+                { href: "/departments", label: "Departments", icon: Layers, active: pathname.startsWith("/departments"), permission: "VIEW_DEPARTMENTS" },
                 { href: "/profile", label: "My Profile", icon: UserCircle, active: pathname.startsWith("/profile") },
             ]
         },
@@ -132,20 +133,22 @@ export function Sidebar() {
                 { href: "/purchase-orders", label: "Purchase Orders", icon: ShoppingCart, active: pathname.startsWith("/purchase-orders"), permission: "VIEW_PROCUREMENT" },
                 { href: "/contracts", label: "Contracts", icon: FileSignature, active: pathname.startsWith("/contracts"), permission: "VIEW_CONTRACTS" },
                 { href: "/budgets", label: "Budgets", icon: Wallet, active: pathname.startsWith("/budgets"), permission: "VIEW_BUDGETS" },
-                { href: "/expenses", label: "Expenses", icon: Receipt, active: pathname.startsWith("/expenses"), permission: "VIEW_BUDGETS" },
-                { href: "/leases", label: "Lease Records", icon: Home, active: pathname.startsWith("/leases"), permission: "VIEW_CONTRACTS" },
+                { href: "/expenses", label: "Expenses", icon: Receipt, active: pathname.startsWith("/expenses"), permission: "MANAGE_EXPENSES" },
+                { href: "/leases", label: "Lease Records", icon: Home, active: pathname.startsWith("/leases"), permission: "MANAGE_LEASES" },
                 { href: "/vendor-reviews", label: "Vendor Reviews", icon: Star, active: pathname.startsWith("/vendor-reviews"), permission: "VIEW_VENDOR_REVIEWS" },
                 { href: "/licenses", label: "Software Licenses", icon: Key, active: pathname.startsWith("/licenses"), permission: "VIEW_SOFTWARE_LICENSES" },
                 { href: "/depreciation-policies", label: "Depreciation", icon: Calculator, active: pathname.startsWith("/depreciation-policies"), permission: "VIEW_DEPRECIATION" },
-                { href: "/exchange-rates", label: "Exchange Rates", icon: DollarSign, active: pathname.startsWith("/exchange-rates"), permission: "MANAGE_ORGANIZATION_SETTINGS" },
+                { href: "/exchange-rates", label: "Exchange Rates", icon: DollarSign, active: pathname.startsWith("/exchange-rates"), permission: "MANAGE_EXCHANGE_RATES" },
             ]
         },
         {
             group: "Compliance",
             items: [
                 { href: "/compliance/controls", label: "Controls", icon: ShieldCheck, active: pathname.startsWith("/compliance/controls"), permission: "VIEW_COMPLIANCE" },
-                { href: "/compliance/bog-controls", label: "BoG Controls", icon: Building2, active: pathname.startsWith("/compliance/bog-controls"), permission: "VIEW_COMPLIANCE" },
-                { href: "/compliance/bog-report", label: "BoG Report", icon: BarChart2, active: pathname.startsWith("/compliance/bog-report"), permission: "VIEW_COMPLIANCE" },
+                ...(commercialFeatures.bog2026 ? [
+                    { href: "/compliance/bog-controls", label: "BoG 2026 Controls", icon: Building2, active: pathname.startsWith("/compliance/bog-controls"), permission: "VIEW_COMPLIANCE" },
+                    { href: "/compliance/bog-report", label: "BoG 2026 Report", icon: BarChart2, active: pathname.startsWith("/compliance/bog-report"), permission: "VIEW_COMPLIANCE" },
+                ] : []),
                 { href: "/compliance/risks", label: "Risk Register", icon: AlertTriangle, active: pathname.startsWith("/compliance/risks"), permission: "VIEW_COMPLIANCE" },
                 { href: "/compliance/incidents", label: "Incidents", icon: Siren, active: pathname.startsWith("/compliance/incidents"), permission: "VIEW_COMPLIANCE" },
                 { href: "/compliance/policies", label: "Policies", icon: FileText, active: pathname.startsWith("/compliance/policies"), permission: "VIEW_COMPLIANCE" },
@@ -163,8 +166,10 @@ export function Sidebar() {
         {
             group: "Insights & AI",
             items: [
-                { href: "/ai-insights", label: "AI Insights", icon: Brain, active: pathname.startsWith("/ai-insights"), permission: "VIEW_ASSETS" },
-                { href: "/ai-chat", label: "AI Chat", icon: MessageSquare, active: pathname.startsWith("/ai-chat"), permission: "VIEW_ASSETS" },
+                ...(commercialFeatures.governedAi ? [
+                    { href: "/ai-insights", label: "AI Insights", icon: Brain, active: pathname.startsWith("/ai-insights"), permission: "VIEW_ASSETS" },
+                    { href: "/ai-chat", label: "AI Chat", icon: MessageSquare, active: pathname.startsWith("/ai-chat"), permission: "VIEW_ASSETS" },
+                ] : []),
             ]
         },
         {
@@ -174,11 +179,11 @@ export function Sidebar() {
                 { href: "/locations", label: "Locations", icon: MapPin, active: pathname.startsWith("/locations"), permission: "VIEW_LOCATIONS" },
                 { href: "/sso-configuration", label: "SSO", icon: KeyRound, active: pathname.startsWith("/sso-configuration"), permission: "MANAGE_ORGANIZATION_SETTINGS" },
                 { href: "/settings/storage", label: "Storage", icon: Cloud, active: pathname.startsWith("/settings/storage"), permission: "MANAGE_ORGANIZATION_SETTINGS" },
-                { href: "/webhooks", label: "Webhooks", icon: Webhook, active: pathname.startsWith("/webhooks"), permission: "MANAGE_ORGANIZATION_SETTINGS" },
+                ...(commercialFeatures.outboundWebhooks ? [{ href: "/webhooks", label: "Webhooks", icon: Webhook, active: pathname.startsWith("/webhooks"), permission: "MANAGE_ORGANIZATION_SETTINGS" }] : []),
                 { href: "/notifications", label: "Notifications", icon: Bell, active: pathname.startsWith("/notifications") },
                 { href: "/billing", label: "Billing", icon: CreditCard, active: pathname.startsWith("/billing"), permission: "MANAGE_ORGANIZATION_SETTINGS" },
-                { href: "/audit-events", label: "Audit Events", icon: Shield, active: pathname.startsWith("/audit-events"), permission: "REVIEW_ACCESS" },
-                { href: "/health", label: "System Health", icon: Activity, active: pathname.startsWith("/health"), permission: "MANAGE_ORGANIZATION_SETTINGS" },
+                { href: "/audit-events", label: "Audit Events", icon: Shield, active: pathname.startsWith("/audit-events"), permission: "VIEW_AUDIT_LOGS" },
+                ...(commercialFeatures.platformHealth ? [{ href: "/health", label: "Platform Health", icon: Activity, active: pathname.startsWith("/health"), permission: "ROLE_ADMIN" }] : []),
                 ...(licenseStatus.mode === "standalone" ? [{ href: "/settings/license", label: "License Key", icon: Key, active: pathname.startsWith("/settings/license"), permission: "MANAGE_ORGANIZATION_SETTINGS" as string }] : []),
             ]
         }

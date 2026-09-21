@@ -1,4 +1,5 @@
 import api from "@/lib/axios";
+import { isAxiosError } from "axios";
 import { OrgSsoConfig, SsoDiscoverResponse, SsoOAuth2Dto, SsoSamlDto, SsoToggleDto } from "@/types";
 import { invalidateRequestCache, withRequestCache } from "@/services/requestCache";
 
@@ -10,8 +11,8 @@ export const orgSsoService = {
                 const response = await api.get(`/organisations/${orgId}/sso`);
                 if (response.status === 204 || !response.data) return null;
                 return response.data as OrgSsoConfig;
-            } catch (error: any) {
-                if (error?.response?.status === 404) return null;
+            } catch (error: unknown) {
+                if (isAxiosError(error) && error.response?.status === 404) return null;
                 throw error;
             }
         }, 60_000);

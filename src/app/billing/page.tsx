@@ -71,6 +71,8 @@ export default function BillingPage() {
         return Math.round((subscription.currentEmployeeCount / subscription.plan.maxEmployees) * 100);
     }, [subscription]);
 
+    const currentPlanIsFree = subscription ? isFreePlan(subscription.plan) : false;
+
     const onUpgrade = async (planCode: string) => {
         try {
             setCheckoutPlanCode(planCode);
@@ -145,23 +147,29 @@ export default function BillingPage() {
                             <p className="text-sm text-muted-fg">Assets: {subscription.currentAssetCount} / {subscription.plan.maxAssets} ({assetUsage}%)</p>
                             <p className="text-sm text-muted-fg">Employees: {subscription.currentEmployeeCount} / {subscription.plan.maxEmployees} ({employeeUsage}%)</p>
                             <p className="text-xs text-faint-fg">
-                                {subscription.autoRenew ? "Renews" : "Downgrades"} on {formatDate(subscription.currentPeriodEnd)}
+                                {currentPlanIsFree
+                                    ? "No renewal required"
+                                    : `${subscription.autoRenew ? "Renews" : "Downgrades"} on ${formatDate(subscription.currentPeriodEnd)}`}
                             </p>
                         </div>
                         <div className="space-y-2">
                             <p className="text-xs uppercase tracking-wide text-faint-fg">Subscription Controls</p>
-                            <div className="flex items-center justify-between rounded-control border border-edge-subtle bg-surface-muted px-3 py-2">
-                                <span className="text-sm text-muted-fg">
-                                    {subscription.autoRenew ? "Auto-renew enabled" : "Auto-renew disabled"}
-                                </span>
-                                <input aria-label="Toggle auto-renew" type="checkbox" checked={subscription.autoRenew} onChange={onToggleAutoRenew} disabled={savingAutoRenew} className="accent-[var(--primary)]" />
-                            </div>
-                            <p className="text-xs text-faint-fg">
-                                {subscription.autoRenew
-                                    ? `Next billing: ${formatDate(subscription.nextBillingAt ?? subscription.currentPeriodEnd)}`
-                                    : "Your paid package remains active until the period ends."}
-                            </p>
-                            {subscription.plan.amountMinor > 0 && (
+                            {currentPlanIsFree ? (
+                                <div className="rounded-control border border-edge-subtle bg-surface-muted px-3 py-2">
+                                    <p className="text-sm text-muted-fg">Freemium remains active without billing.</p>
+                                </div>
+                            ) : (<>
+                                <div className="flex items-center justify-between rounded-control border border-edge-subtle bg-surface-muted px-3 py-2">
+                                    <span className="text-sm text-muted-fg">
+                                        {subscription.autoRenew ? "Auto-renew enabled" : "Auto-renew disabled"}
+                                    </span>
+                                    <input aria-label="Toggle auto-renew" type="checkbox" checked={subscription.autoRenew} onChange={onToggleAutoRenew} disabled={savingAutoRenew} className="accent-[var(--primary)]" />
+                                </div>
+                                <p className="text-xs text-faint-fg">
+                                    {subscription.autoRenew
+                                        ? `Next billing: ${formatDate(subscription.nextBillingAt ?? subscription.currentPeriodEnd)}`
+                                        : "Your paid package remains active until the period ends."}
+                                </p>
                                 <Button
                                     variant="outline"
                                     className="w-full"
@@ -171,7 +179,7 @@ export default function BillingPage() {
                                     {savingAutoRenew ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
                                     {subscription.autoRenew ? "Downgrade to Freemium" : "Downgrade scheduled"}
                                 </Button>
-                            )}
+                            </>)}
                         </div>
                     </CardContent>
                 </Card>

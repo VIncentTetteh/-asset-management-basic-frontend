@@ -1,13 +1,14 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { exchangeRateService } from "@/services/exchangeRateService";
 
 export type SupportedCurrency = "USD" | "GHS";
 
 interface CurrencyContextValue {
     currency: SupportedCurrency;
     setCurrency: (c: SupportedCurrency) => void;
-    rate: number;           // GHS per 1 USD
+    rate: number | null;    // governed GHS per 1 USD; null when unavailable
     rateLoading: boolean;
     rateLastUpdated: Date | null;
     convert: (amount: number, fromCurrency?: string) => number;
@@ -15,13 +16,12 @@ interface CurrencyContextValue {
     symbol: string;
 }
 
-const FALLBACK_RATE = 15.5; // approximate GHS/USD fallback
 const SYMBOLS: Record<SupportedCurrency, string> = { USD: "$", GHS: "₵" };
 
 const CurrencyContext = createContext<CurrencyContextValue>({
     currency: "USD",
     setCurrency: () => {},
-    rate: FALLBACK_RATE,
+    rate: null,
     rateLoading: false,
     rateLastUpdated: null,
     convert: (a) => a,
@@ -31,7 +31,7 @@ const CurrencyContext = createContext<CurrencyContextValue>({
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
     const [currency, setCurrencyState] = useState<SupportedCurrency>("USD");
-    const [rate, setRate] = useState(FALLBACK_RATE);
+    const [rate, setRate] = useState<number | null>(null);
     const [rateLoading, setRateLoading] = useState(false);
     const [rateLastUpdated, setRateLastUpdated] = useState<Date | null>(null);
 
@@ -41,32 +41,25 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         if (saved === "USD" || saved === "GHS") setCurrencyState(saved);
     }, []);
 
-    // Fetch the live USD→GHS rate.
-    //
-    // This used to call /api/fx/usd-ghs, a Next route handler that fetched the upstream
-    // once and cached it server-side for everyone. The app is now built with
-    // output: "export" and served as static files from S3 behind CloudFront, so there is
-    // no server left to hold that cache and the route handler was removed.
-    //
-    // Calling the provider from the browser is what the desktop client already does. The
-    // trade-off is a per-visitor request and no shared cache; what it does not change is
-    // resilience, because this was always best-effort — any failure silently keeps the
-    // fallback rate rather than blocking the render. The rate is display-only conversion,
-    // never used for billing or persisted amounts.
+    // Only tenant-governed, dated server rates may drive display conversion.
     useEffect(() => {
         const fetchRate = async () => {
             setRateLoading(true);
             try {
-                const res = await fetch("https://open.er-api.com/v6/latest/USD");
-                if (!res.ok) throw new Error();
-                const data = await res.json();
-                const live = data?.rates?.GHS;
-                if (typeof live === "number" && Number.isFinite(live) && live > 0) {
-                    setRate(live);
+                const rates = await exchangeRateService.listAll();
+                const direct = rates
+                    .filter(r => r.baseCurrency === "USD" && r.targetCurrency === "GHS" && (r.rate ?? 0) > 0)
+                    .sort((a, b) => (b.effectiveDate ?? "").localeCompare(a.effectiveDate ?? ""))[0];
+                const inverse = rates
+                    .filter(r => r.baseCurrency === "GHS" && r.targetCurrency === "USD" && (r.rate ?? 0) > 0)
+                    .sort((a, b) => (b.effectiveDate ?? "").localeCompare(a.effectiveDate ?? ""))[0];
+                const governed = direct?.rate ?? (inverse?.rate ? 1 / inverse.rate : null);
+                if (governed != null && Number.isFinite(governed)) {
+                    setRate(governed);
                     setRateLastUpdated(new Date());
                 }
             } catch {
-                // silently keep fallback
+                setRate(null);
             } finally {
                 setRateLoading(false);
             }
@@ -82,18 +75,21 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     const convert = useCallback((amount: number, fromCurrency?: string): number => {
         const from = ((fromCurrency ?? "USD").toUpperCase()) as SupportedCurrency;
         if (from === currency) return amount;
-        if (from === "USD" && currency === "GHS") return amount * rate;
-        if (from === "GHS" && currency === "USD") return amount / rate;
-        return amount;
+        if (rate != null && from === "USD" && currency === "GHS") return amount * rate;
+        if (rate != null && from === "GHS" && currency === "USD") return amount / rate;
+        return Number.NaN;
     }, [currency, rate]);
 
     const format = useCallback((amount: number | null | undefined, fromCurrency?: string): string => {
         if (amount == null) return "—";
-        const converted = convert(amount, fromCurrency ?? "USD");
-        return `${SYMBOLS[currency]}${converted.toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        })}`;
+        const source = ((fromCurrency ?? "GHS").toUpperCase()) as SupportedCurrency;
+        const converted = convert(amount, source);
+        const displayCurrency = Number.isFinite(converted) ? currency : source;
+        const displayAmount = Number.isFinite(converted) ? converted : amount;
+        return new Intl.NumberFormat("en-US", {
+            style: "currency", currency: displayCurrency,
+            minimumFractionDigits: 2, maximumFractionDigits: 2,
+        }).format(displayAmount);
     }, [convert, currency]);
 
     return (

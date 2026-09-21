@@ -57,7 +57,7 @@ export function PlatformShowcase() {
                             <div className="w-7 h-7 rounded-lg bg-teal-500/15 flex items-center justify-center text-sm shrink-0">🌐</div>
                             <div>
                                 <p className="text-sm font-semibold text-slate-200">Web Application</p>
-                                <p className="text-xs text-slate-500">app.assetiq.io — any browser, any OS</p>
+                                <p className="text-xs text-slate-300">app.assetiq.io — any browser, any OS</p>
                             </div>
                             <div className="ml-auto hidden sm:flex gap-1.5 flex-wrap">
                                 {["Chrome", "Firefox", "Safari", "Edge"].map(b => (
@@ -73,7 +73,7 @@ export function PlatformShowcase() {
                                 <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
                                 <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
                                 <div className="flex-1 mx-3 h-5 rounded bg-slate-800/80 flex items-center px-2.5">
-                                    <span className="text-[9px] text-slate-500 font-mono">app.assetiq.io/dashboard</span>
+                                    <span className="text-[9px] text-slate-300 font-mono">app.assetiq.io/dashboard</span>
                                 </div>
                             </div>
 
@@ -87,7 +87,7 @@ export function PlatformShowcase() {
                                     {sidebarItems.map((item, i) => (
                                         <div key={item} className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md mb-0.5 ${i === 0 ? "bg-teal-500/15" : ""}`}>
                                             <div className={`w-1.5 h-1.5 rounded-sm ${i === 0 ? "bg-teal-500" : "bg-slate-600"}`} />
-                                            <span className={`text-[8px] ${i === 0 ? "text-teal-300" : "text-slate-500"}`}>{item}</span>
+                                            <span className={`text-[8px] ${i === 0 ? "text-teal-300" : "text-slate-300"}`}>{item}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -98,7 +98,7 @@ export function PlatformShowcase() {
                                         <span className="text-[10px] font-semibold text-slate-300">Dashboard Overview</span>
                                         <div className="flex gap-1.5">
                                             <div className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 text-[8px] font-semibold">+ Add Asset</div>
-                                            <div className="px-2 py-0.5 rounded border border-slate-700 text-slate-500 text-[8px]">Export</div>
+                                            <div className="px-2 py-0.5 rounded border border-slate-700 text-slate-300 text-[8px]">Export</div>
                                         </div>
                                     </div>
 
@@ -107,7 +107,7 @@ export function PlatformShowcase() {
                                         {kpiCards.map(k => (
                                             <div key={k.label} className="bg-slate-900/60 border border-white/[0.05] rounded-lg p-2">
                                                 <div className={`w-5 h-5 rounded-md ${k.bg} mb-1.5`} />
-                                                <p className="text-[7px] text-slate-500 uppercase tracking-wide mb-0.5">{k.label}</p>
+                                                <p className="text-[7px] text-slate-300 uppercase tracking-wide mb-0.5">{k.label}</p>
                                                 <div className="flex items-end gap-1">
                                                     <span className="text-sm font-bold text-slate-100">{k.value}</span>
                                                     <span className={`text-[8px] font-semibold ${k.up ? "text-emerald-400" : "text-red-400"}`}>{k.trend}</span>
@@ -119,7 +119,7 @@ export function PlatformShowcase() {
                                     {/* Charts */}
                                     <div className="grid grid-cols-3 gap-2 mb-2.5">
                                         <div className="col-span-2 bg-slate-900/60 border border-white/[0.05] rounded-lg p-2">
-                                            <p className="text-[8px] font-semibold text-slate-500 mb-1.5">Asset Status Trend — Last 6 months</p>
+                                            <p className="text-[8px] font-semibold text-slate-300 mb-1.5">Asset Status Trend — Last 6 months</p>
                                             <div className="flex items-end gap-1.5 h-10">
                                                 {[60, 75, 65, 85, 70, 90].map((h, i) => (
                                                     <div key={i} className="flex-1 bg-teal-500/70 rounded-t-sm" style={{ height: `${h}%` }} />
@@ -127,7 +127,7 @@ export function PlatformShowcase() {
                                             </div>
                                         </div>
                                         <div className="bg-slate-900/60 border border-white/[0.05] rounded-lg p-2 flex flex-col items-center justify-center gap-2">
-                                            <p className="text-[8px] font-semibold text-slate-500">By Category</p>
+                                            <p className="text-[8px] font-semibold text-slate-300">By Category</p>
                                             <div className="w-10 h-10 rounded-full" style={{ background: "conic-gradient(#0d9488 0% 62%, #3b82f6 62% 80%, #f97316 80% 90%, #334155 90% 100%)" }} />
                                         </div>
                                     </div>
@@ -143,9 +143,9 @@ export function PlatformShowcase() {
                                                 <div className="w-5 h-5 rounded-md bg-slate-700/60 border border-white/[0.05] shrink-0" />
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-[8px] text-slate-300 font-medium truncate">{a.name}</p>
-                                                    <p className="text-[7px] text-slate-500">{a.tag} · {a.dept}</p>
+                                                    <p className="text-[7px] text-slate-300">{a.tag} · {a.dept}</p>
                                                 </div>
-                                                <span className={`px-1.5 py-0.5 rounded-full text-[7px] font-bold ${a.active ? "bg-teal-500/10 text-teal-400" : "bg-blue-500/10 text-blue-400"}`}>
+                                                <span className={`px-1.5 py-0.5 rounded-full text-[7px] font-bold ${a.active ? "bg-teal-500/10 text-teal-300" : "bg-blue-500/10 text-blue-300"}`}>
                                                     {a.active ? "Active" : "Maint."}
                                                 </span>
                                             </div>
@@ -164,7 +164,7 @@ export function PlatformShowcase() {
                             <div className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center text-sm shrink-0">🖥️</div>
                             <div>
                                 <p className="text-sm font-semibold text-slate-200">Desktop Application</p>
-                                <p className="text-xs text-slate-500">Native Electron — offline capable</p>
+                                <p className="text-xs text-slate-300">Native Electron — managed endpoint</p>
                             </div>
                         </div>
                         <div className="flex gap-1.5 mb-3 relative z-10">
@@ -179,7 +179,7 @@ export function PlatformShowcase() {
                                 <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
                                 <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
                                 <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-                                <span className="flex-1 text-center text-[8px] text-slate-500">AssetIQ Desktop — Asset Register</span>
+                                <span className="flex-1 text-center text-[8px] text-slate-300">AssetIQ Desktop — Asset Register</span>
                             </div>
                             <div className="flex">
                                 {/* Icon sidebar */}
@@ -196,14 +196,14 @@ export function PlatformShowcase() {
                                         <span className="text-[10px] font-semibold text-slate-300">Asset Register</span>
                                         <div className="flex gap-1">
                                             <div className="px-1.5 py-0.5 bg-teal-500/20 text-teal-300 rounded text-[7px] font-semibold">+ New Asset</div>
-                                            <div className="px-1.5 py-0.5 border border-slate-700 text-slate-500 rounded text-[7px]">Bulk Import</div>
+                                            <div className="px-1.5 py-0.5 border border-slate-700 text-slate-300 rounded text-[7px]">Bulk Import</div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 bg-slate-900/60 border border-slate-700/50 rounded-md h-5 px-2 mb-2">
                                         <div className="w-2 h-2 rounded-full border border-slate-600 shrink-0" />
-                                        <span className="text-[7px] text-slate-500">Search assets, tags, departments…</span>
+                                        <span className="text-[7px] text-slate-300">Search assets, tags, departments…</span>
                                     </div>
-                                    <div className="flex items-center gap-2 px-1.5 py-1 bg-slate-900/40 rounded-md mb-1 text-[7px] font-semibold text-slate-500">
+                                    <div className="flex items-center gap-2 px-1.5 py-1 bg-slate-900/40 rounded-md mb-1 text-[7px] font-semibold text-slate-300">
                                         <div className="w-2 h-2 border border-slate-600 rounded-sm shrink-0" />
                                         <span className="w-20 shrink-0">Asset Name</span>
                                         <span className="w-10 shrink-0">Tag</span>
@@ -214,9 +214,9 @@ export function PlatformShowcase() {
                                         <div key={row.tag} className={`flex items-center gap-2 px-1.5 py-1 rounded-md mb-0.5 text-[7px] ${i === 0 ? "bg-teal-500/[0.07]" : ""}`}>
                                             <div className={`w-2 h-2 rounded-sm shrink-0 ${row.checked ? "bg-teal-500" : "border border-slate-600"}`} />
                                             <span className="w-20 text-slate-300 font-medium truncate shrink-0">{row.name}</span>
-                                            <span className="w-10 text-slate-500 shrink-0">{row.tag}</span>
-                                            <span className="w-14 text-slate-500 truncate shrink-0">{row.dept}</span>
-                                            <span className={`px-1.5 py-0.5 rounded-full text-[6px] font-bold ${row.active ? "bg-teal-500/15 text-teal-400" : "bg-blue-500/15 text-blue-400"}`}>
+                                            <span className="w-10 text-slate-300 shrink-0">{row.tag}</span>
+                                            <span className="w-14 text-slate-300 truncate shrink-0">{row.dept}</span>
+                                            <span className={`px-1.5 py-0.5 rounded-full text-[6px] font-bold ${row.active ? "bg-teal-500/15 text-teal-300" : "bg-blue-500/15 text-blue-300"}`}>
                                                 {row.active ? "Active" : "Maint."}
                                             </span>
                                         </div>
@@ -234,7 +234,7 @@ export function PlatformShowcase() {
                             <div className="w-7 h-7 rounded-lg bg-violet-500/15 flex items-center justify-center text-sm shrink-0">📱</div>
                             <div>
                                 <p className="text-sm font-semibold text-slate-200">Mobile App</p>
-                                <p className="text-xs text-slate-500">Full asset access on the go</p>
+                                <p className="text-xs text-slate-300">Supported asset workflows on the go</p>
                             </div>
                         </div>
                         <div className="flex gap-1.5 mb-5 w-full relative z-10">
@@ -273,11 +273,11 @@ export function PlatformShowcase() {
 
                                     {/* Greeting */}
                                     <div className="px-4 pb-3">
-                                        <p className="text-[10px] text-slate-500">Good morning,</p>
+                                        <p className="text-[10px] text-slate-300">Good morning,</p>
                                         <p className="text-sm font-bold text-slate-100 mb-2.5">IT Manager 👋</p>
                                         <div className="flex items-center gap-2 bg-slate-800 rounded-xl h-8 px-3 border border-white/[0.05]">
                                             <div className="w-3 h-3 rounded-full border-2 border-slate-600 shrink-0" />
-                                            <span className="text-[10px] text-slate-500">Search assets…</span>
+                                            <span className="text-[10px] text-slate-300">Search assets…</span>
                                         </div>
                                     </div>
 
@@ -289,7 +289,7 @@ export function PlatformShowcase() {
                                         ].map(k => (
                                             <div key={k.lbl} className="bg-slate-800 rounded-xl p-2.5 border border-white/[0.05]">
                                                 <p className={`text-base font-black ${k.teal ? "text-teal-400" : "text-slate-100"}`}>{k.val}</p>
-                                                <p className="text-[8px] text-slate-500 uppercase tracking-wide mt-0.5">{k.lbl}</p>
+                                                <p className="text-[8px] text-slate-300 uppercase tracking-wide mt-0.5">{k.lbl}</p>
                                                 <p className="text-[9px] font-semibold text-emerald-400 mt-0.5">{k.trend}</p>
                                             </div>
                                         ))}
@@ -312,9 +312,9 @@ export function PlatformShowcase() {
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-[10px] text-slate-200 font-medium truncate">{a.name}</p>
-                                                    <p className="text-[8px] text-slate-500">{a.sub}</p>
+                                                    <p className="text-[8px] text-slate-300">{a.sub}</p>
                                                 </div>
-                                                <span className={`px-1.5 py-0.5 rounded-lg text-[8px] font-bold whitespace-nowrap ${a.active ? "bg-teal-500/20 text-teal-400" : "bg-blue-500/20 text-blue-400"}`}>
+                                                <span className={`px-1.5 py-0.5 rounded-lg text-[8px] font-bold whitespace-nowrap ${a.active ? "bg-teal-500/20 text-teal-300" : "bg-blue-500/20 text-blue-300"}`}>
                                                     {a.active ? "Active" : "Maint."}
                                                 </span>
                                             </div>
@@ -326,7 +326,7 @@ export function PlatformShowcase() {
                                         {["Home", "Assets", "Ops", "More"].map((lbl, i) => (
                                             <div key={lbl} className="flex flex-col items-center gap-1">
                                                 <div className={`w-5 h-1 rounded-full ${i === 0 ? "bg-teal-500" : "bg-slate-700"}`} />
-                                                <span className={`text-[8px] ${i === 0 ? "text-teal-400 font-semibold" : "text-slate-500"}`}>{lbl}</span>
+                                                <span className={`text-[8px] ${i === 0 ? "text-teal-300 font-semibold" : "text-slate-300"}`}>{lbl}</span>
                                             </div>
                                         ))}
                                     </div>

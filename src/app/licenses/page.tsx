@@ -97,7 +97,6 @@ export default function LicensesPage() {
             productName: editing.productName,
             licenseType: editing.licenseType,
             status: editing.status,
-            licenseKey: editing.licenseKey || "",
             vendor: editing.vendor || "",
             seats: editing.seats,
             allocatedSeats: editing.allocatedSeats,
@@ -332,7 +331,6 @@ export default function LicensesPage() {
 
           <div className="space-y-2">
             <Label htmlFor="lic-key">License key</Label>
-            <Input id="lic-key" className="data-mono" placeholder="XXXX-XXXX-XXXX" {...register("licenseKey")} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

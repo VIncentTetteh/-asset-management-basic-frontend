@@ -31,6 +31,7 @@ import { ConfirmDialogHost } from "@/hooks/useConfirm";
 import { AiAssistant } from "@/components/AiAssistant";
 import { LicenseSetupWizard } from "@/components/LicenseSetupWizard";
 import { useAuth } from "@/contexts/AuthContext";
+import { commercialFeatures, isCommercialRouteDisabled } from "@/config/commercialFeatures";
 
 // Routes that require a specific permission — mirrors Sidebar route map.
 // Any path that starts with a pattern AND the user lacks the permission triggers
@@ -39,7 +40,7 @@ const ROUTE_PERMISSIONS: { pattern: string; permission: string }[] = [
     { pattern: "/analytics",          permission: "VIEW_REPORTS" },
     { pattern: "/reports",            permission: "VIEW_REPORTS" },
     { pattern: "/organisations",      permission: "MANAGE_ORGANIZATION_SETTINGS" },
-    { pattern: "/departments",        permission: "MANAGE_ORGANIZATION_SETTINGS" },
+    { pattern: "/departments",        permission: "VIEW_DEPARTMENTS" },
     { pattern: "/locations",          permission: "VIEW_LOCATIONS" },
     { pattern: "/employees",          permission: "VIEW_EMPLOYEES" },
     { pattern: "/users",              permission: "VIEW_USERS" },
@@ -54,16 +55,20 @@ const ROUTE_PERMISSIONS: { pattern: string; permission: string }[] = [
     { pattern: "/purchase-orders",    permission: "VIEW_PROCUREMENT" },
     { pattern: "/contracts",          permission: "VIEW_CONTRACTS" },
     { pattern: "/budgets",            permission: "VIEW_BUDGETS" },
+    { pattern: "/expenses",           permission: "MANAGE_EXPENSES" },
+    { pattern: "/leases",             permission: "MANAGE_LEASES" },
+    { pattern: "/exchange-rates",     permission: "MANAGE_EXCHANGE_RATES" },
     { pattern: "/vendor-reviews",     permission: "VIEW_VENDOR_REVIEWS" },
     { pattern: "/licenses",           permission: "VIEW_SOFTWARE_LICENSES" },
     { pattern: "/compliance",         permission: "VIEW_COMPLIANCE" },
+    { pattern: "/dpa",                permission: "VIEW_COMPLIANCE" },
     { pattern: "/discovery",          permission: "VIEW_NETWORK_DISCOVERY" },
     { pattern: "/cloud-assets",       permission: "VIEW_CLOUD_ASSETS" },
     { pattern: "/ai-insights",        permission: "VIEW_ASSETS" },
     { pattern: "/sso-configuration",  permission: "MANAGE_ORGANIZATION_SETTINGS" },
     { pattern: "/webhooks",           permission: "MANAGE_ORGANIZATION_SETTINGS" },
     { pattern: "/billing",            permission: "MANAGE_ORGANIZATION_SETTINGS" },
-    { pattern: "/audit-events",       permission: "REVIEW_ACCESS" },
+    { pattern: "/audit-events",       permission: "VIEW_AUDIT_LOGS" },
     { pattern: "/health",             permission: "MANAGE_ORGANIZATION_SETTINGS" },
     { pattern: "/depreciation-policies", permission: "VIEW_DEPRECIATION" },
 ];
@@ -85,7 +90,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const { loading: permLoading, hasPermission } = usePermissions();
     const { isAuthenticated, isReady } = useAuth();
 
-    const publicPaths = ["/", "/login", "/register", "/register-tenant", "/forgot-password", "/reset-password", "/design"];
+    const publicPaths = ["/", "/login", "/register", "/register-tenant", "/forgot-password", "/reset-password"];
     const isPublicPage = matchesRoute(pathname, publicPaths);
     const breadcrumb = pathname.split("/").filter(Boolean).join(" / ") || "home";
     const requiresOrgBootstrap =
@@ -180,14 +185,17 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (!isMounted || !isReady) return;
-        if (!isAuthenticated && !isPublicPage) {
-            setIsAuthorized(false);
-            setIsBootstrappingAuth(false);
-            router.push("/login");
-        } else {
-            setIsAuthorized(isAuthenticated);
-            setIsBootstrappingAuth(isAuthenticated && !isPublicPage && !getOrganisationIdFromStorage());
-        }
+        const timer = window.setTimeout(() => {
+            if (!isAuthenticated && !isPublicPage) {
+                setIsAuthorized(false);
+                setIsBootstrappingAuth(false);
+                router.push("/login");
+            } else {
+                setIsAuthorized(isAuthenticated);
+                setIsBootstrappingAuth(isAuthenticated && !isPublicPage && !getOrganisationIdFromStorage());
+            }
+        }, 0);
+        return () => window.clearTimeout(timer);
     }, [pathname, router, isPublicPage, isMounted, isReady, isAuthenticated]);
 
     useEffect(() => {
@@ -204,6 +212,10 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     // This covers direct URL entry, page refresh, and Ctrl+K quick navigation.
     useEffect(() => {
         if (permLoading || isBootstrappingAuth || requiresOrgBootstrap || isPublicPage || !isAuthorized) return;
+        if (isCommercialRouteDisabled(pathname)) {
+            router.replace("/dashboard");
+            return;
+        }
         const match = ROUTE_PERMISSIONS.find(r => pathname.startsWith(r.pattern));
         if (match && !hasPermission(match.permission)) {
             router.replace("/dashboard");
@@ -350,7 +362,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                     </div>
                 </div>
             </Modal>
-            <AiAssistant />
+            {commercialFeatures.governedAi ? <AiAssistant /> : null}
         </div>
     );
 }

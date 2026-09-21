@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { documentService } from "@/services/documentService";
 import { DocumentAttachment, AttachmentEntityType } from "@/types";
+import { commercialFeatures } from "@/config/commercialFeatures";
 import api from "@/lib/axios";
 import {
     File,
     FileText,
-    Image,
+    Image as ImageIcon,
     FileSpreadsheet,
     Trash2,
     ExternalLink,
@@ -40,7 +41,7 @@ function FileIcon({ contentType }: { contentType: string }) {
         return <FileText className="h-4 w-4 text-red-500 shrink-0" />;
     }
     if (contentType.startsWith("image/")) {
-        return <Image className="h-4 w-4 text-blue-500 shrink-0" />;
+        return <ImageIcon className="h-4 w-4 text-blue-500 shrink-0" />;
     }
     if (
         contentType.includes("spreadsheet") ||
@@ -83,7 +84,7 @@ export function DocumentAttachments({
 
     // ── Load attachments on mount / when entityId changes ─────────────────────
     useEffect(() => {
-        if (!entityId) return;
+        if (!commercialFeatures.documentAttachments || !entityId) return;
 
         let cancelled = false;
 
@@ -180,6 +181,8 @@ export function DocumentAttachments({
     };
 
     // ─── Render ───────────────────────────────────────────────────────────────
+    if (!commercialFeatures.documentAttachments) return null;
+
     return (
         <Card>
             <CardHeader className="pb-3">

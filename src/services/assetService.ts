@@ -1,6 +1,5 @@
 import api from "@/lib/axios";
 import { Asset, AssetDto, AssetImportResult, AssetHistory } from "@/types";
-import { extractList } from "@/services/responseUtils";
 
 export interface AssetFilterParams {
     search?: string;

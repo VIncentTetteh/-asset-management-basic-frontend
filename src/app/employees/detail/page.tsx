@@ -11,7 +11,6 @@ import { EmptyState } from "@/components/patterns/EmptyState";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { AssetTag } from "@/components/ui/asset-tag";
 import { PageSpinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import {

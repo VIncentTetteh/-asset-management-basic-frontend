@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { OrgSsoConfig, SsoOAuth2Dto, SsoSamlDto } from "@/types";
 import { orgSsoService } from "@/services/orgSsoService";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
@@ -29,7 +29,7 @@ export default function SsoConfigurationPage() {
     const oauth2Form = useForm<SsoOAuth2Dto>();
     const samlForm = useForm<SsoSamlDto>();
 
-    const loadConfig = async () => {
+    const loadConfig = useCallback(async () => {
         if (!orgId) { setIsLoading(false); return; }
         try {
             setIsLoading(true);
@@ -60,9 +60,9 @@ export default function SsoConfigurationPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [oauth2Form, orgId, samlForm]);
 
-    useEffect(() => { loadConfig(); }, []);
+    useEffect(() => { void loadConfig(); }, [loadConfig]);
 
     const handleToggle = async () => {
         if (!orgId || !config) return;
@@ -71,8 +71,10 @@ export default function SsoConfigurationPage() {
             const updated = await orgSsoService.toggle(orgId, { enabled: !config.enabled });
             setConfig(updated);
             toast.success(`SSO ${updated.enabled ? "enabled" : "disabled"}`);
-        } catch {
-            toast.error("Failed to toggle SSO");
+        } catch (error) {
+            toast.error(axios.isAxiosError(error) && error.response?.status === 403
+                ? "A recent MFA sign-in is required to change SSO. Sign in again with MFA."
+                : "Failed to toggle SSO");
         } finally {
             setIsToggling(false);
         }
@@ -84,8 +86,10 @@ export default function SsoConfigurationPage() {
             const updated = await orgSsoService.configureOAuth2(orgId, data);
             setConfig(updated);
             toast.success("OAuth2 SSO configured");
-        } catch {
-            toast.error("Failed to configure OAuth2 SSO");
+        } catch (error) {
+            toast.error(axios.isAxiosError(error) && error.response?.status === 403
+                ? "A recent MFA sign-in is required to change SSO. Sign in again with MFA."
+                : "Failed to configure OAuth2 SSO");
         }
     };
 
@@ -95,8 +99,10 @@ export default function SsoConfigurationPage() {
             const updated = await orgSsoService.configureSaml(orgId, data);
             setConfig(updated);
             toast.success("SAML SSO configured");
-        } catch {
-            toast.error("Failed to configure SAML SSO");
+        } catch (error) {
+            toast.error(axios.isAxiosError(error) && error.response?.status === 403
+                ? "A recent MFA sign-in is required to change SSO. Sign in again with MFA."
+                : "Failed to configure SAML SSO");
         }
     };
 

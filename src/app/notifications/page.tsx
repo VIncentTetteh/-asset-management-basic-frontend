@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { notificationService, resolveNotifId } from "@/services/notificationService";
 import { Notification, NotificationPreferences, NotificationSummary, NOTIFICATION_TYPES } from "@/types";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Bell, CheckCircle2, Trash2, Settings } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
@@ -58,9 +57,7 @@ export default function NotificationsPage() {
         limit: 20,
     });
 
-    useEffect(() => { fetchData(); }, []);
-
-    const fetchData = async (nextFilters = filters) => {
+    const fetchData = useCallback(async (nextFilters: { type?: string; status?: "unread" | "read" | "all"; limit?: number }) => {
         try {
             const [notifsResult, prefsResult, summaryResult] = await Promise.allSettled([
                 notificationService.getNotifications(nextFilters),
@@ -77,7 +74,11 @@ export default function NotificationsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        void fetchData({ status: "all", limit: 20 });
+    }, [fetchData]);
 
     const markAsRead = async (id: string) => {
         setMarkingReadId(id);
@@ -127,10 +128,6 @@ export default function NotificationsPage() {
         } finally {
             setClearingAll(false);
         }
-    };
-
-    const updatePreference = (key: keyof NotificationPreferences, value: unknown) => {
-        setPreferences((prev) => prev ? { ...prev, [key]: value } : prev);
     };
 
     const updateEmailPreference = (key: string, value: boolean) => {
@@ -294,29 +291,14 @@ export default function NotificationsPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Settings className="h-4 w-4 text-faint-fg" /> Delivery Preferences
+                                <Settings className="h-4 w-4 text-faint-fg" /> Email Preferences
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4 text-sm">
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-fg">In-App Notifications</span>
-                                <input type="checkbox" checked={Boolean(preferences?.inAppNotifications)} onChange={(e) => updatePreference("inAppNotifications", e.target.checked)} className="accent-[var(--primary)]" />
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-fg">Push Notifications</span>
-                                <input type="checkbox" checked={Boolean(preferences?.pushNotifications)} onChange={(e) => updatePreference("pushNotifications", e.target.checked)} className="accent-[var(--primary)]" />
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-fg">Daily Digest</span>
-                                <input type="checkbox" checked={Boolean(preferences?.dailyDigest)} onChange={(e) => updatePreference("dailyDigest", e.target.checked)} className="accent-[var(--primary)]" />
-                            </div>
-                            {preferences?.dailyDigest && (
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Digest Time</Label>
-                                    <Input type="time" value={preferences?.digestTime || "09:00"} onChange={(e) => updatePreference("digestTime", e.target.value)} />
-                                </div>
-                            )}
-                            <div className="space-y-2 border-t border-edge-subtle pt-2">
+                            <p className="text-xs text-muted-fg">
+                                In-app alerts are always delivered for governed workflow events. Configure only the email categories supported by the notification service.
+                            </p>
+                            <div className="space-y-2 border-t border-edge-subtle pt-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-faint-fg">Email by Category</p>
                                 {NOTIFICATION_TYPES.map((t) => (
                                     <div key={t} className="flex items-center justify-between">
