@@ -6,9 +6,9 @@ import Link from "next/link";
 import { matchesRoute } from "@/lib/route-path";
 import { PageSpinner } from "@/components/ui/spinner";
 import { Sidebar } from "@/components/Sidebar";
-import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { QueryProvider } from "@/components/QueryProvider";
 import { Modal } from "@/components/ui/modal";
@@ -307,9 +307,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                         <CurrencySwitcher />
 
                         <ThemeToggle />
-                        <Button variant="outline" size="icon" aria-label="Notifications">
-                            <Bell className="h-4 w-4" />
-                        </Button>
+                        <NotificationBell />
                         <div className="hidden md:flex items-center gap-2 rounded-control border border-edge bg-surface-muted px-3 py-1.5">
                             <span className="h-2 w-2 rounded-full bg-brand" />
                             <span className="text-xs font-semibold text-foreground truncate max-w-[170px]">{orgName}</span>
