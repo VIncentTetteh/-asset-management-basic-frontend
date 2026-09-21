@@ -110,4 +110,24 @@ describe("CurrencyContext", () => {
         expect(result.current.currency).toBe("USD");
         spy.mockRestore();
     });
+
+    it("reports which currencies are reachable from the base", async () => {
+        getSettings.mockResolvedValue({ baseCurrency: "GHS", availableCurrencies: ["GHS", "USD", "EUR"], canEdit: true });
+        const { result } = await renderLoaded();
+        expect(result.current.ratesError).toBe(false);
+        expect(result.current.isReachable("GHS")).toBe(true);
+        expect(result.current.isReachable("USD")).toBe(true);
+        expect(result.current.isReachable("EUR")).toBe(false);
+    });
+
+    it("exposes a rates failure and only allows the base currency", async () => {
+        listAll.mockRejectedValue(new Error("403"));
+        window.localStorage.setItem("assetiq_currency", "USD");
+        const { result } = renderCurrency();
+        await waitFor(() => expect(result.current.ratesError).toBe(true));
+        expect(result.current.baseCurrency).toBe("GHS");
+        expect(result.current.isReachable("USD")).toBe(false);
+        expect(result.current.isReachable("GHS")).toBe(true);
+        expect(result.current.currency).toBe("GHS");
+    });
 });

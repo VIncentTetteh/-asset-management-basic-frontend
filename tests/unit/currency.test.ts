@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
     buildRateMap,
     convertAmount,
+    hasConversionPath,
     mergeCompleteness,
     normalizeCurrencyCode,
     resolveRate,
@@ -45,8 +46,8 @@ describe("resolveRate / convertAmount", () => {
         expect(convertAmount(50, "GHS", "USD", rates)).toBeCloseTo(5);
     });
 
-    it("triangulates through the base currency only when a pivot is given", () => {
-        expect(resolveRate("USD", "EUR", rates)).toBeNull();
+    it("triangulates through intermediate currencies with or without a pivot", () => {
+        expect(resolveRate("USD", "EUR", rates)).toBeCloseTo(0.8);
         expect(resolveRate("USD", "EUR", rates, "GHS")).toBeCloseTo(0.8);
     });
 
@@ -115,5 +116,43 @@ describe("normalizeCurrencyCode", () => {
         expect(normalizeCurrencyCode(" ghs ")).toBe("GHS");
         expect(normalizeCurrencyCode("CEDI")).toBeNull();
         expect(normalizeCurrencyCode(undefined)).toBeNull();
+    });
+});
+
+describe("resolveRate multi-hop graph search", () => {
+    const rates = buildRateMap(
+        [
+            { baseCurrency: "USD", targetCurrency: "GHS", rate: 10, effectiveDate: "2026-01-01" },
+            { baseCurrency: "EUR", targetCurrency: "GHS", rate: 12, effectiveDate: "2026-01-01" },
+            { baseCurrency: "GBP", targetCurrency: "EUR", rate: 1.2, effectiveDate: "2026-01-01" },
+            // Future-dated: must not create a JPY path.
+            { baseCurrency: "JPY", targetCurrency: "GHS", rate: 0.07, effectiveDate: "2026-12-01" },
+        ],
+        AS_OF,
+    );
+
+    it("converts EUR to USD via GHS when only USD->GHS and EUR->GHS exist", () => {
+        // 1 EUR = 12 GHS; 1 GHS = 0.1 USD  =>  1 EUR = 1.2 USD
+        expect(resolveRate("EUR", "USD", rates)).toBeCloseTo(1.2);
+        expect(resolveRate("USD", "EUR", rates)).toBeCloseTo(10 / 12);
+    });
+
+    it("walks more than two hops", () => {
+        // 1 GBP = 1.2 EUR = 14.4 GHS = 1.44 USD
+        expect(resolveRate("GBP", "USD", rates)).toBeCloseTo(1.44);
+    });
+
+    it("uses the inverse edge", () => {
+        expect(resolveRate("GHS", "EUR", rates)).toBeCloseTo(1 / 12);
+    });
+
+    it("returns null when the currencies are not connected", () => {
+        expect(resolveRate("USD", "CHF", rates)).toBeNull();
+        expect(hasConversionPath("USD", "CHF", rates)).toBe(false);
+        expect(hasConversionPath("USD", "GBP", rates)).toBe(true);
+    });
+
+    it("ignores future-dated rates", () => {
+        expect(resolveRate("JPY", "USD", rates)).toBeNull();
     });
 });

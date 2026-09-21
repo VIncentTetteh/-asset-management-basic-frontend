@@ -89,23 +89,63 @@ const directOrInverse = (from: string, to: string, rates: RateMap): number | nul
     return inverse != null ? 1 / inverse : null;
 };
 
+/** Adjacency list over the rate graph: every pair is walkable both ways. */
+const buildRateGraph = (rates: RateMap): Map<string, Map<string, number>> => {
+    const graph = new Map<string, Map<string, number>>();
+    const edge = (from: string, to: string, rate: number, preferred: boolean) => {
+        let neighbours = graph.get(from);
+        if (!neighbours) {
+            neighbours = new Map();
+            graph.set(from, neighbours);
+        }
+        // A directly quoted rate always wins over the inverse of the opposite pair.
+        if (preferred || !neighbours.has(to)) neighbours.set(to, rate);
+    };
+    for (const [pair, rate] of rates) {
+        const [from, to] = pair.split("->");
+        if (!from || !to) continue;
+        edge(from, to, rate, true);
+        edge(to, from, 1 / rate, false);
+    }
+    return graph;
+};
+
 /**
- * Rate for 1 `from` in `to`: direct, else inverse, else (when a pivot — the
- * org's base currency — is given) triangulated through it, since every
- * available currency has a rate to/from the base.
+ * Rate for 1 `from` in `to`. Direct or inverse when available; otherwise the
+ * shortest chain of rates (breadth-first over direct and inverse edges),
+ * multiplied along the path. Null when the currencies are not connected.
+ *
+ * `pivot` is accepted for backwards compatibility; the graph search already
+ * covers every path through the base currency.
  */
 export function resolveRate(from: string, to: string, rates: RateMap, pivot?: string | null): number | null {
+    void pivot;
     const source = normalizeCurrencyCode(from);
     const target = normalizeCurrencyCode(to);
     if (!source || !target) return null;
     const simple = directOrInverse(source, target, rates);
     if (simple != null) return simple;
-    const via = normalizeCurrencyCode(pivot);
-    if (!via || via === source || via === target) return null;
-    const leg1 = directOrInverse(source, via, rates);
-    const leg2 = directOrInverse(via, target, rates);
-    return leg1 != null && leg2 != null ? leg1 * leg2 : null;
+
+    const graph = buildRateGraph(rates);
+    const reached = new Map<string, number>([[source, 1]]);
+    const queue: string[] = [source];
+    for (let head = 0; head < queue.length; head++) {
+        const node = queue[head];
+        const soFar = reached.get(node) ?? 1;
+        for (const [next, rate] of graph.get(node) ?? []) {
+            if (reached.has(next)) continue;
+            const product = soFar * rate;
+            if (next === target) return product;
+            reached.set(next, product);
+            queue.push(next);
+        }
+    }
+    return null;
 }
+
+/** True when `from` can be converted into `to` with the given rates. */
+export const hasConversionPath = (from: string, to: string, rates: RateMap): boolean =>
+    resolveRate(from, to, rates) != null;
 
 /** Converts `amount`; null (never a guess) when no rate is available. */
 export function convertAmount(

@@ -36,6 +36,9 @@ export default function ExchangeRatesPage() {
   });
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ratesKey.all });
+    // The header switcher's rate graph lives under its own key (also covered by
+    // the prefix above; invalidated explicitly so a key rename cannot break it).
+    void queryClient.invalidateQueries({ queryKey: currencyQueryKeys.ratesAll });
     // availableCurrencies is derived from the rates, so the settings change too.
     void queryClient.invalidateQueries({ queryKey: currencyQueryKeys.all });
   };

@@ -12,6 +12,7 @@ import {
     convertAmount,
     currencySymbol,
     formatMoney,
+    hasConversionPath,
     normalizeCurrencyCode,
     ratePair,
     sumMoney,
@@ -29,6 +30,7 @@ const SETTINGS_STALE_MS = 5 * 60_000;
 export const currencyQueryKeys = {
     all: ["currency"] as const,
     settings: (orgId?: string) => ["currency", "settings", orgId] as const,
+    ratesAll: ["exchange-rates", "currency-context"] as const,
     rates: (orgId?: string) => ["exchange-rates", "currency-context", orgId] as const,
 };
 
@@ -45,7 +47,11 @@ export interface CurrencyContextValue {
     settingsLoading: boolean;
     settingsError: boolean;
     rateLoading: boolean;
+    /** True when the exchange-rate list failed to load; only the base currency is usable. */
+    ratesError: boolean;
     rates: RateMap;
+    /** True when amounts in the base currency can be shown in `code` (a rate path exists). */
+    isReachable: (code: string) => boolean;
     /** Converts into `to` (default: display currency); null when no rate exists. */
     tryConvert: (amount: number, fromCurrency?: string | null, to?: string) => number | null;
     /** Legacy numeric API: NaN when no rate exists. */
@@ -75,7 +81,9 @@ const CurrencyContext = createContext<CurrencyContextValue>({
     settingsLoading: false,
     settingsError: false,
     rateLoading: false,
+    ratesError: false,
     rates: new Map(),
+    isReachable: () => true,
     tryConvert: (amount) => amount,
     convert: (amount) => amount,
     canConvert: () => true,
@@ -130,10 +138,26 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         () => settingsQuery.data?.availableCurrencies ?? [baseCurrency],
         [settingsQuery.data, baseCurrency],
     );
-    // A remembered choice only applies while it is still offered for this org.
-    const currency = preferred && availableCurrencies.includes(preferred) ? preferred : baseCurrency;
 
     const rates = useMemo<RateMap>(() => buildRateMap(ratesQuery.data ?? []), [ratesQuery.data]);
+    const ratesError = ratesQuery.isError;
+    const isReachable = useCallback(
+        (code: string) => {
+            const target = normalizeCurrencyCode(code);
+            if (!target) return false;
+            if (target === baseCurrency) return true;
+            return !ratesError && hasConversionPath(baseCurrency, target, rates);
+        },
+        [baseCurrency, rates, ratesError],
+    );
+    // A remembered choice only applies while it is still offered for this org
+    // and (once rates have settled) still reachable from the base currency.
+    const currency =
+        preferred
+        && availableCurrencies.includes(preferred)
+        && (ratesQuery.isLoading || isReachable(preferred))
+            ? preferred
+            : baseCurrency;
 
     const setCurrency = useCallback((next: string) => {
         const code = normalizeCurrencyCode(next);
@@ -174,7 +198,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
             settingsLoading: settingsQuery.isLoading,
             settingsError: settingsQuery.isError,
             rateLoading: ratesQuery.isLoading,
+            ratesError,
             rates,
+            isReachable,
             tryConvert,
             convert: (amount, from) => tryConvert(amount, from) ?? Number.NaN,
             canConvert: (from) => missingRateFor(from) === null,
@@ -186,7 +212,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         };
     }, [
         baseCurrency, currency, setCurrency, availableCurrencies, settingsQuery.data, settingsQuery.isLoading,
-        settingsQuery.isError, ratesQuery.isLoading, rates, tryConvert, sourceOf,
+        settingsQuery.isError, ratesQuery.isLoading, ratesError, rates, isReachable, tryConvert, sourceOf,
     ]);
 
     return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;

@@ -23,8 +23,8 @@ import {
     mergeStoredUser,
     verifyOrganisationContext,
 } from "@/lib/authContext";
-import { CurrencyProvider, useCurrency } from "@/contexts/CurrencyContext";
-import { currencyName } from "@/lib/currency";
+import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { CurrencySwitcher } from "@/components/currency/CurrencySwitcher";
 import { PermissionProvider, usePermissions } from "@/contexts/PermissionContext";
 import { LicenseProvider } from "@/contexts/LicenseContext";
 import { LicenseBanner } from "@/components/LicenseBanner";
@@ -74,9 +74,6 @@ const ROUTE_PERMISSIONS: { pattern: string; permission: string }[] = [
     { pattern: "/depreciation-policies", permission: "VIEW_DEPRECIATION" },
 ];
 
-/** Beyond this many currencies the header switcher becomes a dropdown. */
-const MAX_CURRENCY_BUTTONS = 3;
-
 // Inner layout — can safely use useCurrency + usePermissions since it's inside both providers
 function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -90,7 +87,6 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const [isPlanLimitOpen, setIsPlanLimitOpen] = useState(false);
     const [planLimitMessage, setPlanLimitMessage] = useState("");
 
-    const { currency, setCurrency, availableCurrencies, baseCurrency } = useCurrency();
     const { loading: permLoading, hasPermission } = usePermissions();
     const { isAuthenticated, isReady } = useAuth();
 
@@ -307,46 +303,8 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
                         <GlobalSearch />
 
                         {/* Display-currency switcher: the org's base currency plus every
-                            currency it has an exchange rate for. */}
-                        {availableCurrencies.length > 1 ? (
-                            availableCurrencies.length <= MAX_CURRENCY_BUTTONS ? (
-                                <div
-                                    role="group"
-                                    aria-label="Display currency"
-                                    className="flex items-center rounded-control border border-edge bg-surface-muted p-0.5"
-                                >
-                                    {availableCurrencies.map(c => (
-                                        <button
-                                            key={c}
-                                            type="button"
-                                            onClick={() => setCurrency(c)}
-                                            aria-pressed={currency === c}
-                                            title={c === baseCurrency ? `${currencyName(c)} (base currency)` : currencyName(c)}
-                                            className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${
-                                                currency === c
-                                                    ? "bg-brand text-brand-contrast shadow-sm"
-                                                    : "text-muted-fg hover:text-foreground"
-                                            }`}
-                                        >
-                                            {c}
-                                        </button>
-                                    ))}
-                                </div>
-                            ) : (
-                                <select
-                                    aria-label="Display currency"
-                                    value={currency}
-                                    onChange={(e) => setCurrency(e.target.value)}
-                                    className="ea-focus h-8 rounded-control border border-edge bg-surface-muted px-2 text-xs font-bold text-foreground"
-                                >
-                                    {availableCurrencies.map(c => (
-                                        <option key={c} value={c}>
-                                            {c}{c === baseCurrency ? " (base)" : ""}
-                                        </option>
-                                    ))}
-                                </select>
-                            )
-                        ) : null}
+                            currency reachable from it through exchange rates. */}
+                        <CurrencySwitcher />
 
                         <ThemeToggle />
                         <Button variant="outline" size="icon" aria-label="Notifications">
