@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { Plus, Pencil, Trash2, Tags, Search } from "lucide-react";
@@ -17,6 +18,8 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
+import { useDepreciationPolicies } from "@/features/depreciation/hooks";
+import { depreciationMethodLabel, usefulLifeLabel } from "@/features/assets/depreciation";
 
 const categories = makeCrudHooks<Category, CategoryDto>("categories", categoryService, { entity: "Category" });
 
@@ -25,6 +28,8 @@ export default function CategoriesPage() {
   const save = categories.useSave();
   const remove = categories.useDelete();
   const { confirm, ConfirmDialog } = useConfirm();
+  // Listing policies needs VIEW_DEPRECIATION; without it an assigned policy shows as "Assigned".
+  const { data: policies = [] } = useDepreciationPolicies();
 
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,9 +46,17 @@ export default function CategoriesPage() {
             description: editing.description || "",
             assetPrefixCode: editing.assetPrefixCode || "",
             parentCategoryId: editing.parentCategoryId || "",
+            depreciationPolicyId: editing.depreciationPolicyId || "",
             defaultWarrantyPeriodMonths: editing.defaultWarrantyPeriodMonths,
           }
-        : { name: "", description: "", assetPrefixCode: "", parentCategoryId: "", defaultWarrantyPeriodMonths: undefined },
+        : {
+            name: "",
+            description: "",
+            assetPrefixCode: "",
+            parentCategoryId: "",
+            depreciationPolicyId: "",
+            defaultWarrantyPeriodMonths: undefined,
+          },
     );
   }, [isModalOpen, editing, reset]);
 
@@ -51,6 +64,8 @@ export default function CategoriesPage() {
     const map = new Map(rows.map((c) => [c.id, c.name]));
     return (id?: string | null) => (id ? map.get(id) ?? "—" : "—");
   }, [rows]);
+
+  const policyById = useMemo(() => new Map(policies.map((p) => [p.id, p])), [policies]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return rows;
@@ -70,6 +85,10 @@ export default function CategoriesPage() {
 
   const onSubmit = async (data: CategoryDto) => {
     const payload: CategoryDto = { ...data };
+    // An emptied select is an explicit clear; a missing field means "unchanged".
+    const clearFields: NonNullable<CategoryDto["clearFields"]> = [];
+    if (editing?.depreciationPolicyId && data.depreciationPolicyId === "") clearFields.push("depreciationPolicyId");
+    if (editing?.parentCategoryId && data.parentCategoryId === "") clearFields.push("parentCategoryId");
     if (payload.defaultWarrantyPeriodMonths != null && String(payload.defaultWarrantyPeriodMonths) !== "") {
       payload.defaultWarrantyPeriodMonths = Number(payload.defaultWarrantyPeriodMonths);
     } else {
@@ -81,6 +100,7 @@ export default function CategoriesPage() {
 
     if (editing) {
       const patch = buildPatchPayload<CategoryDto>(editing as unknown as Partial<CategoryDto>, payload);
+      if (clearFields.length > 0) patch.clearFields = clearFields;
       if (Object.keys(patch).length === 0) {
         toast("No changes to update");
         return;
@@ -123,6 +143,25 @@ export default function CategoriesPage() {
         cell: ({ row }) => <span className="text-muted-fg">{parentName(row.original.parentCategoryId)}</span>,
       },
       {
+        id: "depreciationPolicy",
+        header: "Depreciation policy",
+        enableSorting: false,
+        cell: ({ row }) => {
+          const id = row.original.depreciationPolicyId;
+          const policy = id ? policyById.get(id) : undefined;
+          if (!id) return <span className="text-faint-fg">None</span>;
+          if (!policy) return <span className="text-muted-fg">Assigned</span>;
+          return (
+            <div className="min-w-0 max-w-56">
+              <p className="truncate font-medium text-foreground">{policy.name}</p>
+              <p className="truncate text-xs text-faint-fg">
+                {depreciationMethodLabel(policy.method)} · {usefulLifeLabel(policy.usefulLifeMonths)}
+              </p>
+            </div>
+          );
+        },
+      },
+      {
         accessorKey: "defaultWarrantyPeriodMonths",
         header: () => <span className="block text-right">Warranty (mo)</span>,
         cell: ({ row }) => (
@@ -161,7 +200,7 @@ export default function CategoriesPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [parentName],
+    [parentName, policyById],
   );
 
   return (
@@ -223,6 +262,26 @@ export default function CategoriesPage() {
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cat-policy">Depreciation policy</Label>
+            <Select id="cat-policy" {...register("depreciationPolicyId")}>
+              <option value="">None</option>
+              {editing?.depreciationPolicyId && !policyById.has(editing.depreciationPolicyId) ? (
+                <option value={editing.depreciationPolicyId}>Current policy</option>
+              ) : null}
+              {policies.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({depreciationMethodLabel(p.method)}, {usefulLifeLabel(p.usefulLifeMonths)})
+                </option>
+              ))}
+            </Select>
+            <p className="text-xs text-muted-fg">
+              Assets in this category without their own useful life, method or residual value use this policy.{" "}
+              <Link href="/depreciation-policies" className="ea-focus rounded-sm font-semibold text-brand hover:underline">
+                Manage policies
+              </Link>
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="cat-description">Description</Label>
