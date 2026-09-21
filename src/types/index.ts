@@ -1711,6 +1711,12 @@ export interface MfaDisableDto {
     code: string;
 }
 
+/** Response body from POST /mfa/step-up (the access cookie is re-issued too). */
+export interface MfaStepUpResponse {
+    /** Epoch seconds of the fresh authenticator check. */
+    mfaAuthenticatedAt: number;
+}
+
 // ─── SSO Configuration (org-scoped) ──────────────────────────────────────────
 
 export interface OrgSsoConfig {

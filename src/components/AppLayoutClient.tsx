@@ -30,6 +30,7 @@ import { PermissionProvider, usePermissions } from "@/contexts/PermissionContext
 import { LicenseProvider } from "@/contexts/LicenseContext";
 import { LicenseBanner } from "@/components/LicenseBanner";
 import { ConfirmDialogHost } from "@/hooks/useConfirm";
+import { StepUpMfaDialog } from "@/components/security/StepUpMfaDialog";
 import { AiAssistant } from "@/components/AiAssistant";
 import { LicenseSetupWizard } from "@/components/LicenseSetupWizard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -347,6 +348,8 @@ export function AppLayoutClient({ children }: { children: React.ReactNode }) {
                 <PermissionProvider>
                     <AppLayoutInner>{children}</AppLayoutInner>
                     <ConfirmDialogHost />
+                    {/* Step-up MFA prompt for approvals and admin writes; opened by the axios interceptor. */}
+                    <StepUpMfaDialog />
                     {/* First-run wizard: shown in standalone mode when no key is active.
                         No-op (renders null) in cloud mode and after key activation. */}
                     <LicenseSetupWizard />

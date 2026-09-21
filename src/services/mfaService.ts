@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { MfaSetupResponse, MfaVerifyDto, MfaDisableDto, MfaChallengeVerifyResponse } from "@/types";
+import { MfaSetupResponse, MfaVerifyDto, MfaDisableDto, MfaChallengeVerifyResponse, MfaStepUpResponse } from "@/types";
 
 export interface MfaChallengeDto {
     mfaChallengeToken: string;
@@ -32,6 +32,17 @@ export const mfaService = {
      */
     challenge: async (data: MfaChallengeDto): Promise<MfaChallengeVerifyResponse> => {
         const response = await api.post<MfaChallengeVerifyResponse>("/mfa/challenge", data);
+        return response.data;
+    },
+
+    /**
+     * POST /mfa/step-up — re-verify an authenticator code while signed in. The
+     * backend re-issues the HttpOnly access cookie with a fresh MFA timestamp,
+     * which @RequireFreshMfa actions (approvals, role/SSO admin) require.
+     * Errors: 401 MFA_CODE_INVALID, 428 MFA_ENROLMENT_REQUIRED, 429 rate limited.
+     */
+    stepUp: async (code: string): Promise<MfaStepUpResponse> => {
+        const response = await api.post<MfaStepUpResponse>("/mfa/step-up", { code });
         return response.data;
     },
 

@@ -2,6 +2,13 @@ import axios from "axios";
 import { clearVerifiedOrganisationId, getOrganisationIdFromStorage } from "@/lib/authContext";
 import { loginPathWithNext } from "@/lib/safe-next";
 import { PLAN_LIMIT_EVENT, isPlanLimitError, type PlanLimitDetail } from "@/lib/plan-limit";
+import {
+    MFA_ENROLMENT_REQUIRED_EVENT,
+    isMfaCodeInvalidError,
+    isMfaEnrolmentRequiredError,
+    isStepUpRequiredError,
+    requestStepUp,
+} from "@/lib/step-up";
 
 /**
  * Axios instance for all API requests.
@@ -104,6 +111,30 @@ api.interceptors.response.use((response) => response, async (error) => {
             method: originalRequest?.method?.toUpperCase(),
         };
         window.dispatchEvent(new CustomEvent<PlanLimitDetail>(PLAN_LIMIT_EVENT, { detail }));
+        return Promise.reject(error);
+    }
+
+    // Step-up MFA: the session is valid but this action needs a fresh
+    // authenticator check. Prompt once (shared across concurrent requests),
+    // then retry the original request exactly once. These 401s must never
+    // reach the session-expired handling below, which would sign the user out.
+    if (typeof window !== "undefined" && isStepUpRequiredError(error)) {
+        if (!originalRequest || originalRequest._stepUpRetried) {
+            return Promise.reject(error);
+        }
+        originalRequest._stepUpRetried = true;
+        await requestStepUp(); // rejects StepUpCancelledError when dismissed
+        return api(originalRequest);
+    }
+
+    // A mistyped authenticator code (step-up, enrolment, disable) is a form
+    // error, not an expired session.
+    if (isMfaCodeInvalidError(error)) {
+        return Promise.reject(error);
+    }
+
+    if (typeof window !== "undefined" && isMfaEnrolmentRequiredError(error)) {
+        window.dispatchEvent(new CustomEvent(MFA_ENROLMENT_REQUIRED_EVENT));
         return Promise.reject(error);
     }
 
