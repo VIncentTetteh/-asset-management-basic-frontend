@@ -12,7 +12,6 @@ export const DEFAULT_POST_LOGIN_PATH = "/dashboard";
 
 const PROBE_ORIGIN = "https://assetiq.invalid";
 const MAX_NEXT_LENGTH = 2048;
-// eslint-disable-next-line no-control-regex -- rejecting control characters is the point
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
 /** Where sending the user after login would loop or make no sense. */
 const NON_DESTINATIONS = ["/login", "/register", "/register-tenant", "/forgot-password", "/reset-password"];
