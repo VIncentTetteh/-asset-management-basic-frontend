@@ -177,7 +177,10 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
                             {bucketError ? (
                                 <FieldError id="bucketName-error" error={{ message: bucketError }} />
                             ) : (
-                                <p className="text-xs text-faint-fg">Leave blank to use the default bucket.</p>
+                                <p className="text-xs text-faint-fg">
+                                    Leave blank to use the default bucket. Only buckets this deployment allows can be
+                                    named here — anything else is refused when you save.
+                                </p>
                             )}
                         </div>
 
