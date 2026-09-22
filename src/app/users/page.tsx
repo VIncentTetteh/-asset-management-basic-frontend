@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { applyApiFieldErrors } from "@/lib/api-validation";
 import { useConfirm } from "@/hooks/useConfirm";
+import { PASSWORD_INPUT_PROPS, passwordRules } from "@/lib/password-policy";
 import {
   useUsers,
   useUserMasterData,
@@ -312,10 +313,8 @@ export default function UsersPage() {
           {!editingUser && (
             <div className="space-y-2">
               <Label htmlFor="us-password">Temporary password <span className="text-danger">*</span></Label>
-              <Input id="us-password" type="password" autoComplete="new-password" {...register("password", {
-                required: editingUser ? false : "Password is required",
-                minLength: { value: 8, message: "At least 8 characters" },
-              })} />
+              <Input id="us-password" type="password" autoComplete="new-password" {...PASSWORD_INPUT_PROPS}
+                {...register("password", passwordRules(editingUser ? false : "Password is required"))} />
               {errors.password && <p className="text-sm text-danger">{errors.password.message}</p>}
             </div>
           )}

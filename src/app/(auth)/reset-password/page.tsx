@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { authService } from "@/services/authService";
 import { extractErrorMessage } from "@/lib/error";
+import { PASSWORD_INPUT_PROPS, passwordRules } from "@/lib/password-policy";
 
 function ResetPasswordForm() {
     const router = useRouter();
@@ -65,13 +66,8 @@ function ResetPasswordForm() {
                         id="newPassword"
                         type="password"
                         placeholder="••••••••"
-                        {...register("newPassword", {
-                            required: "New password is required",
-                            minLength: {
-                                value: 8,
-                                message: "Password must be at least 8 characters long"
-                            }
-                        })}
+                        {...PASSWORD_INPUT_PROPS}
+                        {...register("newPassword", passwordRules("New password is required"))}
                         className={errors.newPassword ? "border-red-500" : ""}
                     />
                     {errors.newPassword && (

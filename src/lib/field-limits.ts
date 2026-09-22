@@ -1,4 +1,5 @@
 import type { FieldPath, FieldValues, RegisterOptions } from "react-hook-form";
+import { PASSWORD_MAX_BYTES, PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
 
 /**
  * Per-field limits, mirroring the backend request DTOs exactly.
@@ -213,7 +214,7 @@ export const FIELD_LIMITS = {
         phone: text(255),
         employeeId: text(255),
         jobTitle: text(255),
-        password: { minLength: 8, maxLength: 128 },
+        password: { minLength: PASSWORD_MIN_LENGTH, maxLength: PASSWORD_MAX_BYTES },
     },
     vendorReview: {
         rating: { required: true, min: 1, max: 5, step: 0.01 },

@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { authService, TenantRegistrationDto } from "@/services/authService";
 import { Eye, EyeOff } from "lucide-react";
 import { extractErrorMessage } from "@/lib/error";
+import { PASSWORD_INPUT_PROPS, passwordRules } from "@/lib/password-policy";
 
 export default function RegisterTenantPage() {
     const router = useRouter();
@@ -129,10 +130,8 @@ export default function RegisterTenantPage() {
                                         id="password"
                                         type={showPassword ? "text" : "password"}
                                         placeholder="Min 8 characters"
-                                        {...register("password", {
-                                            required: "Password is required",
-                                            minLength: { value: 8, message: "Must be at least 8 characters" }
-                                        })}
+                                        {...PASSWORD_INPUT_PROPS}
+                                        {...register("password", passwordRules())}
                                         className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
                                     />
                                     <button
