@@ -21,7 +21,14 @@ export interface Organisation extends BaseEntity {
     contactPhone?: string;
     timezone?: string;
     status?: OrganisationStatus | string;
+    dpoName?: string;
+    dpoEmail?: string;
+    dataResidencyRegion?: DataResidencyRegion | string;
 }
+
+/** Mirrors OrganisationDto.DATA_RESIDENCY_REGIONS in the API. */
+export const DATA_RESIDENCY_REGIONS = ["GH", "EU", "US", "OTHER"] as const;
+export type DataResidencyRegion = (typeof DATA_RESIDENCY_REGIONS)[number];
 
 export interface OrganisationDto {
     id?: string;
@@ -35,6 +42,9 @@ export interface OrganisationDto {
     contactPhone?: string;
     timezone?: string;
     status?: OrganisationStatus | string;
+    dpoName?: string;
+    dpoEmail?: string;
+    dataResidencyRegion?: DataResidencyRegion | string;
 }
 
 // ─── SSO Config ───────────────────────────────────────────────────────────────

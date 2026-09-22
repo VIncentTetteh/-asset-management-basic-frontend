@@ -171,6 +171,8 @@ export const FIELD_LIMITS = {
         contactPhone: text(255),
         timezone: text(255),
         billingCurrency: CURRENCY,
+        dpoName: text(255),
+        dpoEmail: text(255),
     },
     purchaseOrder: {
         poNumber: text(255, true),
