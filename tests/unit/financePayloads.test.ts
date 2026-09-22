@@ -87,6 +87,7 @@ describe("purchase order payload", () => {
             departmentId: "d1",
             supplierId: "s1",
             linkedBudgetId: "b1",
+            lineItems: [],
         });
         expect(payload).not.toHaveProperty("status");
     });

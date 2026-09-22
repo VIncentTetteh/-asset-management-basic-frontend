@@ -1,5 +1,6 @@
-import type { Budget, BudgetDto, BudgetLedgerEntry, ContractDto, PurchaseOrderDto, SoftwareLicenseDto, SupplierDto, SupplierStatus, VendorReviewDto } from "@/types";
+import type { Budget, BudgetDto, BudgetLedgerEntry, ContractDto, PoLineItemDto, PurchaseOrderDto, SoftwareLicenseDto, SupplierDto, SupplierStatus, VendorReviewDto } from "@/types";
 import type { LeaseRecordDto } from "@/services/leaseRecordService";
+import { orderTotalOf } from "@/features/finance/lineTotals";
 
 /**
  * Form → API body builders for the finance screens.
@@ -111,23 +112,57 @@ export function budgetAvailable(budget: Pick<Budget, "totalAmount" | "spentAmoun
 
 // ── Purchase orders ───────────────────────────────────────────────────────────
 
-export type PurchaseOrderForm = Raw<PurchaseOrderDto>;
+/** One line as the form holds it: every input arrives as a string. */
+export type PoLineItemForm = Raw<PoLineItemDto>;
+
+export type PurchaseOrderForm = Omit<Raw<PurchaseOrderDto>, "lineItems"> & { lineItems?: PoLineItemForm[] };
+
+/** True for a row the user added and then left completely empty. */
+const isBlankLine = (line: PoLineItemForm): boolean =>
+    blank(line.description) && blank(line.quantity) && blank(line.unitPrice)
+    && blank(line.taxRate) && blank(line.supplierPartNumber) && blank(line.categoryId);
+
+/**
+ * The lines to send. Rows the user never filled in are dropped rather than
+ * posted as errors: an empty row at the bottom of a grid is how people stop
+ * typing, not a line they meant to order.
+ */
+export function buildPoLineItems(lines: PoLineItemForm[] | undefined): PoLineItemDto[] {
+    return (lines ?? []).filter((line) => !isBlankLine(line)).map((line) => ({
+        description: String(line.description ?? "").trim(),
+        supplierPartNumber: optionalString(line.supplierPartNumber),
+        categoryId: optionalString(line.categoryId),
+        quantity: Number(line.quantity),
+        unitPrice: Number(line.unitPrice),
+        taxRate: optionalNumber(line.taxRate),
+        // The server derives the amount from the rate when one is given; sending
+        // both would be two answers to the same question.
+        taxAmount: blank(line.taxRate) ? optionalNumber(line.taxAmount) : null,
+    }));
+}
 
 /**
  * Full body for POST and PUT /purchase-orders. No status: the workflow endpoints
  * own it. An empty budget, remarks or expected delivery date is sent as null,
  * which clears it on PUT.
+ *
+ * `lineItems` is always sent, empty included, because PUT replaces the set: an
+ * omitted array on a full replace would leave the old lines in place while the
+ * form showed none. With lines present the server derives the total from them,
+ * so the typed total is sent but does not decide anything.
  */
 export function buildPurchaseOrderPayload(form: PurchaseOrderForm): PurchaseOrderDto {
+    const lineItems = buildPoLineItems(form.lineItems);
     return {
         poNumber: String(form.poNumber ?? "").trim(),
-        totalAmount: Number(form.totalAmount),
+        totalAmount: lineItems.length > 0 ? orderTotalOf(lineItems) : Number(form.totalAmount),
         currency: optionalString(form.currency) ?? undefined,
         remarks: optionalString(form.remarks),
         expectedDeliveryDate: optionalString(form.expectedDeliveryDate),
         departmentId: String(form.departmentId ?? ""),
         supplierId: String(form.supplierId ?? ""),
         linkedBudgetId: optionalString(form.linkedBudgetId),
+        lineItems,
     };
 }
 

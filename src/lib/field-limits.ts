@@ -218,6 +218,17 @@ export const FIELD_LIMITS = {
         dpoName: text(255),
         dpoEmail: { ...text(255), format: "email" },
     },
+    /** PoLineItemDto — po_line_item columns are NUMERIC(19,4) money and NUMERIC(15,4) quantity. */
+    poLineItem: {
+        description: text(500, true),
+        supplierPartNumber: text(100),
+        // @DecimalMin(0, inclusive = false): the smallest value the column can
+        // hold above zero is 0.0001, so that is the input's floor.
+        quantity: { required: true, min: 0.0001, max: 99_999_999_999.9999, step: 0.0001 },
+        unitPrice: { required: true, min: 0, max: 999_999_999_999_999.9999, step: 0.0001 },
+        taxRate: { min: 0, max: 99_999.9999, step: 0.0001 },
+        taxAmount: { min: 0, max: 999_999_999_999_999.9999, step: 0.0001 },
+    },
     purchaseOrder: {
         poNumber: text(255, true),
         rejectionReason: { required: true, maxLength: 5000 },

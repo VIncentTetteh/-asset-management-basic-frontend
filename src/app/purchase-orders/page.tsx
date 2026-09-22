@@ -6,12 +6,13 @@ import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, ShoppingCart, ThumbsUp, XCircle, Download, Send, PackageCheck, Ban } from "lucide-react";
+import { Plus, Pencil, Trash2, ShoppingCart, ThumbsUp, XCircle, Download, Send, PackageCheck, Ban, ListTree } from "lucide-react";
 import { PurchaseOrder, POStatus } from "@/types";
 import { purchaseOrderService } from "@/services/purchaseOrderService";
 import { budgetService } from "@/services/budgetService";
 import { supplierService } from "@/services/supplierService";
 import { departmentService } from "@/services/departmentService";
+import { categoryService } from "@/services/categoryService";
 import { bulkOperationService } from "@/services/bulkOperationService";
 import { qk } from "@/lib/queryClient";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
@@ -30,6 +31,8 @@ import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { formatLocalDate } from "@/lib/local-date";
 import { RejectPurchaseOrderModal } from "@/features/finance/RejectPurchaseOrderModal";
 import { buildPurchaseOrderPayload, budgetAvailable, type PurchaseOrderForm } from "@/features/finance/payloads";
+import { PurchaseOrderLineItems } from "@/features/finance/PurchaseOrderLineItems";
+import { PurchaseOrderLinesModal } from "@/features/finance/PurchaseOrderLinesModal";
 import { PO_ACTION_MESSAGES, poActionsFor, type PoWorkflowAction as WorkflowAction } from "@/features/finance/purchaseOrderWorkflow";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
@@ -80,6 +83,12 @@ function PurchaseOrdersContent() {
     staleTime: 300_000,
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: qk.module("categories").list(),
+    queryFn: () => categoryService.getAll(),
+    staleTime: 300_000,
+  });
+
   const { data: budgets = [] } = useQuery({
     queryKey: qk.module("budgets").list(),
     queryFn: () => budgetService.getAll(),
@@ -115,10 +124,11 @@ function PurchaseOrdersContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseOrder | null>(null);
   const [rejecting, setRejecting] = useState<PurchaseOrder | null>(null);
+  const [viewingLines, setViewingLines] = useState<PurchaseOrder | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  const { register, handleSubmit, reset, setError, watch, formState: { errors } } = useForm<PurchaseOrderForm>();
+  const { register, handleSubmit, reset, setError, watch, control, formState: { errors } } = useForm<PurchaseOrderForm>();
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -133,6 +143,14 @@ function PurchaseOrdersContent() {
             linkedBudgetId: editing.linkedBudgetId || "",
             expectedDeliveryDate: editing.expectedDeliveryDate || "",
             remarks: editing.remarks || "",
+            lineItems: (editing.lineItems ?? []).map((line) => ({
+              description: line.description ?? "",
+              supplierPartNumber: line.supplierPartNumber ?? "",
+              categoryId: line.categoryId ?? "",
+              quantity: line.quantity ?? "",
+              unitPrice: line.unitPrice ?? "",
+              taxRate: line.taxRate ?? "",
+            })),
           }
         : {
             poNumber: "",
@@ -143,6 +161,7 @@ function PurchaseOrdersContent() {
             departmentId: "",
             linkedBudgetId: "",
             expectedDeliveryDate: "",
+            lineItems: [],
           },
     );
   }, [isModalOpen, editing, reset, baseCurrency]);
@@ -160,6 +179,9 @@ function PurchaseOrdersContent() {
 
   const watchedBudgetId = watch("linkedBudgetId");
   const watchedCurrency = watch("currency");
+  const formatFormMoney = (amount: number) => format(amount, String(watchedCurrency || baseCurrency));
+  // Watched so the total field disables itself the moment the first line is added.
+  const hasLines = (watch("lineItems") ?? []).length > 0;
   const selectedBudget = budgets.find((b) => b.id === watchedBudgetId);
   const budgetCurrencyMismatch =
     !!selectedBudget?.currency && !!watchedCurrency && selectedBudget.currency !== watchedCurrency;
@@ -262,11 +284,21 @@ function PurchaseOrdersContent() {
       {
         accessorKey: "totalAmount",
         header: () => <span className="block text-right">Amount</span>,
-        cell: ({ row }) => (
-          <span className="data-mono block text-right">
-            {format(row.original.totalAmount, row.original.currency || baseCurrency)}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const lines = row.original.lineItems?.length ?? 0;
+          return (
+            <div className="text-right">
+              <span className="data-mono block">
+                {format(row.original.totalAmount, row.original.currency || baseCurrency)}
+              </span>
+              {lines > 0 ? (
+                <span className="block text-xs text-faint-fg">
+                  {lines} {lines === 1 ? "line" : "lines"}
+                </span>
+              ) : null}
+            </div>
+          );
+        },
       },
       {
         accessorKey: "expectedDeliveryDate",
@@ -326,6 +358,18 @@ function PurchaseOrdersContent() {
             ) : null;
           return (
             <div className="flex justify-end gap-0.5">
+              {(row.original.lineItems?.length ?? 0) > 0 ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  aria-label="View line items"
+                  title="View line items"
+                  onClick={() => setViewingLines(row.original)}
+                >
+                  <ListTree className="h-3.5 w-3.5" />
+                </Button>
+              ) : null}
               {button("submit", "Submit for approval", <Send className="h-3.5 w-3.5" />, "text-brand")}
               {button("approve", "Approve", <ThumbsUp className="h-3.5 w-3.5" />, "text-ok")}
               {button("reject", "Reject", <XCircle className="h-3.5 w-3.5" />, "text-warn")}
@@ -470,10 +514,17 @@ function PurchaseOrdersContent() {
               <Input
                 id="po-amount"
                 type="number"
+                // With lines the server derives the total from them; an editable
+                // field whose value is discarded is worse than a disabled one.
+                disabled={hasLines}
                 {...limitInputProps(L.totalAmount)}
-                {...register("totalAmount", limitRules<PurchaseOrderForm, "totalAmount">(L.totalAmount, "Total amount"))}
+                {...register("totalAmount", hasLines ? {} : limitRules<PurchaseOrderForm, "totalAmount">(L.totalAmount, "Total amount"))}
               />
-              <FieldError error={errors.totalAmount} />
+              {hasLines ? (
+                <p className="text-xs text-muted-fg">Derived from the line items below.</p>
+              ) : (
+                <FieldError error={errors.totalAmount} />
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="po-currency">Currency</Label>
@@ -496,6 +547,14 @@ function PurchaseOrdersContent() {
             <FieldError error={errors.expectedDeliveryDate} />
           </div>
 
+          <PurchaseOrderLineItems
+            control={control}
+            register={register}
+            errors={errors.lineItems as unknown as Record<string, { message?: unknown } | undefined>[] | undefined}
+            categories={categories}
+            formatMoney={formatFormMoney}
+          />
+
           <div className="space-y-2">
             <Label htmlFor="po-remarks">Remarks</Label>
             <Textarea id="po-remarks" placeholder="What is being ordered, delivery notes…" {...register("remarks")} />
@@ -510,6 +569,11 @@ function PurchaseOrdersContent() {
           </div>
         </form>
       </Modal>
+      <PurchaseOrderLinesModal
+        order={viewingLines}
+        onClose={() => setViewingLines(null)}
+        formatMoney={(amount) => format(amount, viewingLines?.currency || baseCurrency)}
+      />
       <RejectPurchaseOrderModal
         order={rejecting}
         isPending={workflowAction.isPending}
