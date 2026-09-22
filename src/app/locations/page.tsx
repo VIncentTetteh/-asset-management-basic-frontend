@@ -19,11 +19,14 @@ import { countryName, toCountryCode } from "@/lib/countries";
 import { buildPatchPayload } from "@/lib/patch";
 import { applyApiFieldErrors } from "@/lib/api-validation";
 import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { allowedParents, buildLocationPayload } from "@/features/locations/payload";
 import { useConfirm } from "@/hooks/useConfirm";
 
 // Edits go through PUT (full replace) so cleared fields and parents are cleared.
+const L = FIELD_LIMITS.location;
+
 const locations = makeCrudHooks<Location, LocationDto>(
   "locations",
   { ...locationService, update: (id, data) => locationService.replace(id, data as LocationDto) },
@@ -214,27 +217,36 @@ export default function LocationsPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="loc-name">Name <span className="text-danger">*</span></Label>
-            <Input id="loc-name" placeholder="Head Office, Accra" {...register("name", { required: "Name is required" })} />
-            {errors.name && <p className="text-sm text-danger">{errors.name.message as string}</p>}
+            <Input id="loc-name" placeholder="Head Office, Accra" {...limitInputProps(L.name)}
+              {...register("name", limitRules<LocationDto, "name">(L.name, "Name"))} />
+            <FieldError error={errors.name} />
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="loc-building">Building</Label>
-              <Input id="loc-building" {...register("building")} />
+              <Input id="loc-building" {...limitInputProps(L.building)}
+                {...register("building", limitRules<LocationDto, "building">(L.building, "Building"))} />
+              <FieldError error={errors.building} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="loc-floor">Floor</Label>
-              <Input id="loc-floor" {...register("floor")} />
+              <Input id="loc-floor" {...limitInputProps(L.floor)}
+                {...register("floor", limitRules<LocationDto, "floor">(L.floor, "Floor"))} />
+              <FieldError error={errors.floor} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="loc-room">Room</Label>
-              <Input id="loc-room" {...register("room")} />
+              <Input id="loc-room" {...limitInputProps(L.room)}
+                {...register("room", limitRules<LocationDto, "room">(L.room, "Room"))} />
+              <FieldError error={errors.room} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="loc-city">City</Label>
-              <Input id="loc-city" {...register("city")} />
+              <Input id="loc-city" {...limitInputProps(L.city)}
+                {...register("city", limitRules<LocationDto, "city">(L.city, "City"))} />
+              <FieldError error={errors.city} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="loc-country">Country</Label>
@@ -251,6 +263,7 @@ export default function LocationsPage() {
           <div className="space-y-2">
             <Label htmlFor="loc-address">Address</Label>
             <Input id="loc-address" {...register("address")} />
+            <FieldError error={errors.address} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="loc-parent">Parent location</Label>
