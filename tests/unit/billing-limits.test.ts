@@ -22,7 +22,7 @@ describe("plan limits", () => {
             organisationId: "org-1",
             plan: {
                 code: "ENTERPRISE", name: "Enterprise", tier: "ENTERPRISE", interval: "MONTHLY", amountMinor: 0,
-                currency: "USD", maxAssets: INT_MAX, maxEmployees: INT_MAX, maxDepartments: 10,
+                currency: "USD", maxAssets: INT_MAX, maxEmployees: INT_MAX,
                 analyticsEnabled: true, auditRetentionDays: 3650,
             },
             status: "ACTIVE",
@@ -38,6 +38,15 @@ describe("plan limits", () => {
         };
         const rows = usageRows(subscription);
         expect(rows[0]).toMatchObject({ limit: null, percent: null });
-        expect(rows[2]).toMatchObject({ limit: 10, percent: 10 });
+        expect(rows.map((r) => r.label)).toEqual(["Assets", "Employees"]);
+    });
+});
+
+describe("planDiscountLabel", () => {
+    it("advertises a plan's discount and nothing when there is none", async () => {
+        const { planDiscountLabel } = await import("@/features/billing/lib");
+        expect(planDiscountLabel(16.67)).toBe("Save 17%");
+        expect(planDiscountLabel(0)).toBeNull();
+        expect(planDiscountLabel(null)).toBeNull();
     });
 });

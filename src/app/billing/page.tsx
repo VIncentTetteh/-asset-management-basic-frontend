@@ -23,6 +23,7 @@ import {
     isEnterprisePlan,
     isFreePlan,
     planDirection,
+    planDiscountLabel,
     planInterval,
     plansForInterval,
     usageRows,
@@ -432,11 +433,19 @@ function PlanCard({
                 <p className="text-2xl font-bold text-foreground">
                     {enterprise ? "Contact sales" : free ? "Free" : formatMoneyMinor(plan.amountMinor, plan.currency)}
                 </p>
-                {!enterprise && !free && <p className="-mt-2 text-xs text-faint-fg">per {intervalSuffix(plan)}</p>}
+                {!enterprise && !free && (
+                    <p className="-mt-2 text-xs text-faint-fg">
+                        per {intervalSuffix(plan)}
+                        {planDiscountLabel(plan.discountPercent) ? (
+                            <span className="ml-2 rounded-full border border-ok/40 px-2 py-0.5 font-semibold text-ok">
+                                {planDiscountLabel(plan.discountPercent)}
+                            </span>
+                        ) : null}
+                    </p>
+                )}
                 <div className="space-y-1 text-sm text-muted-fg">
                     <p>Max assets: {formatPlanLimit(plan.maxAssets)}</p>
                     <p>Max employees: {formatPlanLimit(plan.maxEmployees)}</p>
-                    {plan.maxDepartments != null && <p>Max departments: {formatPlanLimit(plan.maxDepartments)}</p>}
                     <p>Analytics: {plan.analyticsEnabled ? "Included" : "Not included"}</p>
                     <p>Audit retention: {plan.auditRetentionDays} days</p>
                 </div>

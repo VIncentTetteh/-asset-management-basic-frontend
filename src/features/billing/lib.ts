@@ -116,6 +116,13 @@ export function usageRows(subscription: Subscription): UsageRow[] {
     return [
         row("Assets", subscription.currentAssetCount, subscription.plan.maxAssets),
         row("Employees", subscription.currentEmployeeCount, subscription.plan.maxEmployees),
-        row("Departments", subscription.currentDepartmentCount, subscription.plan.maxDepartments),
+        // No plan limits departments, so they get no usage row.
     ];
+}
+
+/** "Save 17%" for a plan with a discount, else null. */
+export function planDiscountLabel(discountPercent: number | null | undefined): string | null {
+    const pct = Number(discountPercent);
+    if (discountPercent == null || !Number.isFinite(pct) || pct <= 0) return null;
+    return `Save ${Math.round(pct)}%`;
 }

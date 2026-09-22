@@ -1113,10 +1113,10 @@ export interface BillingPlan {
     currency: string;
     maxAssets: number;
     maxEmployees: number;
-    /** Not every backend version reports a department limit. */
-    maxDepartments?: number | null;
     analyticsEnabled: boolean;
     auditRetentionDays: number;
+    /** Percent off versus paying monthly (e.g. 16.67 for an annual plan); null when none. */
+    discountPercent?: number | null;
 }
 
 export type SubscriptionStatus = "ACTIVE" | "PAST_DUE" | "CANCELED" | "EXPIRED";
