@@ -529,9 +529,11 @@ export interface AssetTransfer extends BaseEntity {
 export interface AssetTransferDto {
     id?: string;
     assetId: string;              // required
-    fromDepartmentId: string;     // required
+    /** Read-only: the API derives the origin from the asset (null when it has no department). */
+    fromDepartmentId?: string | null;
     toDepartmentId: string;       // required
-    fromLocationId?: string;
+    /** Read-only: derived from the asset's location. */
+    fromLocationId?: string | null;
     toLocationId?: string;
     requestedById?: string;       // server-assigned from the authenticated session
     reason?: string;

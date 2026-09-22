@@ -3,7 +3,6 @@
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { ArrowRightLeft } from "lucide-react";
-import toast from "react-hot-toast";
 import type { Asset, AssetTransferDto, Department, Location } from "@/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateTransfer } from "@/features/transfers/hooks";
 import { applyApiFieldErrors } from "@/lib/api-validation";
+import { buildTransferRequest } from "@/features/transfers/workflow";
 
 export function TransferFormModal({
   isOpen,
@@ -57,30 +57,17 @@ export function TransferFormModal({
 
   const onSubmit = async (data: AssetTransferDto) => {
     const asset = data.assetId ? assetById.get(data.assetId) : undefined;
-    const fromDepartmentId = data.fromDepartmentId || asset?.departmentId || "";
-    const fromLocationId = data.fromLocationId || asset?.locationId || undefined;
-    if (!fromDepartmentId) {
-      toast.error("Selected asset has no source department");
-      return;
-    }
-    if (fromDepartmentId === data.toDepartmentId) {
-      toast.error("Destination department must be different from source department");
-      return;
-    }
-    if (fromLocationId && data.toLocationId && fromLocationId === data.toLocationId) {
-      toast.error("Destination location must be different from source location");
+    const request = buildTransferRequest(
+      { assetId: data.assetId, toDepartmentId: data.toDepartmentId, toLocationId: data.toLocationId ?? undefined, reason: data.reason },
+      asset,
+    );
+    if ("error" in request) {
+      setError("toDepartmentId", { type: "validate", message: request.error });
       return;
     }
 
     try {
-      await createTransfer.mutateAsync({
-        assetId: data.assetId,
-        fromDepartmentId,
-        toDepartmentId: data.toDepartmentId,
-        fromLocationId: fromLocationId || undefined,
-        toLocationId: data.toLocationId || undefined,
-        reason: data.reason?.trim() || undefined,
-      });
+      await createTransfer.mutateAsync(request.body as AssetTransferDto);
       onClose();
     } catch (err) {
       // Toasted by the mutation (e.g. an open transfer already exists).
@@ -115,13 +102,13 @@ export function TransferFormModal({
           </div>
           <div className="space-y-2">
             <Label htmlFor="fromDepartmentId" className="text-xs">From department</Label>
-            <Select id="fromDepartmentId" {...register("fromDepartmentId", { required: "Origin department required" })} disabled>
-              <option value="">Select department</option>
+            {/* Display only: the API derives the origin from the asset. */}
+            <Select id="fromDepartmentId" {...register("fromDepartmentId")} disabled>
+              <option value="">No department</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </Select>
-            {errors.fromDepartmentId && <p className="text-sm text-danger">{errors.fromDepartmentId.message as string}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="fromLocationId" className="text-xs">From location</Label>
