@@ -114,12 +114,16 @@ export const seedEmailPrefs = (prefs: NotificationPreferences): NotificationPref
     return { ...prefs, emailNotifications: seeded as NotificationPreferences["emailNotifications"] };
 };
 
-/** Screen preferences → API body with lower-case category keys. */
+/**
+ * Screen preferences → API body: only the email categories, with lower-case keys.
+ * The unused push/in-app/digest flags the API echoes back are never sent, so a
+ * save cannot change them.
+ */
 export const toApiPreferences = (prefs: Partial<NotificationPreferences>): Partial<NotificationPreferences> => {
-    if (!prefs.emailNotifications) return prefs;
+    if (!prefs.emailNotifications) return {};
     const email: Record<string, boolean> = {};
     for (const [k, v] of Object.entries(prefs.emailNotifications)) email[toApiEmailKey(k)] = Boolean(v);
-    return { ...prefs, emailNotifications: email as NotificationPreferences["emailNotifications"] };
+    return { emailNotifications: email as NotificationPreferences["emailNotifications"] };
 };
 
 export const notificationService = {

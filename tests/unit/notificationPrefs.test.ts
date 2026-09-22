@@ -15,4 +15,12 @@ describe("notification email preference keys", () => {
         const body = toApiPreferences({ emailNotifications: { MAINTENANCE: false } } as unknown as NotificationPreferences);
         expect(body.emailNotifications).toEqual({ maintenance: false });
     });
+
+    it("never sends the unused push, in-app or digest flags", () => {
+        const body = toApiPreferences({
+            emailNotifications: { SYSTEM: true },
+            pushNotifications: false, dailyDigest: false, digestTime: "07:00",
+        } as unknown as NotificationPreferences);
+        expect(body).toEqual({ emailNotifications: { system: true } });
+    });
 });

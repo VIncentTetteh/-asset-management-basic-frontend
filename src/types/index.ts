@@ -1008,13 +1008,14 @@ export interface Notification {
     actionUrl?: string;
 }
 
+/**
+ * The preferences the web app edits. The API also returns push, in-app and daily
+ * digest flags; no sender reads them, so the app neither shows nor sends them
+ * (the columns stay for a future implementation).
+ */
 export interface NotificationPreferences {
     /** Per-type email toggle keyed by NotificationType */
     emailNotifications: Record<string, boolean>;
-    pushNotifications?: boolean;
-    inAppNotifications?: boolean;
-    dailyDigest: boolean;
-    digestTime: string;
 }
 
 export interface NotificationSummary {
