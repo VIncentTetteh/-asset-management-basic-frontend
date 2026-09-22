@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, Plus, Search, CheckCircle2, AlertTriangle, User } from "lucide-react";
-import { dsarService, type DsarDto, type DsarType, type DsarStatus, type DsarStatusUpdate, type DsarSubmission } from "@/services/dsarService";
+import { dsarService, DSAR_PAGE_SIZE, type DsarDto, type DsarType, type DsarStatus, type DsarStatusUpdate, type DsarSubmission } from "@/services/dsarService";
 import { reportApiError, applyApiFieldErrors } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { buildDsarStatusUpdate, dsarNextStatuses, isDsarClosed, type DsarUpdateForm } from "@/features/dpa/dsar";
@@ -44,10 +44,19 @@ export default function DsarPage() {
   const queryClient = useQueryClient();
   const dsarKey = qk.module("dsar");
 
-  const { data: requests = [], isLoading } = useQuery({
-    queryKey: dsarKey.list(),
-    queryFn: () => dsarService.listAll(),
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<DsarStatus | "">("");
+  const [page, setPage] = useState(0);
+
+  // The list is paged server-side: the screen used to pull 200 rows and silently
+  // drop anything beyond them. The status filter goes to the API; the free-text
+  // search narrows the page that is on screen.
+  const { data: pageData, isLoading } = useQuery({
+    queryKey: [...dsarKey.list(), statusFilter, page],
+    queryFn: () => dsarService.list({ page, status: statusFilter }),
   });
+  const requests = useMemo(() => pageData?.items ?? [], [pageData]);
+  const total = pageData?.total ?? 0;
   const invalidate = () => queryClient.invalidateQueries({ queryKey: dsarKey.all });
 
   const submitDsar = useMutation({
@@ -68,8 +77,6 @@ export default function DsarPage() {
     onError: (err) => reportApiError(err, { fallback: "Failed to update status" }),
   });
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<DsarStatus | "">("");
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
   const [updateTarget, setUpdateTarget] = useState<DsarDto | null>(null);
   const [detailTarget, setDetailTarget] = useState<DsarDto | null>(null);
@@ -94,7 +101,6 @@ export default function DsarPage() {
 
   const filtered = useMemo(() => {
     let list = requests;
-    if (statusFilter) list = list.filter((r) => r.status === statusFilter);
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       list = list.filter(
@@ -105,11 +111,7 @@ export default function DsarPage() {
       );
     }
     return list;
-  }, [requests, statusFilter, searchTerm]);
-
-  const pending = requests.filter((r) => r.status === "PENDING").length;
-  const inProgress = requests.filter((r) => r.status === "IN_PROGRESS").length;
-  const completed = requests.filter((r) => r.status === "COMPLETED").length;
+  }, [requests, searchTerm]);
 
   const openCreate = () => {
     reset({ requestType: "ACCESS", requesterEmail: "", notes: "" });
@@ -232,7 +234,7 @@ export default function DsarPage() {
       subtitle={
         isLoading
           ? "Loading requests…"
-          : `${requests.length} requests · ${pending} pending · ${inProgress} in progress · ${completed} completed`
+          : `${total} ${statusFilter ? `${statusFilter.toLowerCase().replace("_", " ")} ` : ""}request${total === 1 ? "" : "s"}`
       }
       actions={
         <Button onClick={openCreate}>
@@ -250,7 +252,14 @@ export default function DsarPage() {
               className="pl-8"
             />
           </div>
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as DsarStatus | "")} className="w-44">
+          <Select
+            value={statusFilter}
+            onChange={(e) => {
+              setPage(0);
+              setStatusFilter(e.target.value as DsarStatus | "");
+            }}
+            className="w-44"
+          >
             <option value="">All statuses</option>
             <option value="PENDING">Pending</option>
             <option value="IN_PROGRESS">In progress</option>
@@ -276,6 +285,13 @@ export default function DsarPage() {
           columns={columns}
           data={filtered}
           isLoading={isLoading}
+          pageInfo={{
+            page,
+            size: DSAR_PAGE_SIZE,
+            totalElements: total,
+            totalPages: Math.max(1, Math.ceil(total / DSAR_PAGE_SIZE)),
+          }}
+          onPageChange={setPage}
           emptyTitle="No DSAR requests"
           emptyDescription="Manage GDPR / Ghana DPA requests — access, erasure, rectification, and more."
           emptyAction={

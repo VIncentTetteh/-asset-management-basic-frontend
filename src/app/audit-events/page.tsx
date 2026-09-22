@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AuditEvent, AuditEventFilterParams } from "@/types";
-import { auditEventService } from "@/services/auditEventService";
+import { auditEventService, AUDIT_EVENTS_PAGE_SIZE } from "@/services/auditEventService";
 import { userService } from "@/services/userService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { toast } from "react-hot-toast";
-import { Activity, Filter, RotateCw, ShieldCheck } from "lucide-react";
+import { Activity, ChevronLeft, ChevronRight, Filter, RotateCw, ShieldCheck } from "lucide-react";
 
 const methodOptions = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
@@ -99,12 +99,18 @@ export default function AuditEventsPage() {
     const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
     const [filters, setFilters] = useState<AuditEventFilterParams>({});
     const [actors, setActors] = useState<{ id: string; label: string }[]>([]);
+    // The endpoint pages; the applied filters are held apart from the draft in
+    // `filters` so paging never picks up half-edited criteria.
+    const [applied, setApplied] = useState<AuditEventFilterParams>({});
+    const [page, setPage] = useState(0);
+    const [total, setTotal] = useState(0);
 
-    const fetchEvents = async (params?: AuditEventFilterParams) => {
+    const fetchEvents = async (params: AuditEventFilterParams, pageIndex: number) => {
         try {
             setIsLoading(true);
-            const data = await auditEventService.getAll(params);
-            setEvents(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+            const result = await auditEventService.getPage(params, pageIndex);
+            setEvents(result.items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+            setTotal(result.total);
         } catch (error) {
             toast.error("Failed to load audit events");
             console.error(error);
@@ -114,8 +120,8 @@ export default function AuditEventsPage() {
     };
 
     useEffect(() => {
-        fetchEvents();
-    }, []);
+        fetchEvents(applied, page);
+    }, [applied, page]);
 
     useEffect(() => {
         const fetchActors = async () => {
@@ -141,13 +147,19 @@ export default function AuditEventsPage() {
             start: filters.start ? new Date(filters.start).toISOString() : undefined,
             end: filters.end ? new Date(filters.end).toISOString() : undefined,
         };
-        fetchEvents(normalized);
+        setPage(0);
+        setApplied(normalized);
     };
 
     const onResetFilters = () => {
         setFilters({});
-        fetchEvents();
+        setPage(0);
+        setApplied({});
     };
+
+    const totalPages = Math.max(1, Math.ceil(total / AUDIT_EVENTS_PAGE_SIZE));
+    const rangeStart = total === 0 ? 0 : page * AUDIT_EVENTS_PAGE_SIZE + 1;
+    const rangeEnd = page * AUDIT_EVENTS_PAGE_SIZE + events.length;
 
     const openDetails = async (id: string) => {
         try {
@@ -166,9 +178,9 @@ export default function AuditEventsPage() {
                 subtitle="Compliance-grade API event stream with actor and request tracing."
                 actions={<>
                     <div className="rounded-control border border-ok/40 bg-ok-soft px-3 py-2 text-sm text-ok">
-                        Success Rate: <span className="font-semibold">{successRate}%</span>
+                        Success Rate (this page): <span className="font-semibold">{successRate}%</span>
                     </div>
-                    <Button variant="outline" onClick={() => fetchEvents(filters)} className="gap-2">
+                    <Button variant="outline" onClick={() => fetchEvents(applied, page)} className="gap-2">
                         <RotateCw className="h-4 w-4" /> Refresh
                     </Button>
                 </>}
@@ -283,6 +295,34 @@ export default function AuditEventsPage() {
                             </table>
                         </div>
                     )}
+                    {!isLoading && total > 0 ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-edge-subtle px-3 py-2 text-sm text-muted-fg">
+                            <span>
+                                Showing {rangeStart}–{rangeEnd} of {total}
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={page === 0}
+                                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                                    aria-label="Previous page"
+                                >
+                                    <ChevronLeft className="h-4 w-4" /> Previous
+                                </Button>
+                                <span className="whitespace-nowrap">Page {page + 1} of {totalPages}</span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={page + 1 >= totalPages}
+                                    onClick={() => setPage((p) => p + 1)}
+                                    aria-label="Next page"
+                                >
+                                    Next <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null}
                 </CardContent>
             </Card>
 

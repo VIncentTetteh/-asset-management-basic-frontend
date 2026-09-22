@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { extractList } from "@/services/responseUtils";
+import { extractList, normalizePage, type NormalizedPage } from "@/services/responseUtils";
 
 /** DsarRequest.RequestType on the API. */
 export type DsarType = "ACCESS" | "RECTIFICATION" | "ERASURE" | "PORTABILITY" | "OBJECTION";
@@ -39,8 +39,8 @@ export interface DsarStatusUpdate {
   clearAssignee?: boolean;
 }
 
-/** The list endpoint pages; the screen shows the most recent page of this size. */
-const PAGE_SIZE = 200;
+/** Rows per page. The screen used to ask for 200 in one go and show only those. */
+export const DSAR_PAGE_SIZE = 25;
 
 export const dsarService = {
   /** POST /dpa/dsar — record a data subject request (30-day clock starts). */
@@ -49,9 +49,22 @@ export const dsarService = {
     return response.data;
   },
 
-  /** GET /dpa/dsar — a Spring page; returns its content. */
+  /** GET /dpa/dsar — one page, newest first, optionally narrowed to a status. */
+  list: async (opts: { page?: number; size?: number; status?: DsarStatus | "" } = {}): Promise<NormalizedPage<DsarDto>> => {
+    const response = await api.get("/dpa/dsar", {
+      params: {
+        page: opts.page ?? 0,
+        size: opts.size ?? DSAR_PAGE_SIZE,
+        sort: "submittedAt,desc",
+        ...(opts.status ? { status: opts.status } : {}),
+      },
+    });
+    return normalizePage<DsarDto>(response.data);
+  },
+
+  /** GET /dpa/dsar — the first page only, for callers that just want rows. */
   listAll: async (): Promise<DsarDto[]> => {
-    const response = await api.get("/dpa/dsar", { params: { size: PAGE_SIZE, sort: "submittedAt,desc" } });
+    const response = await api.get("/dpa/dsar", { params: { size: DSAR_PAGE_SIZE, sort: "submittedAt,desc" } });
     return extractList<DsarDto>(response.data);
   },
 

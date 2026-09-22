@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck, XCircle, CheckCircle2, Search } from "lucide-react";
-import { dpaConsentService, type ConsentRecordDto, type ConsentPurpose } from "@/services/dpaConsentService";
+import { dpaConsentService, CONSENT_PAGE_SIZE, type ConsentRecordDto, type ConsentPurpose } from "@/services/dpaConsentService";
 import { userService } from "@/services/userService";
 import { qk } from "@/lib/queryClient";
 import { reportApiError } from "@/lib/api-validation";
@@ -94,11 +94,16 @@ export default function DpaConsentPage() {
   const queryClient = useQueryClient();
   const consentsKey = qk.module("dpa-consent");
   const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(0);
 
-  const { data: consents = [], isLoading, error } = useQuery({
-    queryKey: consentsKey.list(),
-    queryFn: () => dpaConsentService.listAll(),
+  // The ledger is paged server-side: it used to be fetched 500 rows at a time
+  // and anything past that was invisible. The search narrows the page on screen.
+  const { data: pageData, isLoading, error } = useQuery({
+    queryKey: [...consentsKey.list(), page],
+    queryFn: () => dpaConsentService.list({ page }),
   });
+  const consents = useMemo(() => pageData?.items ?? [], [pageData]);
+  const total = pageData?.total ?? 0;
   const { data: users = [] } = useQuery({
     queryKey: qk.module("users").list(),
     queryFn: () => userService.getAll(),
@@ -125,6 +130,7 @@ export default function DpaConsentPage() {
 
   const granted = consents.filter(isActive).length;
   const withdrawn = consents.length - granted;
+  const totalPages = Math.max(1, Math.ceil(total / CONSENT_PAGE_SIZE));
 
   const columns = useMemo<ColumnDef<ConsentRecordDto, unknown>[]>(
     () => [
@@ -184,7 +190,11 @@ export default function DpaConsentPage() {
   return (
     <ListPageTemplate
       title="Data processing consent"
-      subtitle={isLoading ? "Loading consent records…" : `${consents.length} records · ${granted} granted · ${withdrawn} withdrawn`}
+      subtitle={
+        isLoading
+          ? "Loading consent records…"
+          : `${total} record${total === 1 ? "" : "s"} · this page: ${granted} granted · ${withdrawn} withdrawn`
+      }
       toolbar={
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-faint-fg" />
@@ -209,6 +219,8 @@ export default function DpaConsentPage() {
             columns={columns}
             data={filtered}
             isLoading={isLoading}
+            pageInfo={{ page, size: CONSENT_PAGE_SIZE, totalElements: total, totalPages }}
+            onPageChange={setPage}
             emptyTitle="No consent records"
             emptyDescription="Consents granted or withdrawn by people in your organisation appear here, per processing purpose."
           />

@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { extractList } from "@/services/responseUtils";
+import { extractList, normalizePage, type NormalizedPage } from "@/services/responseUtils";
 
 export type ConsentPurpose =
   | "MARKETING"
@@ -25,7 +25,8 @@ export interface ConsentRecordDto {
   createdAt?: string;
 }
 
-const PAGE_SIZE = 500;
+/** Rows per page. The ledger used to be fetched 500 at a time and truncated there. */
+export const CONSENT_PAGE_SIZE = 25;
 
 export const dpaConsentService = {
   /** POST /dpa/consent — grant (or decline) consent for a purpose, as the current user. */
@@ -35,9 +36,17 @@ export const dpaConsentService = {
     return response.data;
   },
 
-  /** GET /dpa/consent — the organisation's consent ledger (a Spring page). */
+  /** GET /dpa/consent — one page of the organisation's consent ledger. */
+  list: async (opts: { page?: number; size?: number } = {}): Promise<NormalizedPage<ConsentRecordDto>> => {
+    const response = await api.get("/dpa/consent", {
+      params: { page: opts.page ?? 0, size: opts.size ?? CONSENT_PAGE_SIZE },
+    });
+    return normalizePage<ConsentRecordDto>(response.data);
+  },
+
+  /** GET /dpa/consent — the first page only, for callers that just want rows. */
   listAll: async (): Promise<ConsentRecordDto[]> => {
-    const response = await api.get("/dpa/consent", { params: { size: PAGE_SIZE } });
+    const response = await api.get("/dpa/consent", { params: { size: CONSENT_PAGE_SIZE } });
     return extractList<ConsentRecordDto>(response.data);
   },
 
