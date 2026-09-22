@@ -43,7 +43,8 @@ describeRoundTrip({
         { label: "Type", type: "select", value: "VOLUME", edit: "OPEN SOURCE" },
         { label: "Status", type: "select", value: "ACTIVE", edit: "SUSPENDED" },
         { label: "Total seats", type: "number", value: 50, optional: true },
-        { label: "Seats in use", type: "number", value: 12, optional: true },
+        // A blank seat count means none: the API stores 0.
+        { label: "Seats in use", type: "number", value: 12, edit: 0, optional: true },
         { label: "Purchase date", type: "date", value: isoDate(-30), optional: true },
         // Far from today, so the API never re-labels the status as expiring.
         { label: "Expiry date", type: "date", value: isoDate(365), optional: true },
