@@ -53,6 +53,18 @@ describe("AssetFinancials", () => {
         expect(screen.queryByRole("status")).toBeNull();
     });
 
+    it("warns when the TCO left out costs with no exchange rate", async () => {
+        assets.getTco.mockResolvedValue({
+            acquisitionCost: 1200, totalMaintenanceCost: 0, totalInsuranceCost: 0, totalDowntimeCost: 0,
+            disposalRecovery: 0, netTco: 1200, currency: "GHS", maintenanceRecordCount: 1, downtimeDays: 0,
+            complete: false, missingRates: ["EUR->GHS"],
+        });
+
+        renderWithQuery(<AssetFinancials asset={depreciating} />);
+
+        expect(await screen.findByRole("status")).toBeTruthy();
+    });
+
     it("prompts for setup when depreciation is not configured", () => {
         assets.getTco.mockReturnValue(new Promise(() => {}));
         renderWithQuery(

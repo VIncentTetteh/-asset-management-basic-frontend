@@ -51,6 +51,9 @@ export interface AssetTco {
     disposalRecovery: number;
     netTco: number;
     currency: string;
+    /** False when a maintenance cost in another currency had no exchange rate and was left out. */
+    complete?: boolean;
+    missingRates?: string[];
     calculatedAt: string;
     maintenanceRecordCount: number;
     downtimeDays: number;

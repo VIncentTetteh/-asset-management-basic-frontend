@@ -8,6 +8,7 @@ import { assetService } from "@/services/assetService";
 import { formatMoney, FALLBACK_CURRENCY } from "@/lib/currency";
 import { Skeleton } from "@/components/ui/skeleton";
 import { depreciationMethodLabel, usefulLifeLabel } from "@/features/assets/depreciation";
+import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 
 function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
@@ -91,6 +92,12 @@ export function AssetFinancials({ asset, category }: { asset: Asset; category?: 
         ) : tco.isError || !tco.data ? (
           <p className="py-2 text-xs text-muted-fg">Total cost of ownership is unavailable.</p>
         ) : (
+          <>
+          <MissingRatesNotice
+            className="mt-2"
+            incomplete={tco.data.complete === false}
+            missingRates={tco.data.missingRates ?? []}
+          />
           <dl className="divide-y divide-edge-subtle">
             <Row label="Acquisition" value={formatMoney(tco.data.acquisitionCost ?? 0, tco.data.currency || currency)} />
             <Row
@@ -108,6 +115,7 @@ export function AssetFinancials({ asset, category }: { asset: Asset; category?: 
             />
             <Row label="Net TCO" value={formatMoney(tco.data.netTco ?? 0, tco.data.currency || currency)} strong />
           </dl>
+          </>
         )}
       </section>
     </div>
