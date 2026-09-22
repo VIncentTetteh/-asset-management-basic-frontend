@@ -20,6 +20,7 @@ import { CountrySelect } from "@/components/ui/country-select";
 import { countryName } from "@/lib/countries";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { reportApiError } from "@/lib/api-validation";
 import { buildPatchPayload } from "@/lib/patch";
 import { CurrencySettingsCard } from "@/components/currency/CurrencySettingsCard";
 
@@ -46,10 +47,8 @@ export default function OrganisationsPage() {
       toast.success("Organisation updated");
       invalidate();
     },
-    onError: (error) => {
-      const message = (error as { message?: string })?.message ?? "Failed to save organisation";
-      toast.error(message);
-    },
+    // Was the axios message ("Request failed with status code 409"), not the API's reason.
+    onError: (error) => reportApiError(error, { fallback: "Failed to save organisation" }),
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -121,8 +120,17 @@ export default function OrganisationsPage() {
       toast("No changes to update");
       return;
     }
-    await saveOrg.mutateAsync({ id: editingOrg.id, data: patch });
-    setIsModalOpen(false);
+    delete (patch as Partial<OrganisationDto>).status;
+    if (Object.keys(patch).length === 0) {
+      toast("No changes to update");
+      return;
+    }
+    try {
+      await saveOrg.mutateAsync({ id: editingOrg.id, data: patch });
+      setIsModalOpen(false);
+    } catch {
+      // Reported by the mutation; keep the form open.
+    }
   };
 
   const onSubmitSSO = async (e: React.FormEvent) => {
@@ -278,16 +286,12 @@ export default function OrganisationsPage() {
                 <Input id="org-industry" value={formData.industry || ""} onChange={(e) => setFormData({ ...formData, industry: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="org-status">Status</Label>
-                <Select
-                  id="org-status"
-                  value={formData.status || "ACTIVE"}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as OrganisationStatus })}
-                >
-                  <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
-                  <option value="SUSPENDED">Suspended</option>
-                </Select>
+                <Label>Status</Label>
+                {/* Read-only: suspending or deactivating your own organisation signed
+                    everyone out with no way back. Billing and account closure own it. */}
+                <div className="flex h-9 items-center">
+                  <StatusBadge status={formData.status || "ACTIVE"} />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="org-timezone">Timezone</Label>
