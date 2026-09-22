@@ -19,8 +19,19 @@ export const nextAuditStatuses = (current?: string): AuditStatus[] =>
 
 export const isAuditFinal = (status?: string): boolean => nextAuditStatuses(status).length === 0;
 
-/** Statuses a new audit may start in. */
+/** Statuses a new audit may start in (the API refuses any other). */
 export const INITIAL_AUDIT_STATUSES = [AuditStatus.PLANNED, AuditStatus.IN_PROGRESS] as const;
+
+/** An audit's status; legacy rows without one read as PLANNED, as the API does. */
+export const auditStatusOf = (audit: { status?: string | null } | null | undefined): AuditStatus =>
+  (audit?.status as AuditStatus | undefined) || AuditStatus.PLANNED;
+
+/** Status options for the form: a new audit's initial statuses, or the current one and its next steps. */
+export function auditStatusOptions(editing: { status?: string | null } | null | undefined): AuditStatus[] {
+  if (!editing) return [...INITIAL_AUDIT_STATUSES];
+  const current = auditStatusOf(editing);
+  return [current, ...nextAuditStatuses(current)];
+}
 
 export interface AuditForm {
   auditDate: string;
@@ -39,7 +50,7 @@ export function buildAuditPayload(form: AuditForm): Partial<AssetAuditDto> {
     auditDate: form.auditDate,
     departmentId: form.departmentId || undefined,
     conductedById: form.conductedById || undefined,
-    status: form.status || AuditStatus.PLANNED,
+    status: (INITIAL_AUDIT_STATUSES as readonly string[]).includes(form.status ?? "") ? form.status : AuditStatus.PLANNED,
     remarks: form.remarks?.trim() || undefined,
   };
 }

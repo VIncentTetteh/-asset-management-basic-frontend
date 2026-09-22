@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { AuditSeal } from "@/components/ui/audit-seal";
 import {
   useAudits,
   useAuditMasterData,
@@ -22,7 +21,8 @@ import {
 } from "@/features/audits/hooks";
 import {
   buildAuditPayload,
-  INITIAL_AUDIT_STATUSES,
+  auditStatusOf,
+  auditStatusOptions,
   isAuditFinal,
   nextAuditStatuses,
   type AuditForm,
@@ -53,7 +53,7 @@ export default function AuditsPage() {
             departmentId: editingAudit.departmentId || "",
             auditDate: toDateInputValue(editingAudit.auditDate),
             conductedById: editingAudit.conductedById || "",
-            status: (editingAudit.status as AuditStatus) || AuditStatus.PLANNED,
+            status: auditStatusOf(editingAudit),
             remarks: editingAudit.remarks || "",
           }
         : {
@@ -133,14 +133,10 @@ export default function AuditsPage() {
       {
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => <StatusBadge status={row.original.status ?? "PLANNED"} />,
+        cell: ({ row }) => <StatusBadge status={auditStatusOf(row.original)} />,
       },
-      {
-        id: "verified",
-        header: "Verified",
-        enableSorting: false,
-        cell: ({ row }) => <AuditSeal verified={row.original.status === AuditStatus.COMPLETED} />,
-      },
+      // No "Verified" seal: item-level verification (scan / verify / discrepancy per
+      // asset) does not exist yet, so a completed audit proves nothing was checked.
       {
         id: "actions",
         header: "",
@@ -180,9 +176,7 @@ export default function AuditsPage() {
   );
 
   const openCount = audits.filter((a) => !isAuditFinal(a.status)).length;
-  const statusOptions = editingAudit
-    ? [editingAudit.status as AuditStatus, ...nextAuditStatuses(editingAudit.status)]
-    : [...INITIAL_AUDIT_STATUSES];
+  const statusOptions = auditStatusOptions(editingAudit);
 
   return (
     <ListPageTemplate
