@@ -1,3 +1,4 @@
+import { allowedTreeParents } from "@/lib/tree";
 import type { Location, LocationDto } from "@/types";
 import { optionalString } from "@/features/finance/payloads";
 
@@ -24,18 +25,5 @@ export function buildLocationPayload(form: LocationDto, existing?: Location | nu
 
 /** Locations that may be picked as the parent of `self`: not itself or any of its descendants. */
 export function allowedParents(all: Pick<Location, "id" | "parentLocationId">[], selfId?: string): Set<string> {
-  const allowed = new Set(all.map((l) => l.id!));
-  if (!selfId) return allowed;
-  const children = new Map<string, string[]>();
-  for (const l of all) {
-    if (!l.parentLocationId) continue;
-    children.set(l.parentLocationId, [...(children.get(l.parentLocationId) ?? []), l.id!]);
-  }
-  const stack = [selfId];
-  while (stack.length) {
-    const id = stack.pop()!;
-    allowed.delete(id);
-    stack.push(...(children.get(id) ?? []));
-  }
-  return allowed;
+  return allowedTreeParents(all, selfId, (l) => l.parentLocationId);
 }

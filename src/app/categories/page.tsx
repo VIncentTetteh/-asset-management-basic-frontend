@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { buildPatchPayload } from "@/lib/patch";
+import { allowedTreeParents } from "@/lib/tree";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useDepreciationPolicies } from "@/features/depreciation/hooks";
 import { depreciationMethodLabel, usefulLifeLabel } from "@/features/assets/depreciation";
@@ -59,6 +60,11 @@ export default function CategoriesPage() {
           },
     );
   }, [isModalOpen, editing, reset]);
+
+  const parentOptions = useMemo(
+    () => allowedTreeParents(rows, editing?.id, (c) => c.parentCategoryId),
+    [rows, editing?.id],
+  );
 
   const parentName = useMemo(() => {
     const map = new Map(rows.map((c) => [c.id, c.name]));
@@ -258,7 +264,8 @@ export default function CategoriesPage() {
             <Label htmlFor="cat-parent">Parent category</Label>
             <Select id="cat-parent" {...register("parentCategoryId")}>
               <option value="">None</option>
-              {rows.filter((c) => c.id !== editing?.id).map((c) => (
+              {/* Not itself or a sub-category: that would make a cycle. */}
+              {rows.filter((c) => parentOptions.has(c.id)).map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </Select>
