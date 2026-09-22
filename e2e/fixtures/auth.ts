@@ -137,9 +137,18 @@ export const PREFIX = `E2E-${RUN_ID}-`;
 export const uniq = (label: string): string => `${PREFIX}${label}`;
 
 type WorkerFixtures = { workerStorageState: string };
-type TestFixtures = { api: ApiClient; creds: Credentials };
+type TestFixtures = { api: ApiClient; creds: Credentials; stagingOnly: void };
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
+    // The default playwright.config.ts (public pages, local static build) also
+    // globs e2e/: these journeys only run under playwright.staging.config.ts.
+    stagingOnly: [
+        async ({}, use) => {
+            test.skip(!process.env.E2E_BASE_URL, "staging journeys: run with playwright.staging.config.ts and E2E_BASE_URL");
+            await use();
+        },
+        { auto: true },
+    ],
     workerStorageState: [
         async ({ browser }, use, workerInfo) => {
             const baseURL = workerInfo.project.use.baseURL;
