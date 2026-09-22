@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
+import { reportApiError } from "@/lib/api-validation";
+import { extractErrorMessage } from "@/lib/error";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +28,7 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
     const [config, setConfig]   = useState<OrgStorageConfig>(DEFAULT_CONFIG);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving]   = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!orgId) {
@@ -34,8 +37,10 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
         }
         storageConfigService
             .get(orgId)
+            // The service maps 404 (no config yet) to null, so defaults stand;
+            // anything else (403, 500) must not masquerade as "defaults".
             .then((c) => { if (c) setConfig(c); })
-            .catch(() => { /* 404 means no config yet — defaults stand */ })
+            .catch((err) => setLoadError(extractErrorMessage(err, "Could not load the storage settings")))
             .finally(() => setLoading(false));
     }, [orgId]);
 
@@ -45,8 +50,8 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
             const saved = await storageConfigService.save(orgId, config);
             setConfig(saved);
             toast.success("Storage settings saved");
-        } catch {
-            toast.error("Failed to save storage settings");
+        } catch (err) {
+            reportApiError(err, { fallback: "Failed to save storage settings" });
         } finally {
             setSaving(false);
         }
@@ -61,6 +66,16 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
                 <CardContent className="flex items-center justify-center gap-2 py-8 text-faint-fg">
                     <Spinner size="sm" />
                     <span className="text-sm">Loading storage settings…</span>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <Card>
+                <CardContent className="py-6 text-sm text-danger">
+                    {loadError}. Storage settings need an organisation admin role.
                 </CardContent>
             </Card>
         );
