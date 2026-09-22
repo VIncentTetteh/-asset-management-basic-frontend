@@ -19,6 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 const REQUEST_TYPES: { value: DsarType; label: string }[] = [
@@ -35,6 +37,8 @@ const fmt = (d?: string) =>
 const daysLeft = (d?: string) => (d ? Math.round((new Date(d).getTime() - Date.now()) / 86400000) : null);
 
 type SubmitForm = DsarSubmission;
+
+const L = FIELD_LIMITS.dsar;
 
 export default function DsarPage() {
   const queryClient = useQueryClient();
@@ -74,7 +78,7 @@ export default function DsarPage() {
   const { hasPermission } = usePermissions();
   // Mirrors the API: status changes need MANAGE_COMPLIANCE (or an admin role).
   const canManage = hasPermission("MANAGE_COMPLIANCE");
-  const { register: regU, handleSubmit: hsU, reset: resetU, formState: { isSubmitting: subU } } = useForm<DsarUpdateForm>();
+  const { register: regU, handleSubmit: hsU, reset: resetU, setError: setErrorU, formState: { isSubmitting: subU, errors: errorsU } } = useForm<DsarUpdateForm>();
   // Assignee picker; an empty list (e.g. no VIEW_USERS) just leaves "Unassigned".
   const { data: users = [] } = useQuery({
     queryKey: qk.module("users").list(),
@@ -135,8 +139,9 @@ export default function DsarPage() {
     try {
       await updateDsarStatus.mutateAsync({ id: updateTarget.id, data: buildDsarStatusUpdate(form, updateTarget) });
       setUpdateTarget(null);
-    } catch {
-      // Reported by the mutation; keep the dialog open.
+    } catch (err) {
+      // Toasted by the mutation; keep the dialog open with the fields marked.
+      applyApiFieldErrors(err, setErrorU);
     }
   };
 
@@ -290,21 +295,24 @@ export default function DsarPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="d-type">Request type <span className="text-danger">*</span></Label>
-            <Select id="d-type" {...register("requestType", { required: "Request type is required" })}>
+            <Select id="d-type" {...register("requestType", limitRules<SubmitForm, "requestType">(L.requestType, "Request type"))}>
               {REQUEST_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </Select>
-            {errors.requestType && <p className="text-sm text-danger">{errors.requestType.message}</p>}
+            <FieldError error={errors.requestType} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="d-email">Data subject email <span className="text-danger">*</span></Label>
-            <Input id="d-email" type="email" placeholder="email@example.com" {...register("requesterEmail", { required: "Email is required" })} />
-            {errors.requesterEmail && <p className="text-sm text-danger">{errors.requesterEmail.message}</p>}
+            <Input id="d-email" type="email" placeholder="email@example.com"
+              {...limitInputProps(L.requesterEmail)}
+              {...register("requesterEmail", limitRules<SubmitForm, "requesterEmail">(L.requesterEmail, "Email"))} />
+            <FieldError error={errors.requesterEmail} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="d-notes">Request details</Label>
             <Textarea id="d-notes" placeholder="Who the subject is and what data they are asking about…" {...register("notes")} />
+            <FieldError error={errors.notes} />
           </div>
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
             <Button type="button" variant="outline" onClick={() => setIsSubmitOpen(false)}>Cancel</Button>
@@ -331,6 +339,7 @@ export default function DsarPage() {
                   ))
                 : null}
             </Select>
+            <FieldError error={errorsU.status} />
             <p className="text-xs text-faint-fg">Completing or rejecting a request is final.</p>
           </div>
           <div className="space-y-2">
@@ -344,10 +353,12 @@ export default function DsarPage() {
                 <option key={u.id} value={u.id}>{userName(u.id)}</option>
               ))}
             </Select>
+            <FieldError error={errorsU.assignedToUserId} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="u-notes">Response summary</Label>
             <Textarea id="u-notes" placeholder="How the request was handled…" {...regU("responseSummary")} />
+            <FieldError error={errorsU.responseSummary} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setUpdateTarget(null)}>Cancel</Button>
