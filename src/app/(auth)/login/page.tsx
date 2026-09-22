@@ -19,6 +19,7 @@ import { clearVerifiedOrganisationId, setStoredUser } from "@/lib/authContext";
 import { Eye, EyeOff, Smartphone } from "lucide-react";
 import { extractErrorMessage } from "@/lib/error";
 import { nextFromSearch } from "@/lib/safe-next";
+import { organisationChoicesFromError, type LoginOrganisationChoice } from "@/lib/login-organisations";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,11 @@ export default function LoginPage() {
     const [mfaChallengeToken, setMfaChallengeToken] = useState<string | null>(null);
     const [mfaCode, setMfaCode] = useState("");
     const [isMfaSubmitting, setIsMfaSubmitting] = useState(false);
+
+    // Email in several organisations: shown only after the API has accepted the
+    // password for each one (409 ORGANISATION_REQUIRED).
+    const [orgChoices, setOrgChoices] = useState<LoginOrganisationChoice[] | null>(null);
+    const [organisationId, setOrganisationId] = useState("");
 
     const { register, handleSubmit, getValues, formState: { errors } } = useForm<{
         email: string;
@@ -83,7 +89,10 @@ export default function LoginPage() {
     const onSubmit = async (data: { email: string; password: string }) => {
         setIsLoading(true);
         try {
-            const response = await authService.login(data);
+            const response = await authService.login({
+                ...data,
+                ...(orgChoices && organisationId ? { organisationId } : {}),
+            });
 
             // ── MFA required: backend returned 202 with a challenge token ─────
             if ("mfaRequired" in response && response.mfaRequired) {
@@ -110,6 +119,13 @@ export default function LoginPage() {
                 toast.error("Invalid response from server");
             }
         } catch (error: unknown) {
+            const choices = organisationChoicesFromError(error);
+            if (choices) {
+                setOrgChoices(choices);
+                setOrganisationId(choices[0].id);
+                toast("Choose the organisation to sign in to.");
+                return;
+            }
             toast.error(extractErrorMessage(error, "Failed to login. Please check your credentials."));
         } finally {
             setIsLoading(false);
@@ -225,7 +241,7 @@ export default function LoginPage() {
                                 {...register("email", {
                                     required: "Email is required",
                                     pattern: { value: /\S+@\S+\.\S+/, message: "Invalid email address" },
-                                    onChange: () => setSsoDiscovery(null),
+                                    onChange: () => { setSsoDiscovery(null); setOrgChoices(null); },
                                     onBlur: onEmailBlur,
                                 })}
                                 className={errors.email ? "border-red-500" : ""}
@@ -292,6 +308,25 @@ export default function LoginPage() {
                                 {errors.password && (
                                     <p className="text-sm text-red-500">{errors.password.message as string}</p>
                                 )}
+                            </div>
+                        )}
+
+                        {!ssoDiscovery && orgChoices && (
+                            <div className="space-y-2">
+                                <Label htmlFor="organisationId">Organisation</Label>
+                                <select
+                                    id="organisationId"
+                                    value={organisationId}
+                                    onChange={(e) => setOrganisationId(e.target.value)}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                >
+                                    {orgChoices.map((o) => (
+                                        <option key={o.id} value={o.id}>{o.name}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-slate-500">
+                                    This email belongs to more than one organisation.
+                                </p>
                             </div>
                         )}
                     </CardContent>
