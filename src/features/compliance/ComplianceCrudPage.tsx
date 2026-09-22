@@ -15,6 +15,9 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { buildPatchPayload } from "@/lib/patch";
+import { applyApiFieldErrors } from "@/lib/api-validation";
+import { usePermissions } from "@/contexts/PermissionContext";
+import { buildCompliancePayload } from "@/features/compliance/payload";
 import { useConfirm } from "@/hooks/useConfirm";
 
 /** One form control, rendered in a two-column grid (span2 for full width). */
@@ -54,6 +57,8 @@ interface ComplianceCrudPageProps<T extends { id?: string }, TDto extends FieldV
     update: (id: string, data: Partial<TDto>) => Promise<T>;
     delete: (id: string) => Promise<void>;
   };
+  /** False for entities the API cannot delete (PCI SAQ answers, SLA metrics). */
+  canDelete?: boolean;
   moduleKey: string;
   columns: ColumnSpec<T>[];
   fields: FieldSpec<TDto>[];
@@ -115,7 +120,11 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
   searchKeys,
   emptyDescription,
   useOptions,
+  canDelete = true,
 }: ComplianceCrudPageProps<T, TDto>) {
+  const { hasPermission } = usePermissions();
+  // Mirrors the API: every compliance write takes MANAGE_COMPLIANCE or MANAGE_SECURITY_SETTINGS.
+  const canManage = hasPermission("MANAGE_COMPLIANCE") || hasPermission("MANAGE_SECURITY_SETTINGS");
   const entityPlural = entity.endsWith("y")
     ? `${entity.slice(0, -1)}ies`
     : `${entity}s`;
@@ -148,7 +157,7 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<TDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<TDto>();
 
   useEffect(() => {
     if (isModalOpen) reset(toFormDefaults(editing));
@@ -174,22 +183,30 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
   };
 
   const onSubmit = async (data: TDto) => {
-    let payload = toPayload ? toPayload(data) : data;
-    payload = Object.fromEntries(
-      Object.entries(payload).filter(([, v]) => v !== ""),
+    const transformed = toPayload ? toPayload(data) : data;
+    const payload = buildCompliancePayload(
+      fields,
+      transformed as Record<string, unknown>,
+      editing as unknown as Record<string, unknown> | null,
     ) as TDto;
 
-    if (editing) {
-      const patch = buildPatchPayload<TDto>(editing as unknown as Partial<TDto>, payload);
-      if (Object.keys(patch).length === 0) {
-        toast("No changes to update");
-        return;
+    try {
+      if (editing) {
+        const previous = buildCompliancePayload(fields, editing as unknown as Record<string, unknown>) as Partial<TDto>;
+        const patch = buildPatchPayload<TDto>(previous, payload);
+        if (Object.keys(patch).length === 0) {
+          toast("No changes to update");
+          return;
+        }
+        await save.mutateAsync({ id: editing.id!, data: patch as TDto });
+      } else {
+        await save.mutateAsync({ data: payload });
       }
-      await save.mutateAsync({ id: editing.id!, data: patch as TDto });
-    } else {
-      await save.mutateAsync({ data: payload });
+      setIsModalOpen(false);
+    } catch (err) {
+      // The save hook toasted; keep the form open with the fields marked.
+      applyApiFieldErrors(err, setError);
     }
-    setIsModalOpen(false);
   };
 
   const tableColumns = useMemo<ColumnDef<T, unknown>[]>(
@@ -204,7 +221,7 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
         id: "actions",
         header: "",
         enableSorting: false,
-        cell: ({ row }: { row: { original: T } }) => (
+        cell: ({ row }: { row: { original: T } }) => !canManage ? null : (
           <div className="flex justify-end gap-0.5">
             <Button
               variant="ghost"
@@ -218,21 +235,23 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-danger"
-              aria-label={`Delete ${entity.toLowerCase()}`}
-              onClick={() => handleDelete(row.original)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-danger"
+                aria-label={`Delete ${entity.toLowerCase()}`}
+                onClick={() => handleDelete(row.original)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
         ),
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [columns, entity],
+    [columns, entity, canManage, canDelete],
   );
 
   return (
@@ -240,9 +259,11 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
       title={title}
       subtitle={isLoading ? `Loading ${entityPlural.toLowerCase()}…` : `${rows.length} records`}
       actions={
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> New {entity}
-        </Button>
+        canManage ? (
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" /> New {entity}
+          </Button>
+        ) : undefined
       }
       toolbar={
         <div className="relative w-full max-w-xs">
@@ -258,9 +279,11 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
         emptyTitle={`No ${entityPlural.toLowerCase()} yet`}
         emptyDescription={emptyDescription}
         emptyAction={
-          <Button size="sm" onClick={openCreate}>
-            <Icon className="mr-1.5 h-4 w-4" /> New {entity}
-          </Button>
+          canManage ? (
+            <Button size="sm" onClick={openCreate}>
+              <Icon className="mr-1.5 h-4 w-4" /> New {entity}
+            </Button>
+          ) : undefined
         }
       />
 
@@ -313,7 +336,11 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
                       {...register(field.name as Path<TDto>, { required: field.required })}
                     />
                   )}
-                  {err && <p className="text-sm text-danger">{field.label} is required</p>}
+                  {err && (
+                    <p className="text-sm text-danger">
+                      {typeof err.message === "string" && err.message ? err.message : `${field.label} is required`}
+                    </p>
+                  )}
                 </div>
               );
             })}

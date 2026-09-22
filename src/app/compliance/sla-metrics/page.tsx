@@ -57,6 +57,7 @@ export default function SlaMetricsPage() {
         rpoMinutes: d.rpoMinutes != null && String(d.rpoMinutes) !== "" ? Number(d.rpoMinutes) : undefined,
       })}
       searchKeys={["year", "month"]}
+      canDelete={false}
       emptyDescription="Record monthly service levels against your availability commitments."
     />
   );

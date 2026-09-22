@@ -39,6 +39,7 @@ export default function PciSaqPage() {
       fields={FIELDS}
       toFormDefaults={(e) => defaultsFrom(e, FIELDS, CREATE_DEFAULTS)}
       searchKeys={["requirementNumber", "requirementText"]}
+      canDelete={false}
       emptyDescription="Answer the PCI-DSS self-assessment questionnaire requirement by requirement."
     />
   );
