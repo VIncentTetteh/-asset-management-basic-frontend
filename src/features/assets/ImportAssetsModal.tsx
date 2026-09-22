@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AssetImportResult } from "@/types";
 import { importJobService } from "@/services/importJobService";
+import { importJobPhase, shouldPollImportJob } from "./importJob";
 import { qk } from "@/lib/queryClient";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -40,14 +41,20 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
   // Poll background import jobs until they settle.
   useEffect(() => {
-    if (!jobId || !(status === "PENDING" || status === "PROCESSING" || status === "uploading")) return;
+    if (!jobId || !shouldPollImportJob(jobId, status)) return;
 
     const interval = setInterval(async () => {
       try {
         const details = await importJobService.getJobDetails(jobId);
-        setStatus(details.status || "COMPLETED");
+        const phase = importJobPhase(details.status);
+        setStatus(details.status ?? null);
 
-        if (details.status === "COMPLETED" || details.status === "FAILED") {
+        if (phase === "cancelled") {
+          toast.error("The import was cancelled before it finished");
+          setJobId(null);
+          return;
+        }
+        if (phase === "completed" || phase === "failed") {
           if (details.result) {
             setResult({
               totalRows: details.result.totalRows || 0,
@@ -56,16 +63,18 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
               errors: (details.result.errors || []).map((e) => ({ row: e.row || 0, message: e.message || "" })),
             });
           }
-          if (details.status === "COMPLETED") {
+          if (phase === "completed") {
             toast.success("Bulk import completed");
             queryClient.invalidateQueries({ queryKey: qk.assets.all });
+          } else {
+            toast.error("The import failed. See the row errors for details.");
           }
           setJobId(null);
         }
-      } catch (err) {
-        console.error("Import polling failed", err);
+      } catch {
         clearInterval(interval);
         setJobId(null);
+        toast.error("Lost track of the import job. Refresh the asset list to see what was imported.");
       }
     }, 2000);
 
@@ -83,7 +92,7 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
       const response = await importJobService.importAssets(file);
       if (response.jobId) {
         setJobId(response.jobId);
-        setStatus(response.status || "PENDING");
+        setStatus(response.status || "QUEUED");
         toast.success("File uploaded — processing in the background");
       } else if (response.result) {
         setResult({
