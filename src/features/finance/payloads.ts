@@ -1,4 +1,4 @@
-import type { Budget, BudgetDto, ContractDto, PurchaseOrderDto, SoftwareLicenseDto, VendorReviewDto } from "@/types";
+import type { Budget, BudgetDto, ContractDto, PurchaseOrderDto, SoftwareLicenseDto, SupplierDto, SupplierStatus, VendorReviewDto } from "@/types";
 import type { LeaseRecordDto } from "@/services/leaseRecordService";
 
 /**
@@ -24,6 +24,35 @@ export const optionalNumber = (v: unknown): number | null => {
 
 /** Trimmed string or null for an optional text/select input. */
 export const optionalString = (v: unknown): string | null => (blank(v) ? null : String(v).trim());
+
+// ── Suppliers ─────────────────────────────────────────────────────────────────
+
+/** Every SupplierStatus the API accepts, in display order. */
+export const SUPPLIER_STATUSES: readonly { value: SupplierStatus; label: string }[] = [
+    { value: "ACTIVE", label: "Active" },
+    { value: "INACTIVE", label: "Inactive" },
+    { value: "SUSPENDED", label: "Suspended" },
+    { value: "BLACKLISTED", label: "Blacklisted" },
+];
+
+export type SupplierForm = Raw<SupplierDto>;
+
+/**
+ * Full body for POST and PUT /suppliers. Every optional field is sent, a blank
+ * one as null, so an edit (a full-replace PUT) clears what the user emptied.
+ */
+export function buildSupplierPayload(form: SupplierForm): SupplierDto {
+    return {
+        name: String(form.name ?? "").trim(),
+        email: optionalString(form.email),
+        phone: optionalString(form.phone),
+        contactPerson: optionalString(form.contactPerson),
+        taxId: optionalString(form.taxId),
+        registrationNumber: optionalString(form.registrationNumber),
+        address: optionalString(form.address),
+        status: optionalString(form.status) ?? "ACTIVE",
+    };
+}
 
 // ── Budgets ───────────────────────────────────────────────────────────────────
 

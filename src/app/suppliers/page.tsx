@@ -17,10 +17,19 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { applyApiFieldErrors } from "@/lib/api-validation";
+import { buildSupplierPayload, SUPPLIER_STATUSES } from "@/features/finance/payloads";
 
-const suppliers = makeCrudHooks<Supplier, SupplierDto>("suppliers", supplierService, { entity: "Supplier" });
+// Edits are a full-replace PUT so a field the user empties is cleared (PATCH skips nulls).
+const suppliers = makeCrudHooks<Supplier, SupplierDto>(
+  "suppliers",
+  { ...supplierService, update: (id, data) => supplierService.replace(id, data as SupplierDto) },
+  { entity: "Supplier", fields: { registrationNumber: "Registration number", taxId: "Tax ID" } },
+);
+const L = FIELD_LIMITS.supplier;
 
 export default function SuppliersPage() {
   const { data: rows = [], isLoading } = suppliers.useList();
@@ -32,7 +41,7 @@ export default function SuppliersPage() {
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<SupplierDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<SupplierDto>();
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -84,27 +93,15 @@ export default function SuppliersPage() {
   };
 
   const onSubmit = async (data: SupplierDto) => {
-    const name = data.name.trim();
-    if (!name) {
-      toast.error("Company name is required");
-      return;
+    const payload = buildSupplierPayload(data);
+    try {
+      await save.mutateAsync(editing ? { id: editing.id!, data: payload } : { data: payload });
+      setIsModalOpen(false);
+    } catch (error) {
+      // The save hook toasts; a duplicate email / tax ID / registration number, or a
+      // validation failure, is also marked on its field.
+      applyApiFieldErrors(error, setError);
     }
-    const payload: SupplierDto = { ...data, name };
-    (Object.keys(payload) as (keyof SupplierDto)[]).forEach((k) => {
-      if (payload[k] === "") delete (payload as unknown as Record<string, unknown>)[k];
-    });
-
-    if (editing) {
-      const patch = buildPatchPayload<SupplierDto>(editing as unknown as Partial<SupplierDto>, payload);
-      if (Object.keys(patch).length === 0) {
-        toast("No changes to update");
-        return;
-      }
-      await save.mutateAsync({ id: editing.id!, data: patch as SupplierDto });
-    } else {
-      await save.mutateAsync({ data: payload });
-    }
-    setIsModalOpen(false);
   };
 
   const columns = useMemo<ColumnDef<Supplier, unknown>[]>(
@@ -138,6 +135,25 @@ export default function SuppliersPage() {
           ) : (
             <span className="text-faint-fg">—</span>
           ),
+      },
+      {
+        accessorKey: "registrationNumber",
+        header: "Registration",
+        cell: ({ row }) =>
+          row.original.registrationNumber ? (
+            <span className="data-mono text-xs">{row.original.registrationNumber}</span>
+          ) : (
+            <span className="text-faint-fg">—</span>
+          ),
+      },
+      {
+        accessorKey: "address",
+        header: "Address",
+        cell: ({ row }) => (
+          <span className="block max-w-56 truncate text-xs text-muted-fg" title={row.original.address ?? undefined}>
+            {row.original.address || "—"}
+          </span>
+        ),
       },
       {
         accessorKey: "status",
@@ -216,52 +232,64 @@ export default function SuppliersPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="sup-name">Company name <span className="text-danger">*</span></Label>
-            <Input id="sup-name" placeholder="Acme Supplies Ltd" {...register("name", { required: "Name is required" })} />
-            {errors.name && <p className="text-sm text-danger">{errors.name.message as string}</p>}
+            <Input id="sup-name" placeholder="Acme Supplies Ltd" {...limitInputProps(L.name)}
+              {...register("name", limitRules<SupplierDto, "name">(L.name, "Company name"))} />
+            <FieldError error={errors.name} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="sup-email">Email</Label>
-              <Input id="sup-email" type="email" {...register("email")} />
+              <Input id="sup-email" type="email" {...limitInputProps(L.email)}
+                {...register("email", limitRules<SupplierDto, "email">(L.email, "Email"))} />
+              <FieldError error={errors.email} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="sup-phone">Phone</Label>
-              <Input id="sup-phone" {...register("phone")} />
+              <Input id="sup-phone" {...limitInputProps(L.phone)}
+                {...register("phone", limitRules<SupplierDto, "phone">(L.phone, "Phone"))} />
+              <FieldError error={errors.phone} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="sup-contact">Contact person</Label>
-              <Input id="sup-contact" {...register("contactPerson")} />
+              <Input id="sup-contact" {...limitInputProps(L.contactPerson)}
+                {...register("contactPerson", limitRules<SupplierDto, "contactPerson">(L.contactPerson, "Contact person"))} />
+              <FieldError error={errors.contactPerson} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="sup-status">Status</Label>
               <Select id="sup-status" {...register("status")}>
-                <option value="ACTIVE">Active</option>
-                <option value="INACTIVE">Inactive</option>
-                <option value="BLACKLISTED">Blacklisted</option>
+                {SUPPLIER_STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
               </Select>
+              <FieldError error={errors.status} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="sup-tax">Tax ID</Label>
-              <Input id="sup-tax" className="data-mono" {...register("taxId")} />
+              <Input id="sup-tax" className="data-mono" {...limitInputProps(L.taxId)}
+                {...register("taxId", limitRules<SupplierDto, "taxId">(L.taxId, "Tax ID"))} />
+              <FieldError error={errors.taxId} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="sup-reg">Registration number</Label>
-              <Input id="sup-reg" className="data-mono" {...register("registrationNumber")} />
+              <Input id="sup-reg" className="data-mono" {...limitInputProps(L.registrationNumber)}
+                {...register("registrationNumber", limitRules<SupplierDto, "registrationNumber">(L.registrationNumber, "Registration number"))} />
+              <FieldError error={errors.registrationNumber} />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="sup-address">Address</Label>
             <Textarea id="sup-address" {...register("address")} />
+            <FieldError error={errors.address} />
           </div>
-
 
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>

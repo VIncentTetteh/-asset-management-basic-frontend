@@ -9,6 +9,8 @@ import {
     buildLeasePayload,
     buildLicensePayload,
     buildPurchaseOrderPayload,
+    buildSupplierPayload,
+    SUPPLIER_STATUSES,
     expenseCurrencyFor,
 } from "@/features/finance/payloads";
 import { poActionsFor } from "@/features/finance/purchaseOrderWorkflow";
@@ -236,5 +238,21 @@ describe("budgetCurrencyLocked", () => {
         expect(budgetCurrencyLocked({ spentAmount: 10, committedAmount: 0 })).toBe(true);
         expect(budgetCurrencyLocked({ spentAmount: 0, committedAmount: 5 })).toBe(true);
         expect(budgetCurrencyLocked(null)).toBe(false);
+    });
+});
+
+describe("supplier payload", () => {
+    it("sends every optional field, blanks as null, so a PUT clears them", () => {
+        expect(buildSupplierPayload({
+            name: " Acme ", email: "", phone: " ", contactPerson: "Ama", taxId: "",
+            registrationNumber: "", address: "", status: "SUSPENDED",
+        })).toEqual({
+            name: "Acme", email: null, phone: null, contactPerson: "Ama", taxId: null,
+            registrationNumber: null, address: null, status: "SUSPENDED",
+        });
+    });
+
+    it("offers every SupplierStatus, including SUSPENDED", () => {
+        expect(SUPPLIER_STATUSES.map((s) => s.value)).toEqual(["ACTIVE", "INACTIVE", "SUSPENDED", "BLACKLISTED"]);
     });
 });

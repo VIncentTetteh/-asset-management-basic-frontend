@@ -649,12 +649,13 @@ export interface Supplier extends BaseEntity {
 export interface SupplierDto {
     id?: string;
     name: string;                 // required
-    email?: string;
-    phone?: string;
-    address?: string;
-    contactPerson?: string;
-    taxId?: string;
-    registrationNumber?: string;
+    /** null clears the field on PUT. */
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    contactPerson?: string | null;
+    taxId?: string | null;
+    registrationNumber?: string | null;
     status?: SupplierStatus | string;
     organisationId?: string;
 }
