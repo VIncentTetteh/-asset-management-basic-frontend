@@ -1,12 +1,5 @@
-import { test, expect, RUN_ID, uniq } from "../../fixtures/auth";
-import {
-    bypassNativeValidation,
-    fieldControl,
-    formModal,
-    overLength,
-    setControl,
-    type FieldSpec,
-} from "../../fixtures/forms";
+import { RUN_ID, uniq } from "../../fixtures/auth";
+import { overLength, type FieldSpec } from "../../fixtures/forms";
 import { createAsset, dropAsset, isoDate } from "../../fixtures/prereqs";
 import { describeRoundTrip, type Ctx, type NegativeCase } from "../../fixtures/roundtrip";
 import { ADMIN_EMAIL } from "./_admin-helpers";
@@ -304,33 +297,50 @@ for (const reg of REGISTERS) {
     });
 }
 
-// ── SLA metrics: validation only ──────────────────────────────────────────────
-// No delete in the UI or the API, and a record is keyed by (month, year) of the
-// real tenant, so a round trip would leave a permanent, unprefixable SLA figure.
-// The limits are still checked on the create form, which is never submitted valid.
-test.describe("Compliance sla-metrics (validation only)", () => {
-    const cases: { label: string; value: number; error: RegExp }[] = [
-        { label: "Month (1–12)", value: 13, error: /Month \(1–12\) must be at most 12/ },
-        { label: "Year", value: 1999, error: /Year must be at least 2000/ },
-        { label: "Uptime %", value: 100.5, error: /Uptime % must be at most 100/ },
-        { label: "Incidents", value: -1, error: /Incidents must be at least 0/ },
-        { label: "RTO (min)", value: -5, error: /RTO \(min\) must be at least 0/ },
-    ];
-    for (const [index, c] of cases.entries()) {
-        test(`e${index + 1}) inline error for invalid "${c.label}"`, async ({ page }) => {
-            await page.goto("/compliance/sla-metrics");
-            await page.getByRole("button", { name: /^New SLA metric$/i }).first().click();
-            const form = formModal(page);
-            await expect(form).toBeVisible();
-            const spec: FieldSpec = { label: c.label, type: "number", value: c.value };
-            const control = await fieldControl(form, spec);
-            await bypassNativeValidation(form, control);
-            await setControl(control, spec, c.value);
-            await form.getByRole("button", { name: /^Create sla metric$/i }).click();
-            await expect(form.getByRole("alert").filter({ hasText: c.error }).first()).toBeVisible();
-            await expect(form, "the form stays open").toBeVisible();
-            await form.getByRole("button", { name: /^Cancel$/ }).click();
-            await expect(form).toBeHidden();
-        });
+// ── SLA metrics ───────────────────────────────────────────────────────────────
+// A metric is keyed by (month, year) of the real tenant, so the round trip books
+// a far-future period nobody reports on and deletes it again (the register gained
+// DELETE /compliance/sla-metrics/{id}). The row is found by its year, which is
+// what the Period column shows and what the list searches on.
+const SLA_YEAR = 2099;
+
+async function dropSlaMetrics({ api }: Ctx): Promise<void> {
+    const rows = await api
+        .list<{ id?: string; year?: number }>("/compliance/sla-metrics")
+        .catch(() => []);
+    for (const row of rows) {
+        if (row.year === SLA_YEAR && row.id) await api.tryDelete(`/compliance/sla-metrics/${row.id}`);
     }
+}
+
+describeRoundTrip({
+    title: "Compliance sla-metrics",
+    path: "/compliance/sla-metrics",
+    key: String(SLA_YEAR),
+    createButton: /^New SLA metric$/i,
+    editButton: /^Edit sla metric$/i,
+    deleteButton: /^Delete sla metric$/i,
+    searchPlaceholder: /^Search…$/,
+    // A period left behind by an interrupted run would collide with the create.
+    setup: dropSlaMetrics,
+    teardown: dropSlaMetrics,
+    fields: [
+        { label: "Month (1–12)", type: "number", value: 1, edit: 2 },
+        { label: "Year", type: "number", value: SLA_YEAR },
+        { label: "Uptime %", type: "number", value: 99.123, edit: 98.5 },
+        { label: "Incidents", type: "number", value: 3, optional: true },
+        { label: "Planned downtime (min)", type: "number", value: 30, optional: true },
+        { label: "Unplanned downtime (min)", type: "number", value: 12, optional: true },
+        { label: "RTO (min)", type: "number", value: 60, optional: true },
+        { label: "RPO (min)", type: "number", value: 15, optional: true },
+        { label: "SLA breached this period", type: "checkbox", value: true, optional: true },
+        { label: "Notes", type: "textarea", value: uniq("SLA notes"), optional: true },
+    ],
+    negative: [
+        { field: { label: "Month (1–12)", type: "number", value: 1 }, value: 13, error: /Month \(1–12\) must be at most 12/ },
+        { field: { label: "Year", type: "number", value: SLA_YEAR }, value: 1999, error: /Year must be at least 2000/ },
+        { field: { label: "Uptime %", type: "number", value: 99.9 }, value: 100.5, error: /Uptime % must be at most 100/ },
+        { field: { label: "Incidents", type: "number", value: 0 }, value: -1, error: /Incidents must be at least 0/ },
+        { field: { label: "RTO (min)", type: "number", value: 0 }, value: -5, error: /RTO \(min\) must be at least 0/ },
+    ],
 });
