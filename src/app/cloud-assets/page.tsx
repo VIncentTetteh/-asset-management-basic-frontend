@@ -22,6 +22,13 @@ import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { reportApiError } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
+import {
+    CLOUD_ENVIRONMENTS,
+    CLOUD_RESOURCE_TYPES,
+    buildCloudAssetPayload,
+    resourceTypeLabel,
+    type CloudAssetForm,
+} from "@/features/cloud/options";
 
 const PROVIDER_COLORS: Record<string, string> = {
     AWS: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
@@ -62,7 +69,7 @@ export default function CloudAssetsPage() {
     const [costAssetId, setCostAssetId] = useState("");
     const [isSyncing, setIsSyncing] = useState(false);
 
-    const assetForm = useForm<CloudAssetDto>();
+    const assetForm = useForm<CloudAssetForm>();
     const { format, baseCurrency } = useCurrency();
     const costForm = useForm<CloudMonthlyCostDto>();
     const { confirm, ConfirmDialog } = useConfirm();
@@ -101,7 +108,7 @@ export default function CloudAssetsPage() {
 
     const handleOpenCreate = () => {
         setEditingAsset(null);
-        assetForm.reset({ name: "", provider: "AWS", region: "", resourceId: "", resourceType: "VIRTUAL_MACHINE", status: "RUNNING", environment: "PROD", currency: baseCurrency });
+        assetForm.reset({ name: "", provider: "AWS", region: "", resourceId: "", resourceType: "VIRTUAL_MACHINE", status: "RUNNING", environment: "", currency: baseCurrency });
         setIsModalOpen(true);
     };
 
@@ -112,7 +119,7 @@ export default function CloudAssetsPage() {
             resourceId: asset.resourceId, resourceType: asset.resourceType,
             status: asset.status, accountId: asset.accountId || "",
             monthlyCostEstimate: asset.monthlyCostEstimate ?? undefined,
-            currency: asset.currency || baseCurrency, environment: asset.environment,
+            currency: asset.currency || baseCurrency, environment: asset.environment ?? "",
             tags: asset.tags || "", description: asset.description || "",
         });
         setIsModalOpen(true);
@@ -138,7 +145,8 @@ export default function CloudAssetsPage() {
         }
     };
 
-    const onSubmitAsset = async (data: CloudAssetDto) => {
+    const onSubmitAsset = async (form: CloudAssetForm) => {
+        const data: CloudAssetDto = buildCloudAssetPayload(form);
         try {
             if (editingAsset) {
                 await cloudAssetService.update(editingAsset.id, data);
@@ -246,7 +254,7 @@ export default function CloudAssetsPage() {
                 </Select>
                 <Select value={filterEnvironment} onChange={e => { setFilterEnvironment(e.target.value); setPage(0); }} className="w-40">
                     <option value="">All Environments</option>
-                    {["PROD", "STAGING", "DEV"].map(e => <option key={e} value={e}>{e}</option>)}
+                    {CLOUD_ENVIRONMENTS.map(e => <option key={e} value={e}>{e}</option>)}
                 </Select>
             </div>
 
@@ -295,12 +303,14 @@ export default function CloudAssetsPage() {
                                                         {asset.provider}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 text-xs text-muted-fg">{asset.resourceType.replace("_", " ")}</td>
+                                                <td className="px-4 py-3 text-xs text-muted-fg">{resourceTypeLabel(asset.resourceType)}</td>
                                                 <td className="px-4 py-3 text-muted-fg">{asset.region}</td>
                                                 <td className="px-4 py-3">
-                                                    <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", ENV_STYLES[asset.environment] || "bg-info-soft text-info")}>
-                                                        {asset.environment}
-                                                    </span>
+                                                    {asset.environment ? (
+                                                        <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", ENV_STYLES[asset.environment] || "bg-info-soft text-info")}>
+                                                            {asset.environment}
+                                                        </span>
+                                                    ) : <span className="text-faint-fg">—</span>}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-fg">
                                                     {asset.monthlyCostEstimate != null ? format(asset.monthlyCostEstimate, asset.currency || baseCurrency) : "—"}
@@ -383,9 +393,10 @@ export default function CloudAssetsPage() {
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>Environment <span className="text-danger">*</span></Label>
+                            <Label>Environment</Label>
                             <Select {...assetForm.register("environment")}>
-                                {["PROD", "STAGING", "DEV"].map(e => <option key={e} value={e}>{e}</option>)}
+                                <option value="">(none)</option>
+                                {CLOUD_ENVIRONMENTS.map(e => <option key={e} value={e}>{e}</option>)}
                             </Select>
                         </div>
                     </div>
@@ -393,7 +404,7 @@ export default function CloudAssetsPage() {
                         <div className="space-y-2">
                             <Label>Resource Type</Label>
                             <Select {...assetForm.register("resourceType")}>
-                                {["VIRTUAL_MACHINE", "STORAGE_BUCKET", "DATABASE", "LOAD_BALANCER", "CONTAINER", "SERVERLESS_FUNCTION", "KUBERNETES_CLUSTER", "NETWORK", "OTHER"].map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+                                {CLOUD_RESOURCE_TYPES.map(t => <option key={t} value={t}>{resourceTypeLabel(t)}</option>)}
                             </Select>
                         </div>
                         <div className="space-y-2">
@@ -420,7 +431,7 @@ export default function CloudAssetsPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label>Monthly Cost Estimate</Label>
-                            <Input type="number" step="0.01" {...assetForm.register("monthlyCostEstimate", { valueAsNumber: true })} />
+                            <Input type="number" min="0" step="0.0001" {...assetForm.register("monthlyCostEstimate")} />
                         </div>
                         <div className="space-y-2">
                             <Label>Currency</Label>

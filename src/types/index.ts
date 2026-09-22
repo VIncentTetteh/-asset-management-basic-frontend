@@ -1966,7 +1966,8 @@ export type CloudResourceType =
     | "CACHE"
     | "MESSAGE_QUEUE"
     | "OTHER";
-export type CloudEnvironment = "PROD" | "STAGING" | "DEV";
+/** The API's CloudEnvironment enum; null means "not set". */
+export type CloudEnvironment = "PROD" | "STAGING" | "DEV" | "TEST" | "OTHER";
 export type CloudAssetStatus = "RUNNING" | "STOPPED" | "TERMINATED" | "PENDING" | "UNKNOWN";
 
 export interface CloudAsset {
@@ -1980,7 +1981,7 @@ export interface CloudAsset {
     accountId?: string | null;
     monthlyCostEstimate?: number | null;
     currency?: string | null;
-    environment: CloudEnvironment;
+    environment?: CloudEnvironment | null;
     tags?: string | null;
     description?: string | null;
     lastSyncAt?: string | null;
@@ -1999,7 +2000,7 @@ export interface CloudAssetDto {
     accountId?: string | null;
     monthlyCostEstimate?: number | null;
     currency?: string | null;
-    environment: CloudEnvironment;
+    environment?: CloudEnvironment | null;
     tags?: string | null;
     description?: string | null;
 }
