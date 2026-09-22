@@ -96,13 +96,30 @@ const normalizeNotifications = (payload: unknown): { totalNotifications: number;
     };
 };
 
-/** Ensure every known notification type has an entry in emailNotifications */
-const seedEmailPrefs = (prefs: NotificationPreferences): NotificationPreferences => {
+/**
+ * The API keys email categories in lower case ("maintenance", "purchase_order");
+ * the screen uses the NotificationType names ("MAINTENANCE"). Reading them
+ * as-is showed every box as on (the upper-case key was never present) and saving
+ * sent upper-case keys the API ignores, so preferences never changed.
+ */
+export const toApiEmailKey = (type: string): string => type.toLowerCase();
+
+/** API preferences → screen: one upper-case entry per known type (unknown ones default on). */
+export const seedEmailPrefs = (prefs: NotificationPreferences): NotificationPreferences => {
+    const api = (prefs.emailNotifications ?? {}) as Record<string, boolean>;
     const seeded: Record<string, boolean> = {};
     for (const t of NOTIFICATION_TYPES) {
-        seeded[t] = prefs.emailNotifications?.[t] ?? true;
+        seeded[t] = api[toApiEmailKey(t)] ?? api[t] ?? true;
     }
-    return { ...prefs, emailNotifications: { ...seeded, ...prefs.emailNotifications } };
+    return { ...prefs, emailNotifications: seeded as NotificationPreferences["emailNotifications"] };
+};
+
+/** Screen preferences → API body with lower-case category keys. */
+export const toApiPreferences = (prefs: Partial<NotificationPreferences>): Partial<NotificationPreferences> => {
+    if (!prefs.emailNotifications) return prefs;
+    const email: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(prefs.emailNotifications)) email[toApiEmailKey(k)] = Boolean(v);
+    return { ...prefs, emailNotifications: email as NotificationPreferences["emailNotifications"] };
 };
 
 export const notificationService = {
@@ -135,7 +152,7 @@ export const notificationService = {
     },
 
     updatePreferences: async (data: Partial<NotificationPreferences>): Promise<{ updated: boolean; updatedAt: string; preferences: NotificationPreferences }> => {
-        const response = await api.patch("/notifications/preferences", data);
+        const response = await api.patch("/notifications/preferences", toApiPreferences(data));
         return response.data;
     },
 
