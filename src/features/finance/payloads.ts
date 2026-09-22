@@ -101,14 +101,16 @@ export type PurchaseOrderForm = Raw<PurchaseOrderDto>;
 
 /**
  * Full body for POST and PUT /purchase-orders. No status: the workflow endpoints
- * own it. An empty budget select is sent as null, which unlinks on PUT.
+ * own it. An empty budget, remarks or expected delivery date is sent as null,
+ * which clears it on PUT.
  */
 export function buildPurchaseOrderPayload(form: PurchaseOrderForm): PurchaseOrderDto {
     return {
         poNumber: String(form.poNumber ?? "").trim(),
         totalAmount: Number(form.totalAmount),
         currency: optionalString(form.currency) ?? undefined,
-        remarks: optionalString(form.remarks) ?? undefined,
+        remarks: optionalString(form.remarks),
+        expectedDeliveryDate: optionalString(form.expectedDeliveryDate),
         departmentId: String(form.departmentId ?? ""),
         supplierId: String(form.supplierId ?? ""),
         linkedBudgetId: optionalString(form.linkedBudgetId),

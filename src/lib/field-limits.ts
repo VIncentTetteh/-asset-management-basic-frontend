@@ -166,6 +166,7 @@ export const FIELD_LIMITS = {
     },
     purchaseOrder: {
         poNumber: text(255, true),
+        rejectionReason: { required: true, maxLength: 5000 },
         totalAmount: POSITIVE_MONEY,
         currency: CURRENCY,
         departmentId: REQUIRED,

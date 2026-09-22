@@ -441,6 +441,14 @@ export interface PurchaseOrder extends BaseEntity {
     rejectedById?: string | null;
     approvedAt?: string | null;
     rejectedAt?: string | null;
+    /** Why the order was rejected (set by POST /reject). */
+    rejectionReason?: string | null;
+    /** Approval trail display names (full name, else email). */
+    requestedByName?: string | null;
+    approvedByName?: string | null;
+    rejectedByName?: string | null;
+    /** yyyy-MM-dd */
+    expectedDeliveryDate?: string | null;
 }
 
 /** Create/replace body. Status is not client-editable; use the workflow endpoints. */
@@ -449,7 +457,10 @@ export interface PurchaseOrderDto {
     poNumber: string;             // required, unique within org
     totalAmount: number;          // required
     currency?: string;
-    remarks?: string;
+    /** null clears on PUT. */
+    remarks?: string | null;
+    /** yyyy-MM-dd; null clears on PUT. */
+    expectedDeliveryDate?: string | null;
     departmentId: string;         // required
     supplierId: string;           // required
     /** null unlinks the budget on PUT. */

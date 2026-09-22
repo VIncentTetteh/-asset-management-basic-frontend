@@ -23,6 +23,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
 import { reportApiError } from "@/lib/api-validation";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { formatLocalDate } from "@/lib/local-date";
+import { RejectPurchaseOrderModal } from "@/features/finance/RejectPurchaseOrderModal";
 import { buildPurchaseOrderPayload, budgetAvailable, type PurchaseOrderForm } from "@/features/finance/payloads";
 import { PO_ACTION_MESSAGES, poActionsFor, type PoWorkflowAction as WorkflowAction } from "@/features/finance/purchaseOrderWorkflow";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -38,6 +42,8 @@ const normalizePoStatus = (status?: string): string | undefined => {
   if (status === "RECEIVED" || status === "ORDERED") return POStatus.DELIVERED;
   return status;
 };
+
+const L = FIELD_LIMITS.purchaseOrder;
 
 export default function PurchaseOrdersPage() {
   const { format, baseCurrency, sum } = useCurrency();
@@ -73,11 +79,11 @@ export default function PurchaseOrdersPage() {
   };
 
   const workflowAction = useMutation({
-    mutationFn: async ({ id, action }: { id: string; action: WorkflowAction }) => {
+    mutationFn: async ({ id, action, reason }: { id: string; action: WorkflowAction; reason?: string }) => {
       const run: Record<WorkflowAction, (poId: string) => Promise<unknown>> = {
         submit: purchaseOrderService.submit,
         approve: purchaseOrderService.approve,
-        reject: purchaseOrderService.reject,
+        reject: (poId) => purchaseOrderService.reject(poId, reason ?? ""),
         receive: purchaseOrderService.receive,
         cancel: purchaseOrderService.cancel,
         delete: purchaseOrderService.delete,
@@ -94,6 +100,7 @@ export default function PurchaseOrdersPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseOrder | null>(null);
+  const [rejecting, setRejecting] = useState<PurchaseOrder | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -110,6 +117,7 @@ export default function PurchaseOrdersPage() {
             supplierId: editing.supplierId || "",
             departmentId: editing.departmentId || "",
             linkedBudgetId: editing.linkedBudgetId || "",
+            expectedDeliveryDate: editing.expectedDeliveryDate || "",
             remarks: editing.remarks || "",
           }
         : {
@@ -120,6 +128,7 @@ export default function PurchaseOrdersPage() {
             supplierId: "",
             departmentId: "",
             linkedBudgetId: "",
+            expectedDeliveryDate: "",
           },
     );
   }, [isModalOpen, editing, reset, baseCurrency]);
@@ -166,6 +175,10 @@ export default function PurchaseOrdersPage() {
         : order.linkedBudgetId && status === POStatus.DELIVERED
           ? " Its spend will be reversed on the budget."
           : "";
+    if (action === "reject") {
+      setRejecting(order);
+      return;
+    }
     if (action === "delete" || action === "cancel") {
       const verb = action === "delete" ? "Delete" : "Cancel";
       if (!(await confirm({ message: `${verb} PO ${order.poNumber}?${budgetEffect}`, variant: "danger" }))) return;
@@ -205,7 +218,14 @@ export default function PurchaseOrdersPage() {
       {
         accessorKey: "poNumber",
         header: "PO number",
-        cell: ({ row }) => <span className="data-mono font-semibold text-foreground">{row.original.poNumber}</span>,
+        cell: ({ row }) => (
+          <div className="min-w-0 max-w-56">
+            <p className="data-mono font-semibold text-foreground">{row.original.poNumber}</p>
+            {row.original.remarks ? (
+              <p className="truncate text-xs text-faint-fg" title={row.original.remarks}>{row.original.remarks}</p>
+            ) : null}
+          </div>
+        ),
       },
       {
         id: "supplier",
@@ -235,9 +255,37 @@ export default function PurchaseOrdersPage() {
         ),
       },
       {
+        accessorKey: "expectedDeliveryDate",
+        header: "Expected",
+        cell: ({ row }) => (
+          <span className="data-mono text-xs text-muted-fg">
+            {row.original.expectedDeliveryDate ? formatLocalDate(row.original.expectedDeliveryDate) : "—"}
+          </span>
+        ),
+      },
+      {
         accessorKey: "status",
         header: "Status",
         cell: ({ row }) => <StatusBadge status={normalizePoStatus(row.original.status) ?? "DRAFT"} />,
+      },
+      {
+        id: "trail",
+        header: "Approval trail",
+        enableSorting: false,
+        cell: ({ row }) => {
+          const po = row.original;
+          return (
+            <div className="min-w-0 max-w-60 space-y-0.5 text-xs text-muted-fg">
+              {po.requestedByName ? <p className="truncate">Requested by {po.requestedByName}</p> : null}
+              {po.approvedByName ? <p className="truncate">Approved by {po.approvedByName}</p> : null}
+              {po.rejectedByName ? <p className="truncate">Rejected by {po.rejectedByName}</p> : null}
+              {po.rejectionReason ? (
+                <p className="truncate text-warn" title={po.rejectionReason}>Reason: {po.rejectionReason}</p>
+              ) : null}
+              {!po.requestedByName && !po.approvedByName && !po.rejectedByName ? <p>—</p> : null}
+            </div>
+          );
+        },
       },
       {
         id: "actions",
@@ -346,8 +394,9 @@ export default function PurchaseOrdersPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="po-number">PO number <span className="text-danger">*</span></Label>
-              <Input id="po-number" className="data-mono" placeholder="PO-2026-001" {...register("poNumber", { required: "PO number is required" })} />
-              {errors.poNumber && <p className="text-sm text-danger">{errors.poNumber.message as string}</p>}
+              <Input id="po-number" className="data-mono" placeholder="PO-2026-001" {...limitInputProps(L.poNumber)}
+                {...register("poNumber", limitRules<PurchaseOrderForm, "poNumber">(L.poNumber, "PO number"))} />
+              <FieldError error={errors.poNumber} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="po-budget">Budget</Label>
@@ -361,6 +410,7 @@ export default function PurchaseOrdersPage() {
                     </option>
                   ))}
               </Select>
+              <FieldError error={errors.linkedBudgetId} />
               {selectedBudget ? (
                 <p className="text-xs text-muted-fg">
                   Available ·{" "}
@@ -374,21 +424,23 @@ export default function PurchaseOrdersPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="po-supplier">Supplier <span className="text-danger">*</span></Label>
-              <Select id="po-supplier" {...register("supplierId", { required: "Supplier is required" })}>
+              <Select id="po-supplier" {...register("supplierId", limitRules<PurchaseOrderForm, "supplierId">(L.supplierId, "Supplier"))}>
                 <option value="">Select supplier</option>
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </Select>
+              <FieldError error={errors.supplierId} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="po-dept">Department <span className="text-danger">*</span></Label>
-              <Select id="po-dept" {...register("departmentId", { required: "Department is required" })}>
+              <Select id="po-dept" {...register("departmentId", limitRules<PurchaseOrderForm, "departmentId">(L.departmentId, "Department"))}>
                 <option value="">Select department</option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </Select>
+              <FieldError error={errors.departmentId} />
             </div>
           </div>
 
@@ -398,14 +450,10 @@ export default function PurchaseOrdersPage() {
               <Input
                 id="po-amount"
                 type="number"
-                step="0.01"
-                min="0.01"
-                {...register("totalAmount", {
-                  required: "Total amount is required",
-                  validate: (v) => Number(v) > 0 || "Must be greater than 0",
-                })}
+                {...limitInputProps(L.totalAmount)}
+                {...register("totalAmount", limitRules<PurchaseOrderForm, "totalAmount">(L.totalAmount, "Total amount"))}
               />
-              {errors.totalAmount && <p className="text-sm text-danger">{errors.totalAmount.message as string}</p>}
+              <FieldError error={errors.totalAmount} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="po-currency">Currency</Label>
@@ -423,8 +471,15 @@ export default function PurchaseOrdersPage() {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="po-expected">Expected delivery</Label>
+            <Input id="po-expected" type="date" {...register("expectedDeliveryDate")} />
+            <FieldError error={errors.expectedDeliveryDate} />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="po-remarks">Remarks</Label>
-            <Textarea id="po-remarks" placeholder="Line items, delivery expectations…" {...register("remarks")} />
+            <Textarea id="po-remarks" placeholder="What is being ordered, delivery notes…" {...register("remarks")} />
+            <FieldError error={errors.remarks} />
           </div>
 
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
@@ -435,6 +490,14 @@ export default function PurchaseOrdersPage() {
           </div>
         </form>
       </Modal>
+      <RejectPurchaseOrderModal
+        order={rejecting}
+        isPending={workflowAction.isPending}
+        onReject={async (order, reason) => {
+          await workflowAction.mutateAsync({ id: order.id!, action: "reject", reason });
+        }}
+        onClose={() => setRejecting(null)}
+      />
       {ConfirmDialog}
     </ListPageTemplate>
   );

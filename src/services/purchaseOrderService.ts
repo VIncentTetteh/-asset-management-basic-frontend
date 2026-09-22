@@ -102,9 +102,9 @@ export const purchaseOrderService = {
         return response.data;
     },
 
-    /** POST /purchase-orders/{id}/reject */
-    reject: async (id: string): Promise<PurchaseOrder> => {
-        const response = await api.post<PurchaseOrder>(`/purchase-orders/${id}/reject`, null, {
+    /** POST /purchase-orders/{id}/reject with the (required) reason. */
+    reject: async (id: string, reason: string): Promise<PurchaseOrder> => {
+        const response = await api.post<PurchaseOrder>(`/purchase-orders/${id}/reject`, { reason }, {
             params: withOrgParams(),
         });
         return response.data;

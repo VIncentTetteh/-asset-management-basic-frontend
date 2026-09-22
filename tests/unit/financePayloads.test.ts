@@ -75,12 +75,20 @@ describe("purchase order payload", () => {
             poNumber: "PO-7",
             totalAmount: 250.5,
             currency: "GHS",
-            remarks: undefined,
+            remarks: null,
+            expectedDeliveryDate: null,
             departmentId: "d1",
             supplierId: "s1",
             linkedBudgetId: "b1",
         });
         expect(payload).not.toHaveProperty("status");
+    });
+
+    it("carries the expected delivery date and clears blanks with null", () => {
+        const payload = buildPurchaseOrderPayload({ poNumber: "PO-1", expectedDeliveryDate: "2026-10-01", remarks: " " });
+        expect(payload.expectedDeliveryDate).toBe("2026-10-01");
+        expect(payload.remarks).toBeNull();
+        expect(buildPurchaseOrderPayload({ poNumber: "PO-1", expectedDeliveryDate: "" }).expectedDeliveryDate).toBeNull();
     });
 
     it("sends null for an emptied budget so PUT unlinks it", () => {
