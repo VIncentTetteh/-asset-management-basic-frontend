@@ -24,6 +24,7 @@ import { extractErrorMessage } from "@/lib/error";
 import { clearAuthState } from "@/lib/axios";
 import { loginPathWithNext } from "@/lib/safe-next";
 import { MFA_SETUP_ANCHOR, isMfaCodeInvalidError } from "@/lib/step-up";
+import { ChangePasswordCard } from "@/features/users/ChangePasswordCard";
 
 /**
  * Enabling or disabling MFA revokes every session server-side (sessionVersion
@@ -292,17 +293,10 @@ export default function ProfilePage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="email">Email Address <span className="text-danger">*</span></Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    {...register("email", {
-                                        required: "Email is required",
-                                        pattern: { value: /^\S+@\S+$/i, message: "Invalid email format" }
-                                    })}
-                                    className={errors.email ? "border-danger ring-danger" : ""}
-                                />
-                                {errors.email && <p className="text-sm text-danger">{errors.email.message as string}</p>}
+                                <Label htmlFor="email">Email Address</Label>
+                                {/* Read-only: the API never saves an email change from here (it needs a verified flow). */}
+                                <Input id="email" type="email" value={user.email ?? ""} readOnly disabled />
+                                <p className="text-xs text-muted-fg">Your sign-in email. Ask an administrator to change it.</p>
                             </div>
 
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -342,6 +336,8 @@ export default function ProfilePage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <ChangePasswordCard onChanged={signInAgain} />
 
             <Card id={MFA_SETUP_ANCHOR} className="shadow-sm scroll-mt-4">
                 <CardHeader>

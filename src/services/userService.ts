@@ -77,6 +77,14 @@ export const userService = {
         return response.data;
     },
 
+    /**
+     * POST /users/me/password — change your own password. On success the API has
+     * signed out every session, this one included.
+     */
+    changeMyPassword: async (data: { currentPassword: string; newPassword: string }): Promise<void> => {
+        await api.post("/users/me/password", data);
+    },
+
     /** PUT /users/{id}/deactivate — sets status → INACTIVE */
     deactivate: async (id: string): Promise<void> => {
         await api.put(`/users/${id}/deactivate`);
