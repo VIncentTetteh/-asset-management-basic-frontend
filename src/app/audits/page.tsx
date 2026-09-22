@@ -330,7 +330,7 @@ export default function AuditsPage() {
         description="Every asset in this audit's scope, and what was found. Scan or type a tag to verify one."
       >
         <div className="max-h-[70vh] overflow-y-auto px-1">
-          {countingAudit ? <AuditCountSheet audit={countingAudit} /> : null}
+          {countingAudit ? <AuditCountSheet audit={countingAudit} canConduct={canConduct} /> : null}
         </div>
       </Modal>
 

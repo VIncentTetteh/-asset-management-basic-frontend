@@ -36,7 +36,7 @@ const PAGE_SIZE = 20;
  * One box therefore serves the scanner and the keyboard, and the client never
  * has to know the label format.
  */
-export function AuditCountSheet({ audit }: { audit: Audit }) {
+export function AuditCountSheet({ audit, canConduct = true }: { audit: Audit; canConduct?: boolean }) {
   const auditId = audit.id!;
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -44,7 +44,10 @@ export function AuditCountSheet({ audit }: { audit: Audit }) {
   const [scan, setScan] = useState("");
   const [flagging, setFlagging] = useState<AuditItem | null>(null);
 
-  const open = canCountItems(audit.status);
+  // Writable only when the audit is still open AND the viewer may conduct audits:
+  // the API gates the verify and discrepancy endpoints on CONDUCT_AUDIT, so
+  // offering the buttons to anyone else only produces a 403.
+  const open = canCountItems(audit.status) && canConduct;
   const progress = auditProgressOf(audit);
   const { data, isLoading } = useAuditItems(auditId, {
     search: search || undefined,
@@ -150,7 +153,9 @@ export function AuditCountSheet({ audit }: { audit: Audit }) {
         </section>
       ) : (
         <p className="rounded-md bg-surface-subtle p-3 text-sm text-muted-fg">
-          This audit is closed — its count sheet is a final record and cannot change.
+          {canConduct
+            ? "This audit is closed — its count sheet is a final record and cannot change."
+            : "You can read this count sheet, but recording a count needs the Conduct audit permission."}
         </p>
       )}
 
