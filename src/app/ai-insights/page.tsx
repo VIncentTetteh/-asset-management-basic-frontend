@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useConfirm } from "@/hooks/useConfirm";
 import { cn } from "@/lib/utils";
+import { formatLocalDate } from "@/lib/local-date";
 
 // ── Meta ──────────────────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ const daysBetween = (dateStr: string) => {
 };
 
 const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    formatLocalDate(dateStr, { locale: "en-US", month: "short", day: "numeric", year: "numeric" });
 
 // ── Health Score ──────────────────────────────────────────────────────────────
 

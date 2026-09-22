@@ -18,6 +18,7 @@ import {
   defaultMaintenanceCurrency,
   type MaintenanceForm,
 } from "@/features/maintenance/payload";
+import { todayLocal } from "@/lib/local-date";
 
 export function MaintenanceFormModal({
   isOpen,
@@ -66,7 +67,7 @@ export function MaintenanceFormModal({
           }
         : {
             assetId: "",
-            scheduledDate: new Date().toISOString().split("T")[0],
+            scheduledDate: todayLocal(),
             performedDate: "",
             nextDueDate: "",
             description: "",

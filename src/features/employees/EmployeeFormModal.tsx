@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useSaveEmployee } from "@/features/employees/hooks";
 import { applyApiFieldErrors } from "@/lib/api-validation";
+import { todayLocal } from "@/lib/local-date";
 
 export function EmployeeFormModal({
   isOpen,
@@ -57,7 +58,7 @@ export function EmployeeFormModal({
             departmentId: "",
             managerId: "",
             userId: "",
-            hireDate: new Date().toISOString().split("T")[0],
+            hireDate: todayLocal(),
             notes: "",
           },
     );

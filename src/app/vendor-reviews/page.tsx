@@ -20,6 +20,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirm } from "@/hooks/useConfirm";
 import { cn } from "@/lib/utils";
+import { formatLocalDate } from "@/lib/local-date";
 
 function ScoreBadge({ score }: { score: number }) {
   const tone =
@@ -171,9 +172,9 @@ export default function VendorReviewsPage() {
         enableSorting: false,
         cell: ({ row }) => (
           <span className="text-xs text-muted-fg">
-            {row.original.periodStart ? new Date(row.original.periodStart).toLocaleDateString() : "—"}
+            {formatLocalDate(row.original.periodStart)}
             {" – "}
-            {row.original.periodEnd ? new Date(row.original.periodEnd).toLocaleDateString() : "—"}
+            {formatLocalDate(row.original.periodEnd)}
           </span>
         ),
       },

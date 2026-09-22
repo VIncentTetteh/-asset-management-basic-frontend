@@ -26,6 +26,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
+import { formatLocalDate, todayLocal } from "@/lib/local-date";
 
 const CATEGORY_LABELS: Record<string, string> = {
   MAINTENANCE: "Maintenance",
@@ -43,7 +44,7 @@ type FormData = Omit<
 >;
 
 const fmtDate = (d?: string) =>
-  d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+  formatLocalDate(d, { locale: "en-US", month: "short", day: "numeric", year: "numeric" });
 
 export default function ExpensesPage() {
   const { format, baseCurrency, sum } = useCurrency();
@@ -143,7 +144,7 @@ export default function ExpensesPage() {
       category: "OTHER",
       linkedAssetId: "",
       linkedBudgetId: "",
-      expenseDate: new Date().toISOString().split("T")[0],
+      expenseDate: todayLocal(),
     });
   }, [isModalOpen, reset, baseCurrency]);
 

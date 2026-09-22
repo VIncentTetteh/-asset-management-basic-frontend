@@ -11,6 +11,7 @@
  */
 
 import type { MoneyAggregateMeta } from "@/types";
+import { toLocalIsoDate } from "@/lib/local-date";
 
 /** Used only while the organisation's base currency is still loading. */
 export const FALLBACK_CURRENCY = "USD";
@@ -58,7 +59,8 @@ export const ratePair = (from: string, to: string): RatePair => `${from}->${to}`
 /** "USD->GHS" → "USD→GHS" for display. */
 export const describeRatePair = (pair: string): string => pair.replace("->", "→");
 
-const isoDay = (date: Date): string => date.toISOString().slice(0, 10);
+// Rates are dated by calendar day: compare against the viewer's local day.
+const isoDay = (date: Date): string => toLocalIsoDate(date);
 
 /**
  * Builds the latest-effective rate for every directed pair. Rates dated in the

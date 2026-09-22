@@ -18,6 +18,7 @@ import {
   disposalTermsLocked,
   type DisposalForm,
 } from "@/features/disposals/workflow";
+import { todayLocal } from "@/lib/local-date";
 
 export function DisposalFormModal({
   isOpen,
@@ -49,7 +50,7 @@ export function DisposalFormModal({
           }
         : {
             assetId: "",
-            disposalDate: new Date().toISOString().split("T")[0],
+            disposalDate: todayLocal(),
             reason: "",
             disposalMethod: "SCRAP",
             saleValue: "",

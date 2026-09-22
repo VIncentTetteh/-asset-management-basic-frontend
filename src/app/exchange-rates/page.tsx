@@ -18,6 +18,7 @@ import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency, currencyQueryKeys } from "@/contexts/CurrencyContext";
 import { isoCurrencyCodes } from "@/lib/currency";
+import { formatLocalDate, todayLocal } from "@/lib/local-date";
 
 type FormData = Omit<ExchangeRateDto, "id" | "organisationId">;
 
@@ -78,7 +79,7 @@ export default function ExchangeRatesPage() {
       baseCurrency: defaultSource,
       targetCurrency: baseCurrency,
       rate: 0,
-      effectiveDate: new Date().toISOString().split("T")[0],
+      effectiveDate: todayLocal(),
       source: "",
     });
   }, [isModalOpen, reset, defaultSource, baseCurrency]);
@@ -145,7 +146,7 @@ export default function ExchangeRatesPage() {
         header: "Effective",
         cell: ({ row }) => (
           <span className="text-muted-fg">
-            {row.original.effectiveDate ? new Date(row.original.effectiveDate).toLocaleDateString() : "—"}
+            {formatLocalDate(row.original.effectiveDate)}
           </span>
         ),
       },

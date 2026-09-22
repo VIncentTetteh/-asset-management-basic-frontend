@@ -16,6 +16,7 @@ import { buildAssetUpdate, normaliseAssetForm } from "@/features/assets/assetPay
 import { useSaveAsset } from "@/features/assets/hooks";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
+import { todayLocal } from "@/lib/local-date";
 
 function emptyForm(baseCurrency: string): AssetDto {
   return {
@@ -28,7 +29,7 @@ function emptyForm(baseCurrency: string): AssetDto {
     assetType: AssetType.HARDWARE,
     manufacturer: "",
     model: "",
-    purchaseDate: new Date().toISOString().split("T")[0],
+    purchaseDate: todayLocal(),
     purchaseCost: 0,
     currency: baseCurrency,
     // Blank = inherit the category's depreciation policy.

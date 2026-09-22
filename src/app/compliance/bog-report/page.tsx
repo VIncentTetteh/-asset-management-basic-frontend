@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AssetTag } from "@/components/ui/asset-tag";
 import DocumentAttachments from "@/components/DocumentAttachments";
 import { useBogReport, useBogControlsList, useUpsertBogControl, useUpdateBogControlStatus } from "@/features/compliance/bogReportHooks";
+import { todayLocal } from "@/lib/local-date";
 
 const STATUSES: ControlStatus[] = ["IMPLEMENTED", "PARTIAL", "NOT_IMPLEMENTED", "NOT_APPLICABLE"];
 
@@ -111,7 +112,7 @@ export default function BogReportPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `BOG_Compliance_Report_${new Date().toISOString().split("T")[0]}.pdf`;
+      a.download = `BOG_Compliance_Report_${todayLocal()}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success("PDF downloaded");

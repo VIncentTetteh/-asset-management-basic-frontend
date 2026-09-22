@@ -4,6 +4,7 @@
 import { Hexagon, Wrench, ShoppingCart, DollarSign, ShieldCheck, Building2, RefreshCw, FileText, Users } from "lucide-react";
 import type { Asset, AssetsByDepartment, Budget, BudgetSummary, DepreciationSummary, MoneyAggregateMeta, PurchaseOrder, SoftwareLicense } from "@/types";
 import { readMoneyMeta } from "@/lib/currency";
+import { parseLocalDate } from "@/lib/local-date";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -371,8 +372,8 @@ export const computeBudgetStats = (budgets: Budget[], summary: BudgetSummary | n
 
 export const formatDate = (value?: string) => {
     if (!value) return null;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime())
+    const parsed = parseLocalDate(value);
+    return !parsed
         ? value
         : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };

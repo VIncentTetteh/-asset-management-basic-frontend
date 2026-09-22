@@ -16,6 +16,7 @@ import { disposalActionsFor, disposalStatusOf } from "@/features/disposals/workf
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { DisposalFormModal } from "@/features/disposals/DisposalFormModal";
+import { formatLocalDate } from "@/lib/local-date";
 
 const METHOD_LABEL: Record<string, string> = {
   SALE: "Sale",
@@ -101,7 +102,7 @@ export default function DisposalsPage() {
         header: "Disposed",
         cell: ({ row }) => (
           <span className="text-muted-fg">
-            {row.original.disposalDate ? new Date(row.original.disposalDate).toLocaleDateString() : "—"}
+            {formatLocalDate(row.original.disposalDate)}
           </span>
         ),
       },

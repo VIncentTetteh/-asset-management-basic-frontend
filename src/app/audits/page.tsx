@@ -29,6 +29,7 @@ import {
 } from "@/features/audits/workflow";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { applyApiFieldErrors } from "@/lib/api-validation";
+import { formatLocalDate, toDateInputValue, todayLocal } from "@/lib/local-date";
 
 export default function AuditsPage() {
   const { data: audits = [], isLoading } = useAudits();
@@ -50,14 +51,14 @@ export default function AuditsPage() {
       editingAudit
         ? {
             departmentId: editingAudit.departmentId || "",
-            auditDate: editingAudit.auditDate ? new Date(editingAudit.auditDate).toISOString().split("T")[0] : "",
+            auditDate: toDateInputValue(editingAudit.auditDate),
             conductedById: editingAudit.conductedById || "",
             status: (editingAudit.status as AuditStatus) || AuditStatus.PLANNED,
             remarks: editingAudit.remarks || "",
           }
         : {
             departmentId: "",
-            auditDate: new Date().toISOString().split("T")[0],
+            auditDate: todayLocal(),
             conductedById: "",
             status: AuditStatus.PLANNED,
             remarks: "",
@@ -103,7 +104,7 @@ export default function AuditsPage() {
         header: "Audit date",
         cell: ({ row }) => (
           <span className="font-semibold text-foreground">
-            {row.original.auditDate ? new Date(row.original.auditDate).toLocaleDateString() : "—"}
+            {formatLocalDate(row.original.auditDate)}
           </span>
         ),
       },

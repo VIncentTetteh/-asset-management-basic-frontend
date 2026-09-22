@@ -17,6 +17,7 @@ import { normalizeAssetHistoryEntry } from "@/lib/assetHistory";
 import { loginPathWithNext } from "@/lib/safe-next";
 import { isNotFoundOrForbidden, parseScannedAssetId, useScannedAsset } from "@/features/assets/scan";
 import type { Asset } from "@/types";
+import { parseLocalDate } from "@/lib/local-date";
 
 const NOT_FOUND_MESSAGE = "Asset not found or you don't have access to it.";
 
@@ -25,8 +26,8 @@ const humanize = (value?: string | null): string =>
 
 const formatDate = (value?: string | null): string => {
     if (!value) return "—";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime())
+    const date = parseLocalDate(value);
+    return !date
         ? value
         : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 };

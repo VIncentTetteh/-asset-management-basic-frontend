@@ -27,6 +27,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
+import { formatLocalDate } from "@/lib/local-date";
 
 const CONTRACT_TYPES = ["PURCHASE", "LEASE", "MAINTENANCE", "SERVICE_LEVEL_AGREEMENT", "WARRANTY", "INSURANCE", "OTHER"];
 const CONTRACT_STATUSES = ["DRAFT", "ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATED", "RENEWED"];
@@ -154,9 +155,9 @@ export default function ContractsPage() {
         enableSorting: false,
         cell: ({ row }) => (
           <span className="text-xs text-muted-fg">
-            {row.original.startDate ? new Date(row.original.startDate).toLocaleDateString() : "—"}
+            {formatLocalDate(row.original.startDate)}
             {" – "}
-            {row.original.endDate ? new Date(row.original.endDate).toLocaleDateString() : "—"}
+            {formatLocalDate(row.original.endDate)}
           </span>
         ),
       },

@@ -19,6 +19,7 @@ import {
 import { MaintenanceFormModal } from "@/features/maintenance/MaintenanceFormModal";
 import { canCompleteMaintenance } from "@/features/maintenance/payload";
 import { usePermissions } from "@/contexts/PermissionContext";
+import { formatLocalDate } from "@/lib/local-date";
 
 export default function MaintenancePage() {
   const { format, baseCurrency } = useCurrency();
@@ -90,7 +91,7 @@ export default function MaintenancePage() {
         header: "Scheduled",
         cell: ({ row }) => (
           <span className="text-muted-fg">
-            {row.original.scheduledDate ? new Date(row.original.scheduledDate).toLocaleDateString() : "—"}
+            {formatLocalDate(row.original.scheduledDate)}
           </span>
         ),
       },

@@ -6,14 +6,16 @@ import type { CheckoutRecordDto } from "@/services/checkoutService";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { formatLocalDate, todayLocal } from "@/lib/local-date";
 
 const fmt = (d?: string) =>
-  d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+  formatLocalDate(d, { locale: "en-US", month: "short", day: "numeric", year: "numeric" });
 
 export const isOverdue = (record: CheckoutRecordDto) =>
   record.status === "ACTIVE" &&
   !!record.expectedReturnDate &&
-  new Date(record.expectedReturnDate) < new Date();
+  // Overdue from the day after the due date, matching the backend (isBefore(today)).
+  record.expectedReturnDate.slice(0, 10) < todayLocal();
 
 export function CheckoutTable({
   records,

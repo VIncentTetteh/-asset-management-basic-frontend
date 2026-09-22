@@ -14,6 +14,7 @@ import {
 import { toast } from "react-hot-toast";
 import { printAssetLabel } from "@/features/assets/printLabel";
 import { AssetFinancials } from "@/features/assets/AssetFinancials";
+import { formatLocalDate } from "@/lib/local-date";
 
 interface Props {
     isOpen: boolean;
@@ -184,7 +185,7 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                                 <DetailItem label="Serial Number" value={asset.serialNumber || "N/A"} />
                                 <DetailItem label="Manufacturer" value={asset.manufacturer || "N/A"} />
                                 <DetailItem label="Model" value={asset.model || "N/A"} />
-                                <DetailItem label="Purchase Date" value={asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : "N/A"} />
+                                <DetailItem label="Purchase Date" value={formatLocalDate(asset.purchaseDate, { fallback: "N/A" })} />
                             </div>
                             {asset.description && (
                                 <div className="space-y-1">

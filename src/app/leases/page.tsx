@@ -26,6 +26,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
+import { formatLocalDate } from "@/lib/local-date";
 
 
 const LEASE_STATUSES: LeaseStatus[] = ["ACTIVE", "PENDING_RENEWAL", "EXPIRED", "TERMINATED"];
@@ -196,9 +197,9 @@ export default function LeasesPage() {
         enableSorting: false,
         cell: ({ row }) => (
           <span className="text-xs text-muted-fg">
-            {row.original.startDate ? new Date(row.original.startDate).toLocaleDateString() : "—"}
+            {formatLocalDate(row.original.startDate)}
             {" – "}
-            {row.original.endDate ? new Date(row.original.endDate).toLocaleDateString() : "—"}
+            {formatLocalDate(row.original.endDate)}
           </span>
         ),
       },

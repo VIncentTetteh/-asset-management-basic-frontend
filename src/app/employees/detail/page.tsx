@@ -23,9 +23,10 @@ import {
 } from "@/features/employees/hooks";
 import { EmployeeFormModal } from "@/features/employees/EmployeeFormModal";
 import { OnboardModal, OffboardModal } from "@/features/employees/OnboardOffboardModals";
+import { formatLocalDate } from "@/lib/local-date";
 
 function fmtDate(d?: string) {
-  return d ? new Date(d).toLocaleDateString() : "—";
+  return formatLocalDate(d);
 }
 
 function OverviewTab({ employee }: { employee: EmployeeDto }) {

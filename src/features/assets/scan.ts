@@ -7,6 +7,7 @@ import { locationService } from "@/services/locationService";
 import { maintenanceService } from "@/services/maintenanceService";
 import { userService } from "@/services/userService";
 import type { AssetHistory, MaintenanceRecord } from "@/types";
+import { toLocalIsoDate } from "@/lib/local-date";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RECENT_HISTORY_LIMIT = 5;
@@ -35,7 +36,7 @@ const scanKeys = {
 
 /** Earliest upcoming maintenance date for the asset, if any is scheduled. */
 export const nextMaintenanceDate = (records: readonly MaintenanceRecord[], today: Date = new Date()): string | null => {
-    const todayIso = today.toISOString().slice(0, 10);
+    const todayIso = toLocalIsoDate(today);
     const upcoming = records
         .flatMap((r) => {
             const open = !DONE_MAINTENANCE.has(String(r.status).toUpperCase());

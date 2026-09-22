@@ -27,6 +27,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue, moneyTotalText } from "@/components/currency/MoneyTotalValue";
+import { formatLocalDate } from "@/lib/local-date";
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft (not open for spend)",
@@ -584,7 +585,7 @@ export default function BudgetsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-foreground">{e.title}</p>
                   <p className="text-xs text-faint-fg">
-                    {e.expenseDate ? new Date(e.expenseDate).toLocaleDateString() : "—"}
+                    {formatLocalDate(e.expenseDate)}
                     {e.submittedByName ? ` · ${e.submittedByName}` : ""}
                   </p>
                 </div>

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/patterns/EmptyState";
 import { QUICK_LINKS, type AssetStatusBreakdownItem, type BudgetStats, type DashboardMaintenanceAlerts, type DashboardStats } from "@/features/dashboard/lib";
 import type { AssetsByDepartment, DepreciationSummary, MoneyAggregateMeta } from "@/types";
+import { formatLocalDate } from "@/lib/local-date";
 
 /** Formats an amount given in `currency` (omitted = organisation base currency). */
 type MoneyFormatter = (amount?: number, currency?: string) => string;
@@ -337,7 +338,7 @@ export function MaintenanceAlertsCard({ alerts }: { alerts: DashboardMaintenance
                   {a.daysOverdue
                     ? `${a.daysOverdue} day${a.daysOverdue === 1 ? "" : "s"} overdue`
                     : a.nextDueDate
-                      ? `Due ${new Date(a.nextDueDate).toLocaleDateString()}`
+                      ? `Due ${formatLocalDate(a.nextDueDate)}`
                       : a.severity}
                 </p>
               </div>

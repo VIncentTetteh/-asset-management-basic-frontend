@@ -22,6 +22,7 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { cn } from "@/lib/utils";
+import { formatLocalDate } from "@/lib/local-date";
 
 const LICENSE_STATUSES: LicenseStatus[] = ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "SUSPENDED", "CANCELLED"];
 
@@ -177,7 +178,7 @@ export default function LicensesPage() {
         header: "Expires",
         cell: ({ row }) => (
           <span className="text-muted-fg">
-            {row.original.expiryDate ? new Date(row.original.expiryDate).toLocaleDateString() : "—"}
+            {formatLocalDate(row.original.expiryDate)}
           </span>
         ),
       },
