@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { Asset, AssetHistory, Department, Organisation, Category, Location, User } from "@/types";
+import { Asset, AssetHistory, Department, Organisation, Category, Location, User, Supplier, PurchaseOrder } from "@/types";
 import { assetService } from "@/services/assetService";
 import { normalizeAssetHistoryEntry } from "@/lib/assetHistory";
 import { formatRelativeTime } from "@/lib/time";
@@ -25,6 +25,8 @@ interface Props {
     categories: Category[];
     users: User[];
     organisations?: Organisation[];
+    suppliers?: Supplier[];
+    purchaseOrders?: PurchaseOrder[];
 }
 
 type Tab = "overview" | "financials" | "history" | "qrcode";
@@ -47,7 +49,9 @@ const resolveQrPayload = (payload: Blob | Record<string, unknown> | string): str
     return first ? resolveQrPayload(String(first)) : "";
 };
 
-export function AssetDetailModal({ isOpen, onClose, asset, departments, locations, categories, users, organisations = [] }: Props) {
+export function AssetDetailModal({
+    isOpen, onClose, asset, departments, locations, categories, users, organisations = [], suppliers = [], purchaseOrders = [],
+}: Props) {
     const [activeTab, setActiveTab] = useState<Tab>("overview");
     const [history, setHistory] = useState<AssetHistory[]>([]);
     const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
@@ -60,6 +64,11 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
     const catMap = new Map(categories.map(c => [c.id, c.name]));
     const userMap = new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`]));
     const orgMap = new Map(organisations.map(o => [o.id, o.name]));
+    const supplierMap = new Map(suppliers.map(s => [s.id, s.name]));
+    const poMap = new Map(purchaseOrders.map(po => [po.id, po.poNumber]));
+    /** A related record's name, or a neutral label when it is set but not in the loaded list. */
+    const relationName = (map: Map<string | undefined, string | undefined>, id: string | undefined, none: string) =>
+        id ? (map.get(id) || "Not in list") : none;
 
     useEffect(() => {
         if (!isOpen || !asset?.id) return;
@@ -186,6 +195,14 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                                 <DetailItem label="Manufacturer" value={asset.manufacturer || "N/A"} />
                                 <DetailItem label="Model" value={asset.model || "N/A"} />
                                 <DetailItem label="Purchase Date" value={formatLocalDate(asset.purchaseDate, { fallback: "N/A" })} />
+                                <DetailItem label="Asset Type" value={asset.assetType ? String(asset.assetType).replace(/_/g, ' ') : "—"} />
+                                <DetailItem label="Warranty Expiry" value={formatLocalDate(asset.warrantyExpiryDate, { fallback: "N/A" })} />
+                                <DetailItem label="Supplier" value={relationName(supplierMap, asset.supplierId, "N/A")} />
+                                <DetailItem label="Purchase Order" value={relationName(poMap, asset.purchaseOrderId, "N/A")} />
+                                <DetailItem label="Procurement Type" value={asset.procurementType || "N/A"} />
+                                <DetailItem label="Cost Centre" value={asset.costCenter || "N/A"} />
+                                <DetailItem label="Invoice" value={asset.invoiceId || "N/A"} />
+                                <DetailItem label="Insurance Policy" value={asset.insurancePolicyId || "N/A"} />
                             </div>
                             {asset.description && (
                                 <div className="space-y-1">
