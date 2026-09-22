@@ -67,6 +67,8 @@ const GENERIC_TONE: Record<string, Tone> = {
   IN_TREATMENT: "maintenance",
   ACCEPTED: "reserved",
   RESOLVED: "in-use",
+  // An audit that found missing or misplaced assets needs attention.
+  DISCREPANCY_FOUND: "flagged",
   UNDER_REVIEW: "reserved",
   SUPPORTED: "in-use",
   END_OF_LIFE: "flagged",

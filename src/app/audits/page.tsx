@@ -17,25 +17,35 @@ import {
   useAudits,
   useAuditMasterData,
   useCreateAudit,
+  useUpdateAuditRemarks,
   useUpdateAuditStatus,
 } from "@/features/audits/hooks";
 import {
+  auditEditChanges,
+  auditQueryParams,
+  auditScopeLabel,
   buildAuditPayload,
   auditStatusOf,
   auditStatusOptions,
+  EMPTY_AUDIT_FILTERS,
   isAuditFinal,
   nextAuditStatuses,
+  type AuditFilters,
   type AuditForm,
 } from "@/features/audits/workflow";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { applyApiFieldErrors } from "@/lib/api-validation";
 import { formatLocalDate, toDateInputValue, todayLocal } from "@/lib/local-date";
 
 export default function AuditsPage() {
-  const { data: audits = [], isLoading } = useAudits();
+  const [filters, setFilters] = useState<AuditFilters>(EMPTY_AUDIT_FILTERS);
+  const { data: audits = [], isLoading } = useAudits(auditQueryParams(filters));
   const master = useAuditMasterData();
   const createAudit = useCreateAudit();
   const updateStatus = useUpdateAuditStatus();
+  const updateRemarks = useUpdateAuditRemarks();
   const { hasPermission } = usePermissions();
   // Mirrors the API: scheduling and status changes need CONDUCT_AUDIT.
   const canConduct = hasPermission("CONDUCT_AUDIT");
@@ -70,7 +80,7 @@ export default function AuditsPage() {
     const deptMap = new Map(master.departments.map((d) => [d.id, d.name]));
     const userMap = new Map(master.users.map((u) => [u.id, `${u.firstName} ${u.lastName}`]));
     return {
-      deptName: (id?: string) => deptMap.get(id ?? "") ?? "Whole organisation",
+      deptName: (id: string) => deptMap.get(id),
       userName: (id?: string) => userMap.get(id ?? "") ?? "—",
     };
   }, [master.departments, master.users]);
@@ -83,9 +93,13 @@ export default function AuditsPage() {
   const onSubmit = async (data: AuditForm) => {
     try {
       if (editingAudit) {
-        // The API only supports changing the status of an existing audit.
-        if (data.status && data.status !== editingAudit.status) {
-          await updateStatus.mutateAsync({ id: editingAudit.id!, status: data.status as AuditStatus });
+        // Remarks save first (PATCH /audits/{id}): a status move may make the audit final.
+        const changes = auditEditChanges(editingAudit, data);
+        if (changes.remarks !== undefined) {
+          await updateRemarks.mutateAsync({ id: editingAudit.id!, remarks: changes.remarks });
+        }
+        if (changes.status) {
+          await updateStatus.mutateAsync({ id: editingAudit.id!, status: changes.status });
         }
       } else {
         await createAudit.mutateAsync(buildAuditPayload(data));
@@ -112,13 +126,15 @@ export default function AuditsPage() {
         id: "scope",
         header: "Scope",
         enableSorting: false,
-        cell: ({ row }) => <span className="text-muted-fg">{lookups.deptName(row.original.departmentId)}</span>,
+        cell: ({ row }) => <span className="text-muted-fg">{auditScopeLabel(row.original, lookups.deptName)}</span>,
       },
       {
         id: "conductedBy",
         header: "Conducted by",
         enableSorting: false,
-        cell: ({ row }) => <span className="text-muted-fg">{lookups.userName(row.original.conductedById)}</span>,
+        cell: ({ row }) => (
+          <span className="text-muted-fg">{row.original.conductedByName || lookups.userName(row.original.conductedById)}</span>
+        ),
       },
       {
         id: "remarks",
@@ -159,7 +175,7 @@ export default function AuditsPage() {
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                aria-label="Change audit status"
+                aria-label="Edit audit status and remarks"
                 onClick={() => {
                   setEditingAudit(row.original);
                   setIsModalOpen(true);
@@ -190,12 +206,60 @@ export default function AuditsPage() {
         ) : undefined
       }
     >
+      <div className="mb-3 flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="au-filter-status" className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Status</label>
+          <Select
+            id="au-filter-status"
+            value={filters.status}
+            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+            className="h-8 w-44 text-xs"
+          >
+            <option value="">All statuses</option>
+            {Object.values(AuditStatus).map((st) => (
+              <option key={st} value={st}>{st.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}</option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="au-filter-dept" className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Department</label>
+          <Select
+            id="au-filter-dept"
+            value={filters.departmentId}
+            onChange={(e) => setFilters({ ...filters, departmentId: e.target.value })}
+            className="h-8 w-44 text-xs"
+          >
+            <option value="">All departments</option>
+            {master.departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="au-filter-from" className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">From</label>
+          <Input id="au-filter-from" type="date" value={filters.startDate} onChange={(e) => setFilters({ ...filters, startDate: e.target.value })} className="h-8 text-xs" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="au-filter-to" className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">To</label>
+          <Input id="au-filter-to" type="date" value={filters.endDate} onChange={(e) => setFilters({ ...filters, endDate: e.target.value })} className="h-8 text-xs" />
+        </div>
+        {Object.values(filters).some(Boolean) ? (
+          <button
+            type="button"
+            onClick={() => setFilters(EMPTY_AUDIT_FILTERS)}
+            className="ea-focus mb-1.5 rounded-sm text-xs text-muted-fg underline underline-offset-2 hover:text-danger"
+          >
+            Clear filters
+          </button>
+        ) : null}
+      </div>
+
       <DataTable
         columns={columns}
         data={audits}
         isLoading={isLoading}
         emptyTitle="No audits yet"
-        emptyDescription="Schedule physical inventory checks; completed audits earn the verification seal."
+        emptyDescription="Schedule physical inventory checks and record their outcome."
         emptyAction={
           canConduct ? (
             <Button size="sm" onClick={openCreate}>
@@ -208,10 +272,10 @@ export default function AuditsPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingAudit ? "Update audit status" : "Schedule audit"}
+        title={editingAudit ? "Update audit" : "Schedule audit"}
         description={
           editingAudit
-            ? "Existing audits only support status changes; completed and cancelled audits are final."
+            ? "Change the status or remarks; the date, scope and auditor are fixed. Completed and cancelled audits are final."
             : "Plan a physical inventory verification."
         }
       >
@@ -220,7 +284,7 @@ export default function AuditsPage() {
             <div className="space-y-2">
               <Label htmlFor="au-date">Audit date <span className="text-danger">*</span></Label>
               <Input id="au-date" type="date" disabled={!!editingAudit} {...register("auditDate", { required: true })} />
-              {errors.auditDate && <p className="text-sm text-danger">{errors.auditDate.message || "Audit date is required"}</p>}
+              <FieldError error={errors.auditDate} fallback="Audit date is required" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="au-status">Status</Label>
@@ -229,6 +293,7 @@ export default function AuditsPage() {
                   <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
                 ))}
               </Select>
+              <FieldError error={errors.status} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -245,20 +310,31 @@ export default function AuditsPage() {
               <Label htmlFor="au-user">Conducted by</Label>
               <Select id="au-user" disabled={!!editingAudit} {...register("conductedById")}>
                 <option value="">Me</option>
-                {master.users.map((u) => (
-                  <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
-                ))}
+                {/* Only active users can be named as the auditor (the API refuses others). */}
+                {master.users
+                  .filter((u) => u.id === editingAudit?.conductedById || !u.status || u.status === "ACTIVE")
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                  ))}
               </Select>
+              <FieldError error={errors.conductedById} />
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="au-remarks">Remarks</Label>
-            <Textarea id="au-remarks" disabled={!!editingAudit} placeholder="Scope notes, findings…" {...register("remarks")} />
+            <Textarea
+              id="au-remarks"
+              disabled={!!editingAudit && isAuditFinal(auditStatusOf(editingAudit))}
+              placeholder="Scope notes, findings…"
+              {...limitInputProps(FIELD_LIMITS.assetAudit.remarks)}
+              {...register("remarks", limitRules<AuditForm, "remarks">(FIELD_LIMITS.assetAudit.remarks, "Remarks"))}
+            />
+            <FieldError error={errors.remarks} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button type="submit" isLoading={createAudit.isPending || updateStatus.isPending}>
-              {editingAudit ? "Update status" : "Schedule audit"}
+            <Button type="submit" isLoading={createAudit.isPending || updateStatus.isPending || updateRemarks.isPending}>
+              {editingAudit ? "Save changes" : "Schedule audit"}
             </Button>
           </div>
         </form>

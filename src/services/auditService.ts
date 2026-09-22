@@ -2,11 +2,13 @@ import api from "@/lib/axios";
 import { Audit, AssetAuditDto } from "@/types";
 import { extractList } from "@/services/responseUtils";
 
+/** GET /audits filters; every one is optional and they combine (AND). */
 export interface AuditFilterParams {
     departmentId?: string;
     startDate?: string;       // YYYY-MM-DD
     endDate?: string;         // YYYY-MM-DD
     conductedById?: string;
+    status?: string;
 }
 
 export const auditService = {
@@ -46,4 +48,9 @@ export const auditService = {
         return response.data;
     },
 
+    /** PATCH /audits/{id} — replace an open audit's remarks (blank clears them). */
+    updateRemarks: async (id: string, remarks: string | null): Promise<Audit> => {
+        const response = await api.patch<Audit>(`/audits/${id}`, { remarks });
+        return response.data;
+    },
 };

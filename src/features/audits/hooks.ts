@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { auditService } from "@/services/auditService";
+import { auditService, type AuditFilterParams } from "@/services/auditService";
 import { departmentService } from "@/services/departmentService";
 import { userService } from "@/services/userService";
 import { qk } from "@/lib/queryClient";
@@ -11,10 +11,11 @@ import { reportApiError } from "@/lib/api-validation";
 
 const auditsKey = qk.module("audits");
 
-export function useAudits() {
+export function useAudits(params: AuditFilterParams = {}) {
   return useQuery({
-    queryKey: auditsKey.list(),
-    queryFn: () => auditService.getAll(),
+    queryKey: [...auditsKey.list(), params],
+    queryFn: () => auditService.getAll(params),
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -62,5 +63,17 @@ export function useUpdateAuditStatus() {
     },
     // e.g. 409 when the move is not allowed from the current status.
     onError: (err) => reportApiError(err, { fallback: "Failed to update status" }),
+  });
+}
+
+export function useUpdateAuditRemarks() {
+  const invalidate = useInvalidateAudits();
+  return useMutation({
+    mutationFn: ({ id, remarks }: { id: string; remarks: string | null }) => auditService.updateRemarks(id, remarks),
+    onSuccess: () => {
+      toast.success("Audit remarks saved");
+      invalidate();
+    },
+    onError: (err) => reportApiError(err, { fallback: "Failed to save remarks" }),
   });
 }

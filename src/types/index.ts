@@ -514,8 +514,12 @@ export enum AuditStatus {
 export interface Audit extends BaseEntity {
     organisationId?: string;
     departmentId?: string;
+    /** Read-only; null for an organisation-wide audit. */
+    departmentName?: string | null;
     auditDate: string;
     conductedById?: string;
+    /** Read-only display name of the auditor. */
+    conductedByName?: string | null;
     status?: AuditStatus | string;
     remarks?: string;
 }

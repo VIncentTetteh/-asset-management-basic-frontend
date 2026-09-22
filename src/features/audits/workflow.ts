@@ -54,3 +54,43 @@ export function buildAuditPayload(form: AuditForm): Partial<AssetAuditDto> {
     remarks: form.remarks?.trim() || undefined,
   };
 }
+
+/** The audits list filter bar ("" = any). */
+export interface AuditFilters {
+  status: string;
+  departmentId: string;
+  startDate: string;
+  endDate: string;
+}
+
+export const EMPTY_AUDIT_FILTERS: AuditFilters = { status: "", departmentId: "", startDate: "", endDate: "" };
+
+/** GET /audits params: blank filters omitted, the rest combined by the API. */
+export function auditQueryParams(filters: AuditFilters): Record<string, string> {
+  return Object.fromEntries(Object.entries(filters).filter(([, v]) => Boolean(v)));
+}
+
+/**
+ * The audit's scope: organisation-wide only when it has no department. A
+ * department the viewer's list does not contain still shows by the API's name.
+ */
+export function auditScopeLabel(audit: { departmentId?: string | null; departmentName?: string | null }, lookup?: (id: string) => string | undefined): string {
+  if (!audit.departmentId) return "Whole organisation";
+  return audit.departmentName || lookup?.(audit.departmentId) || "Unknown department";
+}
+
+/**
+ * What saving the edit dialog changes: the remarks (PATCH /audits/{id}) and/or
+ * the status (PATCH /status). A final audit changes neither.
+ */
+export function auditEditChanges(
+  audit: { status?: string | null; remarks?: string | null },
+  form: { status?: string; remarks?: string },
+): { remarks?: string | null; status?: AuditStatus } {
+  const changes: { remarks?: string | null; status?: AuditStatus } = {};
+  if (isAuditFinal(auditStatusOf(audit))) return changes;
+  const nextRemarks = form.remarks?.trim() ?? "";
+  if (nextRemarks !== (audit.remarks ?? "").trim()) changes.remarks = nextRemarks || null;
+  if (form.status && form.status !== auditStatusOf(audit)) changes.status = form.status as AuditStatus;
+  return changes;
+}
