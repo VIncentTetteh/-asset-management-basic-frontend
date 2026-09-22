@@ -1,4 +1,4 @@
-import type { Budget, BudgetDto, ContractDto, PurchaseOrderDto, SoftwareLicenseDto, SupplierDto, SupplierStatus, VendorReviewDto } from "@/types";
+import type { Budget, BudgetDto, BudgetLedgerEntry, ContractDto, PurchaseOrderDto, SoftwareLicenseDto, SupplierDto, SupplierStatus, VendorReviewDto } from "@/types";
 import type { LeaseRecordDto } from "@/services/leaseRecordService";
 
 /**
@@ -87,6 +87,20 @@ export function buildBudgetPayload(form: BudgetForm): BudgetDto {
 export function budgetCurrencyLocked(budget: Pick<Budget, "spentAmount" | "committedAmount"> | null | undefined): boolean {
     if (!budget) return false;
     return (budget.spentAmount || 0) !== 0 || (budget.committedAmount || 0) !== 0;
+}
+
+/**
+ * Where a budget ledger entry came from, as a link to the order or expense that
+ * moved the budget; null for manual adjustments or an entry with no source id.
+ */
+export function ledgerSourceLink(
+    entry: Pick<BudgetLedgerEntry, "sourceType" | "sourceId">,
+): { href: string; label: string } | null {
+    if (!entry.sourceId) return null;
+    const id = encodeURIComponent(entry.sourceId);
+    if (entry.sourceType === "PURCHASE_ORDER") return { href: `/purchase-orders?id=${id}`, label: "View purchase order" };
+    if (entry.sourceType === "EXPENSE") return { href: `/expenses?id=${id}`, label: "View expense" };
+    return null;
 }
 
 /** Headroom after spend and open commitments; the API's availableAmount when present. */

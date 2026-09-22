@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,6 +36,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
+import { PageSpinner } from "@/components/ui/spinner";
 
 /** Backend may return legacy status names; fold them into the current enum. */
 const normalizePoStatus = (status?: string): string | undefined => {
@@ -46,7 +49,18 @@ const normalizePoStatus = (status?: string): string | undefined => {
 const L = FIELD_LIMITS.purchaseOrder;
 
 export default function PurchaseOrdersPage() {
+  // useSearchParams requires a Suspense boundary in the App Router.
+  return (
+    <Suspense fallback={<PageSpinner label="Loading orders…" />}>
+      <PurchaseOrdersContent />
+    </Suspense>
+  );
+}
+
+function PurchaseOrdersContent() {
   const { format, baseCurrency, sum } = useCurrency();
+  // ?id=… (e.g. from a budget ledger entry) shows just that order.
+  const focusId = useSearchParams().get("id");
   const queryClient = useQueryClient();
   const ordersKey = qk.module("purchase-orders");
   const { confirm, ConfirmDialog } = useConfirm();
@@ -366,9 +380,15 @@ export default function PurchaseOrdersPage() {
     >
       <MissingRatesNotice incomplete={!totalValue.complete} missingRates={totalValue.missingRates} />
 
+      {focusId ? (
+        <p className="mb-3 text-sm text-muted-fg">
+          Showing one purchase order.{" "}
+          <Link href="/purchase-orders" className="text-brand underline-offset-2 hover:underline">Show all</Link>
+        </p>
+      ) : null}
       <DataTable
         columns={columns}
-        data={orders}
+        data={focusId ? orders.filter((o) => o.id === focusId) : orders}
         isLoading={isLoading}
         emptyTitle="No purchase orders"
         emptyDescription="Raise procurement orders against suppliers with an approval workflow."

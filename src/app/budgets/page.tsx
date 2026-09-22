@@ -9,7 +9,7 @@ import { BUDGET_STATUSES, type Budget, type BudgetLedgerKind, type Expense } fro
 import { budgetService } from "@/services/budgetService";
 import { departmentService } from "@/services/departmentService";
 import { reportApiError } from "@/lib/api-validation";
-import { buildBudgetPayload, budgetAvailable, budgetCurrencyLocked, type BudgetForm } from "@/features/finance/payloads";
+import { buildBudgetPayload, budgetAvailable, budgetCurrencyLocked, ledgerSourceLink, type BudgetForm } from "@/features/finance/payloads";
 import { qk } from "@/lib/queryClient";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -28,6 +28,11 @@ import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue, moneyTotalText } from "@/components/currency/MoneyTotalValue";
 import { formatLocalDate } from "@/lib/local-date";
+import Link from "next/link";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+
+const L = FIELD_LIMITS.budget;
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft (not open for spend)",
@@ -257,6 +262,12 @@ export default function BudgetsPage() {
               {deptName(row.original.departmentId)}
               {row.original.fiscalYear ? ` · FY${row.original.fiscalYear}` : ""}
             </p>
+            <p className="truncate text-xs text-faint-fg">
+              {formatLocalDate(row.original.periodStart)} – {formatLocalDate(row.original.periodEnd)}
+            </p>
+            {row.original.description ? (
+              <p className="truncate text-xs text-muted-fg" title={row.original.description}>{row.original.description}</p>
+            ) : null}
           </div>
         ),
       },
@@ -275,6 +286,21 @@ export default function BudgetsPage() {
             <span className="text-faint-fg">/ {format(row.original.totalAmount, row.original.currency || baseCurrency)}</span>
           </span>
         ),
+      },
+      {
+        accessorKey: "forecastedSpend",
+        header: () => <span className="block text-right" title="Spend so far projected over the whole period">Forecast</span>,
+        cell: ({ row }) => {
+          const forecast = row.original.forecastedSpend;
+          if (forecast == null) return <span className="block text-right text-faint-fg">—</span>;
+          const over = forecast > (row.original.totalAmount || 0);
+          return (
+            <span className={`data-mono block text-right ${over ? "text-warn" : "text-muted-fg"}`}
+              title={over ? "On current pace the budget will be overspent" : undefined}>
+              {format(forecast, row.original.currency || baseCurrency)}
+            </span>
+          );
+        },
       },
       {
         accessorKey: "committedAmount",
@@ -435,8 +461,15 @@ export default function BudgetsPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="bd-name">Name <span className="text-danger">*</span></Label>
-            <Input id="bd-name" placeholder="IT hardware FY2026" {...register("name", { required: "Name is required" })} />
-            {errors.name && <p className="text-sm text-danger">{errors.name.message as string}</p>}
+            <Input id="bd-name" placeholder="IT hardware FY2026" {...limitInputProps(L.name)}
+              {...register("name", limitRules<BudgetForm, "name">(L.name, "Name"))} />
+            <FieldError error={errors.name} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="bd-description">Description</Label>
+            <Textarea id="bd-description" rows={2} placeholder="What this envelope covers" {...register("description")} />
+            <FieldError error={errors.description} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -445,14 +478,10 @@ export default function BudgetsPage() {
               <Input
                 id="bd-amount"
                 type="number"
-                step="0.01"
-                min="0.01"
-                {...register("totalAmount", {
-                  required: "Allocated amount is required",
-                  validate: (v) => Number(v) > 0 || "Must be greater than 0",
-                })}
+                {...limitInputProps(L.totalAmount)}
+                {...register("totalAmount", limitRules<BudgetForm, "totalAmount">(L.totalAmount, "Allocated amount"))}
               />
-              {errors.totalAmount && <p className="text-sm text-danger">{errors.totalAmount.message as string}</p>}
+              <FieldError error={errors.totalAmount} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="bd-currency">Currency</Label>
@@ -632,6 +661,14 @@ export default function BudgetsPage() {
                       {entry.actorEmail ? ` · ${entry.actorEmail}` : ""}
                       {entry.note ? ` · ${entry.note}` : ""}
                     </p>
+                    {(() => {
+                      const source = ledgerSourceLink(entry);
+                      return source ? (
+                        <Link href={source.href} className="text-xs text-brand underline-offset-2 hover:underline">
+                          {source.label}
+                        </Link>
+                      ) : null;
+                    })()}
                   </div>
                   <div className="text-right">
                     <p className={`data-mono text-sm ${delta < 0 ? "text-ok" : ""}`}>

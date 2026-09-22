@@ -10,6 +10,7 @@ import {
     buildLicensePayload,
     buildPurchaseOrderPayload,
     buildSupplierPayload,
+    ledgerSourceLink,
     SUPPLIER_STATUSES,
     expenseCurrencyFor,
 } from "@/features/finance/payloads";
@@ -280,5 +281,17 @@ describe("supplier payload", () => {
 
     it("offers every SupplierStatus, including SUSPENDED", () => {
         expect(SUPPLIER_STATUSES.map((s) => s.value)).toEqual(["ACTIVE", "INACTIVE", "SUSPENDED", "BLACKLISTED"]);
+    });
+});
+
+describe("ledgerSourceLink", () => {
+    it("links purchase-order and expense entries back to their source", () => {
+        expect(ledgerSourceLink({ sourceType: "PURCHASE_ORDER", sourceId: "p1" })).toEqual({ href: "/purchase-orders?id=p1", label: "View purchase order" });
+        expect(ledgerSourceLink({ sourceType: "EXPENSE", sourceId: "e1" })).toEqual({ href: "/expenses?id=e1", label: "View expense" });
+    });
+
+    it("has no link for adjustments or a missing source", () => {
+        expect(ledgerSourceLink({ sourceType: "ADJUSTMENT", sourceId: null })).toBeNull();
+        expect(ledgerSourceLink({ sourceType: "EXPENSE", sourceId: null })).toBeNull();
     });
 });

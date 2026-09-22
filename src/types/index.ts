@@ -1812,9 +1812,6 @@ export interface BudgetLedgerEntry {
     createdAt: string;
 }
 
-export interface BudgetSpendDto {
-    amount: number;
-}
 
 // ─── Vendor Reviews ───────────────────────────────────────────────────────────
 
