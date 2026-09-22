@@ -16,6 +16,7 @@ import { useForm } from "react-hook-form";
 import { KeyRound, Shield, ToggleLeft, ToggleRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toastActionError } from "@/lib/step-up";
+import { reportApiError } from "@/lib/api-validation";
 import axios from "axios";
 
 type TabType = "oauth2" | "saml";
@@ -88,22 +89,24 @@ export default function SsoConfigurationPage() {
             setConfig(updated);
             toast.success("OAuth2 SSO configured");
         } catch (error) {
-            toastActionError(error, axios.isAxiosError(error) && error.response?.status === 403
+            reportApiError(error, { fallback: axios.isAxiosError(error) && error.response?.status === 403
                 ? "You need admin or security permission to manage SSO."
-                : "Failed to configure OAuth2 SSO");
+                : "Failed to configure OAuth2 SSO", setError: oauth2Form.setError });
         }
     };
 
     const onSubmitSaml = async (data: SsoSamlDto) => {
         if (!orgId) return;
         try {
-            const updated = await orgSsoService.configureSaml(orgId, data);
+            // SAML is a single provider value on the API (SsoProvider.SAML); a free-text
+            // name like "Okta SAML" was not an enum value and failed as malformed JSON.
+            const updated = await orgSsoService.configureSaml(orgId, { ...data, provider: "SAML" });
             setConfig(updated);
             toast.success("SAML SSO configured");
         } catch (error) {
-            toastActionError(error, axios.isAxiosError(error) && error.response?.status === 403
+            reportApiError(error, { fallback: axios.isAxiosError(error) && error.response?.status === 403
                 ? "You need admin or security permission to manage SSO."
-                : "Failed to configure SAML SSO");
+                : "Failed to configure SAML SSO", setError: samlForm.setError });
         }
     };
 
@@ -239,8 +242,8 @@ export default function SsoConfigurationPage() {
                     <CardContent>
                         <form onSubmit={samlForm.handleSubmit(onSubmitSaml)} className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="saml-provider">Provider Name</Label>
-                                <Input id="saml-provider" placeholder="e.g. Okta SAML" {...samlForm.register("provider", { required: true })} />
+                                <Label htmlFor="saml-provider">Provider</Label>
+                                <Input id="saml-provider" value="SAML 2.0" readOnly disabled />
                             </div>
 
                             <div className="space-y-2">
