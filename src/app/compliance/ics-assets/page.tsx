@@ -9,7 +9,7 @@ import { qk } from "@/lib/queryClient";
 import { ComplianceCrudPage, defaultsFrom, type FieldSpec } from "@/features/compliance/ComplianceCrudPage";
 
 const FIELDS: FieldSpec<ICSAssetDto>[] = [
-  { name: "assetId", label: "Asset", type: "select", required: true },
+  { name: "assetId", label: "Asset", type: "select", required: true, lockedOnEdit: true },
   { name: "securityZoneId", label: "Security zone", type: "select" },
   { name: "firmwareVersion", label: "Firmware version", type: "text", mono: true },
   { name: "protocol", label: "Protocol", type: "text", placeholder: "Modbus TCP" },

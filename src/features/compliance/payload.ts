@@ -58,6 +58,39 @@ export function buildCompliancePayload(
 }
 
 /**
+ * Full-replace body for PUT /compliance/{register}/{id}: every form field is sent,
+ * and a blank one as null, which the API reads as "clear it" (dates, numbers,
+ * selects and owners included; PATCH could not clear those). Checkboxes are
+ * booleans; numbers are coerced; dates become instants. `fixed` values (e.g. the
+ * asset an ICS record belongs to, which cannot change) override the form.
+ */
+export function buildComplianceReplacePayload(
+  fields: PayloadField[],
+  data: Record<string, unknown>,
+  fixed: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const field of fields) {
+    const raw = data[field.name];
+    if (field.type === "checkbox") {
+      out[field.name] = Boolean(raw);
+    } else if (isBlank(raw)) {
+      out[field.name] = null;
+    } else if (field.type === "number") {
+      const n = Number(raw);
+      out[field.name] = Number.isFinite(n) ? n : null;
+    } else if (field.type === "date") {
+      out[field.name] = dateToInstant(String(raw));
+    } else if (typeof raw === "string") {
+      out[field.name] = raw.trim();
+    } else {
+      out[field.name] = raw;
+    }
+  }
+  return { ...out, ...fixed };
+}
+
+/**
  * Body of POST /compliance/bog/controls (an upsert by directive ref). The target
  * date goes as an instant (a bare date used to be dropped silently by the API),
  * and blank optional text or date is sent as null so an edit can clear it.

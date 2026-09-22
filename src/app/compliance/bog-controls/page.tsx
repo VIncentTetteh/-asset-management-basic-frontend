@@ -3,6 +3,7 @@
 import { Building2 } from "lucide-react";
 import type { BOGControl, BOGControlDto } from "@/types";
 import { bogControlService } from "@/services/complianceService";
+import { useComplianceUserOptions } from "@/features/compliance/useComplianceUserOptions";
 import { ComplianceCrudPage, defaultsFrom, type FieldSpec } from "@/features/compliance/ComplianceCrudPage";
 
 const FIELDS: FieldSpec<BOGControlDto>[] = [
@@ -12,6 +13,7 @@ const FIELDS: FieldSpec<BOGControlDto>[] = [
   { name: "gapDescription", label: "Gap description", type: "textarea" },
   { name: "remediationPlan", label: "Remediation plan", type: "textarea" },
   { name: "targetDate", label: "Target date", type: "date" },
+  { name: "ownerId", label: "Owner", type: "select" },
   { name: "evidenceUrl", label: "Evidence URL", type: "text", placeholder: "https://…" },
 ];
 
@@ -31,9 +33,11 @@ export default function BogControlsPage() {
         { header: "Directive", kind: "mono", key: "directiveRef" },
         { header: "Requirement", kind: "primary", key: "requirement" },
         { header: "Target date", kind: "date", key: "targetDate" },
+        { header: "Owner", kind: "text", key: "ownerEmail" },
         { header: "Status", kind: "status", key: "status" },
       ]}
       fields={FIELDS}
+      useOptions={useComplianceUserOptions}
       toFormDefaults={(e) => defaultsFrom(e, FIELDS, CREATE_DEFAULTS)}
       searchKeys={["directiveRef", "requirement"]}
       emptyDescription="Track compliance with the Bank of Ghana ICT & cybersecurity directive."

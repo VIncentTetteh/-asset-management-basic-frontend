@@ -36,7 +36,7 @@ export const complianceControlService = {
         return res.data;
     },
     update: async (id: string, data: Partial<ComplianceControlDto>): Promise<ComplianceControl> => {
-        const res = await api.patch<ComplianceControl>(`${BASE}/controls/${id}`, data);
+        const res = await api.put<ComplianceControl>(`${BASE}/controls/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {
@@ -59,7 +59,7 @@ export const bogControlService = {
         return res.data;
     },
     update: async (id: string, data: Partial<BOGControlDto>): Promise<BOGControl> => {
-        const res = await api.patch<BOGControl>(`${BASE}/bog-controls/${id}`, data);
+        const res = await api.put<BOGControl>(`${BASE}/bog-controls/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {
@@ -82,7 +82,7 @@ export const riskService = {
         return res.data;
     },
     update: async (id: string, data: Partial<RiskDto>): Promise<Risk> => {
-        const res = await api.patch<Risk>(`${BASE}/risks/${id}`, data);
+        const res = await api.put<Risk>(`${BASE}/risks/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {
@@ -105,7 +105,7 @@ export const incidentService = {
         return res.data;
     },
     update: async (id: string, data: Partial<SecurityIncidentDto>): Promise<SecurityIncident> => {
-        const res = await api.patch<SecurityIncident>(`${BASE}/incidents/${id}`, data);
+        const res = await api.put<SecurityIncident>(`${BASE}/incidents/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {
@@ -128,7 +128,7 @@ export const policyService = {
         return res.data;
     },
     update: async (id: string, data: Partial<SecurityPolicyDto>): Promise<SecurityPolicy> => {
-        const res = await api.patch<SecurityPolicy>(`${BASE}/policies/${id}`, data);
+        const res = await api.put<SecurityPolicy>(`${BASE}/policies/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {
@@ -151,7 +151,7 @@ export const securityZoneService = {
         return res.data;
     },
     update: async (id: string, data: Partial<SecurityZoneDto>): Promise<SecurityZone> => {
-        const res = await api.patch<SecurityZone>(`${BASE}/security-zones/${id}`, data);
+        const res = await api.put<SecurityZone>(`${BASE}/security-zones/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {
@@ -174,7 +174,7 @@ export const icsAssetService = {
         return res.data;
     },
     update: async (id: string, data: Partial<ICSAssetDto>): Promise<ICSAsset> => {
-        const res = await api.patch<ICSAsset>(`${BASE}/ics-assets/${id}`, data);
+        const res = await api.put<ICSAsset>(`${BASE}/ics-assets/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {
@@ -197,7 +197,7 @@ export const patchRecordService = {
         return res.data;
     },
     update: async (id: string, data: Partial<PatchRecordDto>): Promise<PatchRecord> => {
-        const res = await api.patch<PatchRecord>(`${BASE}/patch-records/${id}`, data);
+        const res = await api.put<PatchRecord>(`${BASE}/patch-records/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {
@@ -220,7 +220,7 @@ export const pciSaqService = {
         return res.data;
     },
     update: async (id: string, data: Partial<PCISAQDto>): Promise<PCISAQRecord> => {
-        const res = await api.patch<PCISAQRecord>(`${BASE}/pci-saq/${id}`, data);
+        const res = await api.put<PCISAQRecord>(`${BASE}/pci-saq/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {
@@ -243,7 +243,7 @@ export const slaMetricService = {
         return res.data;
     },
     update: async (id: string, data: Partial<SLAMetricDto>): Promise<SLAMetric> => {
-        const res = await api.patch<SLAMetric>(`${BASE}/sla-metrics/${id}`, data);
+        const res = await api.put<SLAMetric>(`${BASE}/sla-metrics/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {
@@ -266,7 +266,7 @@ export const vulnScanService = {
         return res.data;
     },
     update: async (id: string, data: Partial<VulnerabilityScanDto>): Promise<VulnerabilityScan> => {
-        const res = await api.patch<VulnerabilityScan>(`${BASE}/vulnerability-scans/${id}`, data);
+        const res = await api.put<VulnerabilityScan>(`${BASE}/vulnerability-scans/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {
@@ -289,7 +289,7 @@ export const regulatoryFilingService = {
         return res.data;
     },
     update: async (id: string, data: Partial<RegulatoryFilingDto>): Promise<RegulatoryFiling> => {
-        const res = await api.patch<RegulatoryFiling>(`${BASE}/regulatory-filings/${id}`, data);
+        const res = await api.put<RegulatoryFiling>(`${BASE}/regulatory-filings/${id}`, data);
         return res.data;
     },
     delete: async (id: string): Promise<void> => {

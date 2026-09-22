@@ -3,6 +3,7 @@
 import { AlertTriangle } from "lucide-react";
 import type { Risk, RiskDto } from "@/types";
 import { riskService } from "@/services/complianceService";
+import { useComplianceUserOptions } from "@/features/compliance/useComplianceUserOptions";
 import { ComplianceCrudPage, defaultsFrom, type FieldSpec } from "@/features/compliance/ComplianceCrudPage";
 
 const FIELDS: FieldSpec<RiskDto>[] = [
@@ -23,6 +24,7 @@ const FIELDS: FieldSpec<RiskDto>[] = [
   { name: "mitigationPlan", label: "Mitigation plan", type: "textarea" },
   { name: "residualRisk", label: "Residual risk (1–25)", type: "number", min: 1, max: 25 },
   { name: "reviewDate", label: "Review date", type: "date" },
+  { name: "ownerId", label: "Owner", type: "select" },
 ];
 
 const CREATE_DEFAULTS = { title: "", likelihood: 3, impact: 3, status: "OPEN", treatment: "MITIGATE" } as const;
@@ -43,9 +45,11 @@ export default function RisksPage() {
            render: (r) => <span className="data-mono block text-right font-bold">{(r.likelihood || 0) * (r.impact || 0)}</span> },
         { header: "Treatment", kind: "text", key: "treatment" },
         { header: "Review", kind: "date", key: "reviewDate" },
+        { header: "Owner", kind: "text", key: "ownerEmail" },
         { header: "Status", kind: "status", key: "status" },
       ]}
       fields={FIELDS}
+      useOptions={useComplianceUserOptions}
       toFormDefaults={(e) => defaultsFrom(e, FIELDS, CREATE_DEFAULTS)}
       toPayload={(d) => ({ ...d, likelihood: Number(d.likelihood), impact: Number(d.impact),
         residualRisk: d.residualRisk != null && String(d.residualRisk) !== "" ? Number(d.residualRisk) : undefined })}

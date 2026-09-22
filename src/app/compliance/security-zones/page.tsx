@@ -39,6 +39,7 @@ export default function SecurityZonesPage() {
         { header: "Purdue level", kind: "number", key: "purdueLevel", right: true },
         { header: "Network range", kind: "mono", key: "networkRange" },
         { header: "Protocols", kind: "text", key: "allowedProtocols" },
+        { header: "ICS assets", kind: "number", key: "assetCount", right: true },
       ]}
       fields={FIELDS}
       toFormDefaults={(e) => defaultsFrom(e, FIELDS, CREATE_DEFAULTS)}

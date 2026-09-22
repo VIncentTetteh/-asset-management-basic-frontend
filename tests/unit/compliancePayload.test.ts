@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildBogControlPayload, buildCompliancePayload, dateToInstant } from "@/features/compliance/payload";
+import { buildBogControlPayload, buildCompliancePayload, buildComplianceReplacePayload, dateToInstant } from "@/features/compliance/payload";
+import { userOptions } from "@/features/compliance/useComplianceUserOptions";
+import type { User } from "@/types";
 
 const fields = [
     { name: "filingType", type: "text" as const },
@@ -38,5 +40,33 @@ describe("buildBogControlPayload", () => {
     it("sends blank optional fields as null so an edit clears them", () => {
         const p = buildBogControlPayload({ directiveRef: " A ", requirement: "r", targetDate: "", gapDescription: " ", evidenceUrl: "" });
         expect(p).toMatchObject({ directiveRef: "A", targetDate: null, gapDescription: null, evidenceUrl: null });
+    });
+});
+
+describe("buildComplianceReplacePayload (PUT edits)", () => {
+    it("sends every field, blanks as null so dates, numbers and selects clear", () => {
+        expect(buildComplianceReplacePayload(fields, {
+            filingType: " Return ", notes: "", dueDate: "", status: "", criticalCount: "", isolated: undefined,
+        })).toEqual({
+            filingType: "Return", notes: null, dueDate: null, status: null, criticalCount: null, isolated: false,
+        });
+    });
+
+    it("converts values and keeps fixed fields from the record", () => {
+        const withAsset = [...fields, { name: "assetId", type: "select" as const }];
+        expect(buildComplianceReplacePayload(withAsset, { dueDate: "2026-01-02", criticalCount: "4", assetId: undefined },
+            { assetId: "a-1" })).toMatchObject({ dueDate: "2026-01-02T12:00:00Z", criticalCount: 4, assetId: "a-1" });
+    });
+});
+
+describe("compliance owner options", () => {
+    it("offers active users by id and by email", () => {
+        const users = [
+            { id: "u1", firstName: "Ama", lastName: "M", email: "ama@x.com", status: "ACTIVE" },
+            { id: "u2", firstName: "Old", lastName: "U", email: "old@x.com", status: "INACTIVE" },
+        ] as User[];
+        const { byId, byEmail } = userOptions(users);
+        expect(byId).toEqual([{ value: "u1", label: "Ama M (ama@x.com)" }]);
+        expect(byEmail[0].value).toBe("ama@x.com");
     });
 });

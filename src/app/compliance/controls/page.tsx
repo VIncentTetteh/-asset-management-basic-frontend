@@ -3,6 +3,7 @@
 import { ShieldCheck } from "lucide-react";
 import type { ComplianceControl, ComplianceControlDto } from "@/types";
 import { complianceControlService } from "@/services/complianceService";
+import { useComplianceUserOptions } from "@/features/compliance/useComplianceUserOptions";
 import { ComplianceCrudPage, defaultsFrom, type FieldSpec } from "@/features/compliance/ComplianceCrudPage";
 
 const FIELDS: FieldSpec<ComplianceControlDto>[] = [
@@ -12,6 +13,8 @@ const FIELDS: FieldSpec<ComplianceControlDto>[] = [
   { name: "controlDescription", label: "Description", type: "textarea" },
   { name: "status", label: "Status", type: "select", options: [{ value: "NOT_IMPLEMENTED", label: "Not implemented" }, { value: "PARTIAL", label: "Partial" }, { value: "IMPLEMENTED", label: "Implemented" }, { value: "NOT_APPLICABLE", label: "Not applicable" }] },
   { name: "reviewDueDate", label: "Review due", type: "date" },
+  { name: "ownerId", label: "Owner", type: "select" },
+  { name: "lastReviewedAt", label: "Last reviewed", type: "date" },
   { name: "justification", label: "Justification", type: "textarea" },
   { name: "gapDescription", label: "Gap description", type: "textarea" },
   { name: "remediationPlan", label: "Remediation plan", type: "textarea" },
@@ -34,9 +37,13 @@ export default function ComplianceControlsPage() {
         { header: "Control", kind: "primary", key: "controlName", subKey: "controlRef" },
         { header: "Framework", kind: "text", key: "framework" },
         { header: "Review due", kind: "date", key: "reviewDueDate" },
+        { header: "Owner", kind: "text", key: "ownerEmail" },
+        { header: "Last reviewed", kind: "date", key: "lastReviewedAt", subKey: "lastReviewedByEmail",
+          render: (r) => r.lastReviewedAt ? `${new Date(r.lastReviewedAt).toLocaleDateString()}${r.lastReviewedByEmail ? ` · ${r.lastReviewedByEmail}` : ""}` : "—" },
         { header: "Status", kind: "status", key: "status" },
       ]}
       fields={FIELDS}
+      useOptions={useComplianceUserOptions}
       toFormDefaults={(e) => defaultsFrom(e, FIELDS, CREATE_DEFAULTS)}
       searchKeys={["controlName", "controlRef", "framework"]}
       emptyDescription="Track ISO 27001 / SOC 2 / PCI DSS controls and their implementation evidence."

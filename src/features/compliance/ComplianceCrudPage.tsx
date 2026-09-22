@@ -17,7 +17,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { buildPatchPayload } from "@/lib/patch";
 import { applyApiFieldErrors } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
-import { buildCompliancePayload } from "@/features/compliance/payload";
+import { buildCompliancePayload, buildComplianceReplacePayload } from "@/features/compliance/payload";
 import { useConfirm } from "@/hooks/useConfirm";
 import { FieldError } from "@/components/ui/field-error";
 import { fieldLimit, limitInputProps, limitRules, type FieldLimit, type LimitedEntity } from "@/lib/field-limits";
@@ -35,6 +35,8 @@ export interface FieldSpec<TDto> {
   step?: string;
   min?: number;
   max?: number;
+  /** Fixed once created (the API ignores it on edit): shown disabled and sent unchanged. */
+  lockedOnEdit?: boolean;
 }
 
 export interface ColumnSpec<T> {
@@ -56,6 +58,7 @@ interface ComplianceCrudPageProps<T extends { id?: string }, TDto extends FieldV
   service: {
     getAll: () => Promise<T[] | { items?: T[]; content?: T[] }>;
     create: (data: TDto) => Promise<T>;
+    /** Full replace (PUT): fields sent as null are cleared. */
     update: (id: string, data: Partial<TDto>) => Promise<T>;
     delete: (id: string) => Promise<void>;
   };
@@ -188,23 +191,27 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
   };
 
   const onSubmit = async (data: TDto) => {
-    const transformed = toPayload ? toPayload(data) : data;
-    const payload = buildCompliancePayload(
-      fields,
-      transformed as Record<string, unknown>,
-      editing as unknown as Record<string, unknown> | null,
-    ) as TDto;
+    const transformed = (toPayload ? toPayload(data) : data) as Record<string, unknown>;
 
     try {
       if (editing) {
-        const previous = buildCompliancePayload(fields, editing as unknown as Record<string, unknown>) as Partial<TDto>;
-        const patch = buildPatchPayload<TDto>(previous, payload);
-        if (Object.keys(patch).length === 0) {
+        // Edits are a full replace (PUT): a cleared date, number, select or owner is
+        // sent as null and cleared. Fields fixed at create keep the record's value.
+        const record = editing as unknown as Record<string, unknown>;
+        const fixed = Object.fromEntries(
+          fields.filter((f) => f.lockedOnEdit).map((f) => [f.name, record[f.name]]),
+        );
+        const payload = buildComplianceReplacePayload(fields, transformed, fixed);
+        const before = toFormDefaults(editing) as unknown as TDto;
+        const previous = buildComplianceReplacePayload(
+          fields, (toPayload ? toPayload(before) : before) as Record<string, unknown>, fixed);
+        if (Object.keys(buildPatchPayload(previous, payload)).length === 0) {
           toast("No changes to update");
           return;
         }
-        await save.mutateAsync({ id: editing.id!, data: patch as TDto });
+        await save.mutateAsync({ id: editing.id!, data: payload as TDto });
       } else {
+        const payload = buildCompliancePayload(fields, transformed) as TDto;
         await save.mutateAsync({ data: payload });
       }
       setIsModalOpen(false);
@@ -322,7 +329,12 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
                     </Label>
                   )}
                   {field.type === "select" ? (
-                    <Select {...common} {...register(field.name as Path<TDto>, rules)}>
+                    <Select
+                      {...common}
+                      disabled={!!editing && field.lockedOnEdit}
+                      title={editing && field.lockedOnEdit ? `${field.label} cannot change after the record is created` : undefined}
+                      {...register(field.name as Path<TDto>, editing && field.lockedOnEdit ? {} : rules)}
+                    >
                       {!limit.required && <option value="">—</option>}
                       {(field.options ?? dynamicOptions[field.name] ?? []).map((o) => (
                         <option key={o.value} value={o.value}>{o.label}</option>

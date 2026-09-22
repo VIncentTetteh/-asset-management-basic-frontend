@@ -9,7 +9,7 @@ import { qk } from "@/lib/queryClient";
 import { ComplianceCrudPage, defaultsFrom, type FieldSpec } from "@/features/compliance/ComplianceCrudPage";
 
 const FIELDS: FieldSpec<PatchRecordDto>[] = [
-  { name: "assetId", label: "Asset", type: "select", required: true },
+  { name: "assetId", label: "Asset", type: "select", required: true, lockedOnEdit: true },
   { name: "patchName", label: "Patch name", type: "text", required: true, placeholder: "KB5034441" },
   { name: "version", label: "Version", type: "text", mono: true },
   { name: "status", label: "Status", type: "select", options: [
@@ -49,6 +49,7 @@ export default function PatchRecordsPage() {
         { header: "Patch", kind: "primary", key: "patchName", subKey: "version" },
         { header: "Asset", kind: "text", key: "assetName" },
         { header: "Applied", kind: "date", key: "appliedAt" },
+        { header: "Applied by", kind: "text", key: "appliedByEmail" },
         { header: "Test validated", kind: "bool", key: "testEnvironmentValidated" },
         { header: "Status", kind: "status", key: "status" },
       ]}

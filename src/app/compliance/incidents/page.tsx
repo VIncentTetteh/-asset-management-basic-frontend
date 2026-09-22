@@ -3,6 +3,7 @@
 import { Siren } from "lucide-react";
 import type { SecurityIncident, SecurityIncidentDto } from "@/types";
 import { incidentService } from "@/services/complianceService";
+import { useComplianceUserOptions } from "@/features/compliance/useComplianceUserOptions";
 import { ComplianceCrudPage, defaultsFrom, type FieldSpec } from "@/features/compliance/ComplianceCrudPage";
 
 const FIELDS: FieldSpec<SecurityIncidentDto>[] = [
@@ -19,6 +20,8 @@ const FIELDS: FieldSpec<SecurityIncidentDto>[] = [
   { name: "category", label: "Category", type: "text", placeholder: "Phishing / Malware / Insider…" },
   { name: "detectedAt", label: "Detected", type: "date" },
   { name: "resolvedAt", label: "Resolved", type: "date" },
+  { name: "reportedById", label: "Reported by", type: "select" },
+  { name: "assignedToId", label: "Assigned to", type: "select" },
   { name: "rootCause", label: "Root cause", type: "textarea" },
   { name: "lessonsLearned", label: "Lessons learned", type: "textarea" },
 ];
@@ -40,9 +43,11 @@ export default function IncidentsPage() {
         { header: "Severity", kind: "status", key: "severity" },
         { header: "Detected", kind: "date", key: "detectedAt" },
         { header: "Resolved", kind: "date", key: "resolvedAt" },
+        { header: "Assigned to", kind: "text", key: "assignedToEmail", subKey: "reportedByEmail" },
         { header: "Status", kind: "status", key: "status" },
       ]}
       fields={FIELDS}
+      useOptions={useComplianceUserOptions}
       toFormDefaults={(e) => defaultsFrom(e, FIELDS, CREATE_DEFAULTS)}
       searchKeys={["title", "category"]}
       emptyDescription="Record security incidents from detection through resolution."

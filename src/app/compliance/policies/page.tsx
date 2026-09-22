@@ -3,6 +3,7 @@
 import { FileText } from "lucide-react";
 import type { SecurityPolicy, SecurityPolicyDto } from "@/types";
 import { policyService } from "@/services/complianceService";
+import { useComplianceUserOptions } from "@/features/compliance/useComplianceUserOptions";
 import { ComplianceCrudPage, defaultsFrom, type FieldSpec } from "@/features/compliance/ComplianceCrudPage";
 
 const FIELDS: FieldSpec<SecurityPolicyDto>[] = [
@@ -14,6 +15,8 @@ const FIELDS: FieldSpec<SecurityPolicyDto>[] = [
   ] },
   { name: "effectiveDate", label: "Effective date", type: "date" },
   { name: "reviewDueDate", label: "Review due", type: "date" },
+  { name: "ownerId", label: "Owner", type: "select" },
+  { name: "approvedByEmail", label: "Approved by", type: "select" },
   { name: "documentUrl", label: "Document URL", type: "text", span2: true, placeholder: "https://…" },
 ];
 
@@ -34,9 +37,12 @@ export default function PoliciesPage() {
         { header: "Version", kind: "mono", key: "version" },
         { header: "Effective", kind: "date", key: "effectiveDate" },
         { header: "Review due", kind: "date", key: "reviewDueDate" },
+        { header: "Owner", kind: "text", key: "ownerEmail" },
+        { header: "Approved by", kind: "text", key: "approvedByEmail" },
         { header: "Status", kind: "status", key: "status" },
       ]}
       fields={FIELDS}
+      useOptions={useComplianceUserOptions}
       toFormDefaults={(e) => defaultsFrom(e, FIELDS, CREATE_DEFAULTS)}
       searchKeys={["title", "version"]}
       emptyDescription="Maintain the policy library your controls and audits reference."
