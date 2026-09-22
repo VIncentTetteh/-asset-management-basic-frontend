@@ -1607,6 +1607,8 @@ export interface SoftwareLicense {
     licenseDocumentUrl?: string | null;
     notes?: string | null;
     assetId?: string | null;
+    /** The linked asset's name (read-only). */
+    assetName?: string | null;
     organisationId?: string | null;
     daysUntilExpiry?: number | null;
 }
@@ -1629,6 +1631,8 @@ export interface SoftwareLicenseDto {
     autoRenew?: boolean | null;
     licenseDocumentUrl?: string | null;
     notes?: string | null;
+    /** null unlinks on PUT. The licence key is deliberately not part of this API. */
+    assetId?: string | null;
 }
 
 /** GET /licenses/utilization */

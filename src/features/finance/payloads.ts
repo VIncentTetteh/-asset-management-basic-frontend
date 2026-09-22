@@ -184,6 +184,7 @@ export function buildLicensePayload(form: LicenseForm): SoftwareLicenseDto {
         autoRenew: form.autoRenew === true || form.autoRenew === "true",
         licenseDocumentUrl: optionalString(form.licenseDocumentUrl),
         notes: optionalString(form.notes),
+        assetId: optionalString(form.assetId),
     };
 }
 

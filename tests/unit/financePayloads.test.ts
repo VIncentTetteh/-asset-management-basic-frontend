@@ -152,6 +152,17 @@ describe("lease payload", () => {
 });
 
 describe("license payload", () => {
+    it("wires version, document URL, notes and the linked asset; blanks become null so PUT clears them", () => {
+        const payload = buildLicensePayload({
+            name: "IDE", vendor: "JetBrains", licenseType: "SUBSCRIPTION",
+            version: " 2026.1 ", licenseDocumentUrl: "https://x/eula.pdf", notes: "Dev team", assetId: "a1",
+        });
+        expect(payload).toMatchObject({ version: "2026.1", licenseDocumentUrl: "https://x/eula.pdf", notes: "Dev team", assetId: "a1" });
+        const cleared = buildLicensePayload({ name: "IDE", vendor: "JetBrains", licenseType: "SUBSCRIPTION", version: "", assetId: "", notes: "" });
+        expect(cleared).toMatchObject({ version: null, assetId: null, notes: null, licenseDocumentUrl: null });
+        expect(cleared).not.toHaveProperty("licenseKey");
+    });
+
     it("uses SoftwareLicenseDto field names", () => {
         const payload = buildLicensePayload({
             name: "M365 Finance",

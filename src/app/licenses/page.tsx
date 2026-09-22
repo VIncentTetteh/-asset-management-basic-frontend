@@ -23,6 +23,12 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/local-date";
+import { Textarea } from "@/components/ui/textarea";
+import { FieldError } from "@/components/ui/field-error";
+import { ExternalLink as SafeExternalLink } from "@/components/ui/external-link";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { assetService } from "@/services/assetService";
+import { qk } from "@/lib/queryClient";
 
 const LICENSE_STATUSES: LicenseStatus[] = ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "SUSPENDED", "CANCELLED"];
 
@@ -34,8 +40,12 @@ const licenses = makeCrudHooks<SoftwareLicense, SoftwareLicenseDto>("licenses", 
   update: (id, data) => licenseService.replace(id, data as SoftwareLicenseDto),
 }, {
   entity: "License",
-  fields: { name: "License name", totalSeats: "Total seats", usedSeats: "Seats in use" },
+  fields: {
+    name: "License name", totalSeats: "Total seats", usedSeats: "Seats in use", licenseDocumentUrl: "Document URL",
+    assetId: "Linked asset", expiryDate: "Expiry date",
+  },
 });
+const L = FIELD_LIMITS.softwareLicense;
 
 function SeatBar({ seats, allocated }: { seats: number; allocated: number }) {
   const pct = seats > 0 ? Math.min((allocated / seats) * 100, 100) : 0;
@@ -80,6 +90,12 @@ export default function LicensesPage() {
   const rows = view === "expiring" ? expiringRows : view === "over-allocated" ? overRows : allRows;
   const isLoading = view === "expiring" ? expLoading : view === "over-allocated" ? overLoading : allLoading;
 
+  const { data: assets = [] } = useQuery({
+    queryKey: qk.module("assets-all").list(),
+    queryFn: () => assetService.getAll(),
+    staleTime: 300_000,
+  });
+
   const save = licenses.useSave();
   const remove = licenses.useDelete();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -109,9 +125,9 @@ export default function LicensesPage() {
             annualRenewalCost: editing.annualRenewalCost ?? "",
             currency: editing.currency || baseCurrency,
             autoRenew: editing.autoRenew ?? false,
-            // Not edited here, but carried so the full PUT does not clear them.
             licenseDocumentUrl: editing.licenseDocumentUrl || "",
             notes: editing.notes || "",
+            assetId: editing.assetId || "",
           }
         : {
             name: "",
@@ -123,6 +139,10 @@ export default function LicensesPage() {
             usedSeats: 0,
             currency: baseCurrency,
             autoRenew: false,
+            version: "",
+            licenseDocumentUrl: "",
+            notes: "",
+            assetId: "",
           },
     );
   }, [isModalOpen, editing, reset, baseCurrency]);
@@ -156,9 +176,22 @@ export default function LicensesPage() {
             <p className="truncate font-semibold text-foreground">{row.original.name}</p>
             <p className="truncate text-xs text-faint-fg">
               {row.original.vendor || "—"}
-              {row.original.productName ? ` · ${row.original.productName}` : ""} ·{" "}
+              {row.original.productName ? ` · ${row.original.productName}` : ""}
+              {row.original.version ? ` ${row.original.version}` : ""} ·{" "}
               {String(row.original.licenseType ?? "").replace(/_/g, " ").toLowerCase()}
+              {row.original.autoRenew ? " · auto-renews" : ""}
             </p>
+            {row.original.assetName ? (
+              <p className="truncate text-xs text-faint-fg">Asset · {row.original.assetName}</p>
+            ) : null}
+            {row.original.notes ? (
+              <p className="truncate text-xs text-muted-fg" title={row.original.notes}>{row.original.notes}</p>
+            ) : null}
+            {row.original.licenseDocumentUrl ? (
+              <SafeExternalLink href={row.original.licenseDocumentUrl} className="text-xs text-brand underline-offset-2 hover:underline">
+                Document
+              </SafeExternalLink>
+            ) : null}
           </div>
         ),
       },
@@ -326,30 +359,41 @@ export default function LicensesPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="lic-name">License name <span className="text-danger">*</span></Label>
-            <Input id="lic-name" placeholder="Microsoft 365 E3 — Finance" {...register("name", { required: "License name is required" })} />
-            {errors.name && <p className="text-sm text-danger">{errors.name.message as string}</p>}
+            <Input id="lic-name" placeholder="Microsoft 365 E3 — Finance" {...limitInputProps(L.name)}
+              {...register("name", limitRules<LicenseForm, "name">(L.name, "License name"))} />
+            <FieldError error={errors.name} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="lic-vendor">Vendor <span className="text-danger">*</span></Label>
-              <Input id="lic-vendor" placeholder="Microsoft" {...register("vendor", { required: "Vendor is required" })} />
-              {errors.vendor && <p className="text-sm text-danger">{errors.vendor.message as string}</p>}
+              <Input id="lic-vendor" placeholder="Microsoft" {...limitInputProps(L.vendor)}
+                {...register("vendor", limitRules<LicenseForm, "vendor">(L.vendor, "Vendor"))} />
+              <FieldError error={errors.vendor} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lic-product">Product</Label>
-              <Input id="lic-product" placeholder="Microsoft 365 E3" {...register("productName")} />
+              <Input id="lic-product" placeholder="Microsoft 365 E3" {...limitInputProps(L.productName)}
+                {...register("productName", limitRules<LicenseForm, "productName">(L.productName, "Product"))} />
+              <FieldError error={errors.productName} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lic-version">Version</Label>
+              <Input id="lic-version" placeholder="2024" {...limitInputProps(L.version)}
+                {...register("version", limitRules<LicenseForm, "version">(L.version, "Version"))} />
+              <FieldError error={errors.version} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="lic-type">Type <span className="text-danger">*</span></Label>
-              <Select id="lic-type" {...register("licenseType", { required: "License type is required" })}>
+              <Select id="lic-type" {...register("licenseType", limitRules<LicenseForm, "licenseType">(L.licenseType, "License type"))}>
                 {LICENSE_TYPES.map((t) => (
                   <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
                 ))}
               </Select>
+              <FieldError error={errors.licenseType} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lic-status">Status</Label>
@@ -358,19 +402,22 @@ export default function LicensesPage() {
                   <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
                 ))}
               </Select>
+              <FieldError error={errors.status} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="lic-seats">Total seats</Label>
-              <Input id="lic-seats" type="number" min="0" {...register("totalSeats", { min: { value: 0, message: "Cannot be negative" } })} />
-              {errors.totalSeats && <p className="text-sm text-danger">{errors.totalSeats.message as string}</p>}
+              <Input id="lic-seats" type="number" {...limitInputProps(L.totalSeats)}
+                {...register("totalSeats", limitRules<LicenseForm, "totalSeats">(L.totalSeats, "Total seats"))} />
+              <FieldError error={errors.totalSeats} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lic-used">Seats in use</Label>
-              <Input id="lic-used" type="number" min="0" {...register("usedSeats", { min: { value: 0, message: "Cannot be negative" } })} />
-              {errors.usedSeats && <p className="text-sm text-danger">{errors.usedSeats.message as string}</p>}
+              <Input id="lic-used" type="number" {...limitInputProps(L.usedSeats)}
+                {...register("usedSeats", limitRules<LicenseForm, "usedSeats">(L.usedSeats, "Seats in use"))} />
+              <FieldError error={errors.usedSeats} />
             </div>
           </div>
 
@@ -378,31 +425,47 @@ export default function LicensesPage() {
             <div className="space-y-2">
               <Label htmlFor="lic-purchase">Purchase date</Label>
               <Input id="lic-purchase" type="date" {...register("purchaseDate")} />
+              <FieldError error={errors.purchaseDate} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lic-expiry">Expiry date</Label>
-              <Input id="lic-expiry" type="date" {...register("expiryDate")} />
+              <Input
+                id="lic-expiry"
+                type="date"
+                {...register("expiryDate", {
+                  validate: (expiry, form) =>
+                    !expiry || !form.purchaseDate || String(expiry) >= String(form.purchaseDate)
+                    || "Must be on or after the purchase date",
+                })}
+              />
+              <FieldError error={errors.expiryDate} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lic-renewal">Renewal date</Label>
               <Input id="lic-renewal" type="date" {...register("renewalDate")} />
+              <FieldError error={errors.renewalDate} />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="lic-cost">Purchase cost</Label>
-              <Input id="lic-cost" type="number" step="0.01" min="0" {...register("purchaseCost")} />
+              <Input id="lic-cost" type="number" {...limitInputProps(L.purchaseCost)}
+                {...register("purchaseCost", limitRules<LicenseForm, "purchaseCost">(L.purchaseCost, "Purchase cost"))} />
+              <FieldError error={errors.purchaseCost} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lic-renewal-cost">Annual renewal</Label>
-              <Input id="lic-renewal-cost" type="number" step="0.01" min="0" {...register("annualRenewalCost")} />
+              <Input id="lic-renewal-cost" type="number" {...limitInputProps(L.annualRenewalCost)}
+                {...register("annualRenewalCost", limitRules<LicenseForm, "annualRenewalCost">(L.annualRenewalCost, "Annual renewal"))} />
+              <FieldError error={errors.annualRenewalCost} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lic-currency">Currency</Label>
               <Select id="lic-currency" {...register("currency")}>
                 <CurrencyOptions current={editing?.currency} />
               </Select>
+              <FieldError error={errors.currency} />
             </div>
           </div>
 
@@ -414,6 +477,31 @@ export default function LicensesPage() {
               {...register("autoRenew")}
             />
             <Label htmlFor="lic-autorenew" className="cursor-pointer">Auto-renews</Label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="lic-asset">Linked asset</Label>
+              <Select id="lic-asset" {...register("assetId")}>
+                <option value="">— None —</option>
+                {assets.map((a) => (
+                  <option key={a.id} value={a.id}>{a.assetTag ? `${a.name} (${a.assetTag})` : a.name}</option>
+                ))}
+              </Select>
+              <FieldError error={errors.assetId} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lic-doc">Document URL</Label>
+              <Input id="lic-doc" type="url" placeholder="https://…" {...limitInputProps(L.licenseDocumentUrl)}
+                {...register("licenseDocumentUrl", limitRules<LicenseForm, "licenseDocumentUrl">(L.licenseDocumentUrl, "Document URL"))} />
+              <FieldError error={errors.licenseDocumentUrl} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="lic-notes">Notes</Label>
+            <Textarea id="lic-notes" rows={2} {...register("notes")} />
+            <FieldError error={errors.notes} />
           </div>
 
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
