@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
     budgetAvailable,
+    buildVendorReviewPayload,
+    vendorReviewRating,
     buildBudgetPayload,
     buildContractPayload,
     buildLeasePayload,
@@ -194,5 +196,35 @@ describe("expense currency", () => {
 
     it("keeps the chosen currency without a budget", () => {
         expect(expenseCurrencyFor(undefined, "USD")).toEqual({ currency: "USD" });
+    });
+});
+
+describe("buildVendorReviewPayload", () => {
+    it("always derives the overall rating from the sub-scores", () => {
+        const p = buildVendorReviewPayload({
+            supplierId: "s1", rating: 5, qualityScore: "4", deliveryScore: "3", supportScore: "3",
+            periodStart: "2026-01-01", periodEnd: "2026-03-31", feedback: "  ok ",
+        });
+        expect(p.rating).toBe(3.33);
+        expect(p).toMatchObject({ qualityScore: 4, deliveryScore: 3, supportScore: 3, feedback: "ok" });
+    });
+
+    it("sends whole-number sub-scores (the API takes Integer 1-5)", () => {
+        const p = buildVendorReviewPayload({ supplierId: "s1", qualityScore: "5", deliveryScore: "5", supportScore: "4" });
+        expect(Number.isInteger(p.qualityScore)).toBe(true);
+        expect(p.rating).toBe(4.67);
+    });
+
+    it("blank optional fields become null", () => {
+        const p = buildVendorReviewPayload({ supplierId: "s1", qualityScore: "2", deliveryScore: "", supportScore: "", feedback: " " });
+        expect(p.deliveryScore).toBeNull();
+        expect(p.feedback).toBeNull();
+        expect(p.rating).toBe(2);
+    });
+});
+
+describe("vendorReviewRating", () => {
+    it("is null when no score is given", () => {
+        expect(vendorReviewRating([null, null, null])).toBeNull();
     });
 });

@@ -1,4 +1,4 @@
-import type { Budget, BudgetDto, ContractDto, PurchaseOrderDto, SoftwareLicenseDto } from "@/types";
+import type { Budget, BudgetDto, ContractDto, PurchaseOrderDto, SoftwareLicenseDto, VendorReviewDto } from "@/types";
 import type { LeaseRecordDto } from "@/services/leaseRecordService";
 
 /**
@@ -162,4 +162,41 @@ export function expenseCurrencyFor(
         };
     }
     return { currency: budget.currency };
+}
+
+// ── Vendor reviews ────────────────────────────────────────────────────────────
+
+export type VendorReviewForm = Raw<VendorReviewDto>;
+
+/** A 1–5 whole-number sub-score (`Integer @Min(1) @Max(5)` on the API), or null. */
+const subScore = (v: unknown): number | null => {
+    const n = optionalNumber(v);
+    return n === null ? null : Math.round(n);
+};
+
+/**
+ * The overall rating is always the average of the sub-scores given, to two
+ * decimals (`@Digits(fraction = 2)`). It used to keep the previously saved
+ * rating on edit, so changing the sub-scores never moved it.
+ */
+export function vendorReviewRating(scores: readonly (number | null)[]): number | null {
+    const given = scores.filter((s): s is number => s !== null);
+    if (given.length === 0) return null;
+    return Math.round((given.reduce((a, b) => a + b, 0) / given.length) * 100) / 100;
+}
+
+export function buildVendorReviewPayload(form: VendorReviewForm): VendorReviewDto {
+    const qualityScore = subScore(form.qualityScore);
+    const deliveryScore = subScore(form.deliveryScore);
+    const supportScore = subScore(form.supportScore);
+    return {
+        supplierId: optionalString(form.supplierId) ?? "",
+        rating: vendorReviewRating([qualityScore, deliveryScore, supportScore]) ?? 0,
+        qualityScore,
+        deliveryScore,
+        supportScore,
+        feedback: optionalString(form.feedback),
+        periodStart: optionalString(form.periodStart),
+        periodEnd: optionalString(form.periodEnd),
+    };
 }
