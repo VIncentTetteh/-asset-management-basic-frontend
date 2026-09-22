@@ -15,13 +15,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { buildDepartmentPayload, DEPARTMENT_STATUSES } from "@/features/departments/departmentPayload";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { usePermissions } from "@/contexts/PermissionContext";
 import Link from "next/link";
 import { reportApiError } from "@/lib/api-validation";
+
+const L = FIELD_LIMITS.department;
 
 export default function DepartmentsPage() {
   const { format, baseCurrency } = useCurrency();
@@ -63,8 +68,9 @@ export default function DepartmentsPage() {
             costCenterCode: editingDept.costCenterCode || "",
             budgetLimit: editingDept.budgetLimit,
             status: editingDept.status || "ACTIVE",
+            description: editingDept.description || "",
           }
-        : { name: "", departmentCode: "", costCenterCode: "", budgetLimit: undefined, status: "ACTIVE" },
+        : { name: "", departmentCode: "", costCenterCode: "", budgetLimit: undefined, status: "ACTIVE", description: "" },
     );
   }, [isModalOpen, editingDept, reset]);
 
@@ -117,33 +123,17 @@ export default function DepartmentsPage() {
       return;
     }
 
-    const payload: DepartmentDto = { ...data };
-    delete payload.description;
-    // The API treats a missing field as "unchanged", so a cleared code/cost
-    // center is sent as "" (which clears it) and a cleared cap as 0 (no cap).
-    payload.departmentCode = data.departmentCode?.trim() ?? "";
-    payload.costCenterCode = data.costCenterCode?.trim() ?? "";
-    const rawCap = data.budgetLimit as unknown;
-    payload.budgetLimit = rawCap === undefined || rawCap === null || String(rawCap).trim() === "" ? 0 : Number(rawCap);
-    if (!editingDept) {
-      if (!payload.departmentCode) delete payload.departmentCode;
-      if (!payload.costCenterCode) delete payload.costCenterCode;
-      if (!payload.budgetLimit) delete payload.budgetLimit;
-    }
-
+    const payload = buildDepartmentPayload(data, editingDept);
     try {
       if (editingDept) {
-        const prevForPatch: Partial<DepartmentDto> = { ...(editingDept as unknown as Partial<DepartmentDto>) };
-        delete prevForPatch.description;
-        const patch = buildPatchPayload<DepartmentDto>(prevForPatch, payload);
-        if (Object.keys(patch).length === 0) {
+        if (Object.keys(payload).length === 0) {
           toast("No changes to update");
           return;
         }
-        await departmentService.update(editingDept.id!, patch);
+        await departmentService.update(editingDept.id!, payload);
         toast.success("Department updated");
       } else {
-        await departmentService.create(payload);
+        await departmentService.create(payload as DepartmentDto);
         toast.success("Department created");
       }
       setIsModalOpen(false);
@@ -276,25 +266,50 @@ export default function DepartmentsPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="dept-name">Name <span className="text-danger">*</span></Label>
-            <Input id="dept-name" placeholder="IT Operations" {...register("name", { required: "Name is required" })} />
-            {errors.name && <p className="text-sm text-danger">{errors.name.message as string}</p>}
+            <Input
+              id="dept-name"
+              placeholder="IT Operations"
+              {...limitInputProps(L.name)}
+              {...register("name", limitRules<DepartmentDto, "name">(L.name, "Name"))}
+            />
+            <FieldError error={errors.name} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="dept-code">Department code</Label>
-              <Input id="dept-code" placeholder="IT-OPS" className="data-mono" {...register("departmentCode")} />
+              <Input
+                id="dept-code"
+                placeholder="IT-OPS"
+                className="data-mono"
+                {...limitInputProps(L.departmentCode)}
+                {...register("departmentCode", limitRules<DepartmentDto, "departmentCode">(L.departmentCode, "Department code"))}
+              />
+              <FieldError error={errors.departmentCode} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="dept-cc">Cost center</Label>
-              <Input id="dept-cc" placeholder="CC-1001" className="data-mono" {...register("costCenterCode")} />
+              <Input
+                id="dept-cc"
+                placeholder="CC-1001"
+                className="data-mono"
+                {...limitInputProps(L.costCenterCode)}
+                {...register("costCenterCode", limitRules<DepartmentDto, "costCenterCode">(L.costCenterCode, "Cost center"))}
+              />
+              <FieldError error={errors.costCenterCode} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="dept-budget">Planning cap ({baseCurrency})</Label>
-              <Input id="dept-budget" type="number" step="0.01" min="0" {...register("budgetLimit")} />
+              <Input
+                id="dept-budget"
+                type="number"
+                {...limitInputProps(L.budgetLimit)}
+                {...register("budgetLimit", limitRules<DepartmentDto, "budgetLimit">(L.budgetLimit, "Planning cap"))}
+              />
+              <FieldError error={errors.budgetLimit} />
               <p className="text-xs text-faint-fg">
                 Informational only — nothing is checked against it. To control spending, create a department budget
                 under <Link href="/budgets" className="text-brand underline">Budgets</Link>.
@@ -303,10 +318,18 @@ export default function DepartmentsPage() {
             <div className="space-y-2">
               <Label htmlFor="dept-status">Status</Label>
               <Select id="dept-status" {...register("status")}>
-                <option value="ACTIVE">Active</option>
-                <option value="INACTIVE">Inactive</option>
+                {DEPARTMENT_STATUSES.map((st) => (
+                  <option key={st.value} value={st.value}>{st.label}</option>
+                ))}
               </Select>
+              <FieldError error={errors.status} />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="dept-description">Description</Label>
+            <Textarea id="dept-description" rows={3} {...register("description")} />
+            <FieldError error={errors.description} />
           </div>
 
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
