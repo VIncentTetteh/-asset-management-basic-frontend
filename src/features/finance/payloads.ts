@@ -51,6 +51,15 @@ export function buildBudgetPayload(form: BudgetForm): BudgetDto {
     };
 }
 
+/**
+ * The API refuses a currency change (409) once a budget holds spend or
+ * commitments, because those amounts are recorded in its current currency.
+ */
+export function budgetCurrencyLocked(budget: Pick<Budget, "spentAmount" | "committedAmount"> | null | undefined): boolean {
+    if (!budget) return false;
+    return (budget.spentAmount || 0) !== 0 || (budget.committedAmount || 0) !== 0;
+}
+
 /** Headroom after spend and open commitments; the API's availableAmount when present. */
 export function budgetAvailable(budget: Pick<Budget, "totalAmount" | "spentAmount" | "committedAmount" | "availableAmount">): number {
     if (typeof budget.availableAmount === "number") return budget.availableAmount;

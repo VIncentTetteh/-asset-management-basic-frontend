@@ -9,7 +9,7 @@ import { BUDGET_STATUSES, type Budget, type BudgetLedgerKind, type Expense } fro
 import { budgetService } from "@/services/budgetService";
 import { departmentService } from "@/services/departmentService";
 import { reportApiError } from "@/lib/api-validation";
-import { buildBudgetPayload, budgetAvailable, type BudgetForm } from "@/features/finance/payloads";
+import { buildBudgetPayload, budgetAvailable, budgetCurrencyLocked, type BudgetForm } from "@/features/finance/payloads";
 import { qk } from "@/lib/queryClient";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -128,6 +128,7 @@ export default function BudgetsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<Budget | null>(null);
+  const currencyLocked = budgetCurrencyLocked(editing);
   const [adjusting, setAdjusting] = useState<Budget | null>(null);
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustNote, setAdjustNote] = useState("");
@@ -455,9 +456,19 @@ export default function BudgetsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="bd-currency">Currency</Label>
-              <Select id="bd-currency" {...register("currency")}>
+              <Select
+                id="bd-currency"
+                disabled={currencyLocked}
+                title={currencyLocked ? "Locked: spend or commitments are recorded in this currency" : undefined}
+                {...register("currency")}
+              >
                 <CurrencyOptions current={editing?.currency} />
               </Select>
+              {currencyLocked ? (
+                <p className="text-xs text-muted-fg">
+                  Locked: this budget already has spend or commitments in {editing?.currency}.
+                </p>
+              ) : null}
             </div>
           </div>
 

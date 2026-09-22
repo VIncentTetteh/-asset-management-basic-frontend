@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     budgetAvailable,
+    budgetCurrencyLocked,
     buildVendorReviewPayload,
     vendorReviewRating,
     buildBudgetPayload,
@@ -226,5 +227,14 @@ describe("buildVendorReviewPayload", () => {
 describe("vendorReviewRating", () => {
     it("is null when no score is given", () => {
         expect(vendorReviewRating([null, null, null])).toBeNull();
+    });
+});
+
+describe("budgetCurrencyLocked", () => {
+    it("locks the currency once anything is spent or committed", () => {
+        expect(budgetCurrencyLocked({ spentAmount: 0, committedAmount: 0 })).toBe(false);
+        expect(budgetCurrencyLocked({ spentAmount: 10, committedAmount: 0 })).toBe(true);
+        expect(budgetCurrencyLocked({ spentAmount: 0, committedAmount: 5 })).toBe(true);
+        expect(budgetCurrencyLocked(null)).toBe(false);
     });
 });
