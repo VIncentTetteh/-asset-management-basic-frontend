@@ -336,7 +336,9 @@ export interface CategoryDto {
     depreciationPolicyId?: string;
     defaultWarrantyPeriodMonths?: number;
     /** Update only: optional fields to clear explicitly. */
-    clearFields?: ("depreciationPolicyId" | "parentCategoryId")[];
+    clearFields?: (
+        "depreciationPolicyId" | "parentCategoryId" | "description" | "assetPrefixCode" | "defaultWarrantyPeriodMonths"
+    )[];
 }
 
 // ─── Role ─────────────────────────────────────────────────────────────────────

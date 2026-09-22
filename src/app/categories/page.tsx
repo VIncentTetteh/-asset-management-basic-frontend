@@ -16,7 +16,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { buildPatchPayload } from "@/lib/patch";
+import { FieldError } from "@/components/ui/field-error";
+import { applyApiFieldErrors } from "@/lib/api-validation";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { buildCategoryUpdate, normaliseCategoryForm } from "@/features/categories/categoryPayload";
 import { allowedTreeParents } from "@/lib/tree";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useDepreciationPolicies } from "@/features/depreciation/hooks";
@@ -36,7 +39,7 @@ export default function CategoriesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CategoryDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<CategoryDto>();
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -90,32 +93,23 @@ export default function CategoriesPage() {
   };
 
   const onSubmit = async (data: CategoryDto) => {
-    const payload: CategoryDto = { ...data };
-    // An emptied select is an explicit clear; a missing field means "unchanged".
-    const clearFields: NonNullable<CategoryDto["clearFields"]> = [];
-    if (editing?.depreciationPolicyId && data.depreciationPolicyId === "") clearFields.push("depreciationPolicyId");
-    if (editing?.parentCategoryId && data.parentCategoryId === "") clearFields.push("parentCategoryId");
-    if (payload.defaultWarrantyPeriodMonths != null && String(payload.defaultWarrantyPeriodMonths) !== "") {
-      payload.defaultWarrantyPeriodMonths = Number(payload.defaultWarrantyPeriodMonths);
-    } else {
-      delete payload.defaultWarrantyPeriodMonths;
-    }
-    (Object.keys(payload) as (keyof CategoryDto)[]).forEach((k) => {
-      if (payload[k] === "") delete (payload as unknown as Record<string, unknown>)[k];
-    });
-
-    if (editing) {
-      const patch = buildPatchPayload<CategoryDto>(editing as unknown as Partial<CategoryDto>, payload);
-      if (clearFields.length > 0) patch.clearFields = clearFields;
-      if (Object.keys(patch).length === 0) {
-        toast("No changes to update");
-        return;
+    try {
+      if (editing) {
+        // Emptied optional fields are sent as explicit clears; untouched ones are omitted.
+        const patch = buildCategoryUpdate(editing, data);
+        if (Object.keys(patch).length === 0) {
+          toast("No changes to update");
+          return;
+        }
+        await save.mutateAsync({ id: editing.id, data: patch as CategoryDto });
+      } else {
+        await save.mutateAsync({ data: normaliseCategoryForm(data) });
       }
-      await save.mutateAsync({ id: editing.id, data: patch as CategoryDto });
-    } else {
-      await save.mutateAsync({ data: payload });
+      setIsModalOpen(false);
+    } catch (error) {
+      // The save hook already toasted the reason; put field errors on their inputs.
+      applyApiFieldErrors(error, setError);
     }
-    setIsModalOpen(false);
   };
 
   const columns = useMemo<ColumnDef<Category, unknown>[]>(
@@ -247,18 +241,39 @@ export default function CategoriesPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="cat-name">Name <span className="text-danger">*</span></Label>
-            <Input id="cat-name" placeholder="Laptops" {...register("name", { required: "Name is required" })} />
-            {errors.name && <p className="text-sm text-danger">{errors.name.message as string}</p>}
+            <Input
+              id="cat-name"
+              placeholder="Laptops"
+              {...limitInputProps(FIELD_LIMITS.category.name)}
+              {...register("name", limitRules<CategoryDto, "name">(FIELD_LIMITS.category.name, "Name"))}
+            />
+            <FieldError error={errors.name} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="cat-prefix">Asset prefix code</Label>
-              <Input id="cat-prefix" className="data-mono" placeholder="LT" {...register("assetPrefixCode")} />
+              <Input
+                id="cat-prefix"
+                className="data-mono"
+                placeholder="LT"
+                {...limitInputProps(FIELD_LIMITS.category.assetPrefixCode)}
+                {...register("assetPrefixCode", limitRules<CategoryDto, "assetPrefixCode">(FIELD_LIMITS.category.assetPrefixCode, "Prefix code"))}
+              />
+              <FieldError error={errors.assetPrefixCode} />
               <p className="text-xs text-muted-fg">New assets without a tag get the next one, e.g. LT-0001.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="cat-warranty">Default warranty (months)</Label>
-              <Input id="cat-warranty" type="number" min="0" {...register("defaultWarrantyPeriodMonths")} />
+              <Input
+                id="cat-warranty"
+                type="number"
+                {...limitInputProps(FIELD_LIMITS.category.defaultWarrantyPeriodMonths)}
+                {...register(
+                  "defaultWarrantyPeriodMonths",
+                  limitRules<CategoryDto, "defaultWarrantyPeriodMonths">(FIELD_LIMITS.category.defaultWarrantyPeriodMonths, "Default warranty"),
+                )}
+              />
+              <FieldError error={errors.defaultWarrantyPeriodMonths} />
               <p className="text-xs text-muted-fg">Sets a new asset&apos;s warranty expiry from its purchase date when none is given.</p>
             </div>
           </div>
@@ -271,6 +286,7 @@ export default function CategoriesPage() {
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </Select>
+            <FieldError error={errors.parentCategoryId} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="cat-policy">Depreciation policy</Label>
@@ -285,6 +301,7 @@ export default function CategoriesPage() {
                 </option>
               ))}
             </Select>
+            <FieldError error={errors.depreciationPolicyId} />
             <p className="text-xs text-muted-fg">
               Assets in this category without their own useful life, method or residual value use this policy.{" "}
               <Link href="/depreciation-policies" className="ea-focus rounded-sm font-semibold text-brand hover:underline">
@@ -295,6 +312,7 @@ export default function CategoriesPage() {
           <div className="space-y-2">
             <Label htmlFor="cat-description">Description</Label>
             <Textarea id="cat-description" {...register("description")} />
+            <FieldError error={errors.description} />
           </div>
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
