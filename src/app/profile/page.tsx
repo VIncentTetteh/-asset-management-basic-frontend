@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSpinner } from "@/components/ui/spinner";
@@ -276,19 +278,21 @@ export default function ProfilePage() {
                                     <Label htmlFor="firstName">First Name <span className="text-danger">*</span></Label>
                                     <Input
                                         id="firstName"
-                                        {...register("firstName", { required: "First name is required" })}
+                                        {...limitInputProps(FIELD_LIMITS.user.firstName)}
+                                        {...register("firstName", limitRules<UserDto, "firstName">(FIELD_LIMITS.user.firstName, "First name"))}
                                         className={errors.firstName ? "border-danger ring-danger" : ""}
                                     />
-                                    {errors.firstName && <p className="text-sm text-danger">{errors.firstName.message as string}</p>}
+                                    <FieldError error={errors.firstName} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="lastName">Last Name <span className="text-danger">*</span></Label>
                                     <Input
                                         id="lastName"
-                                        {...register("lastName", { required: "Last name is required" })}
+                                        {...limitInputProps(FIELD_LIMITS.user.lastName)}
+                                        {...register("lastName", limitRules<UserDto, "lastName">(FIELD_LIMITS.user.lastName, "Last name"))}
                                         className={errors.lastName ? "border-danger ring-danger" : ""}
                                     />
-                                    {errors.lastName && <p className="text-sm text-danger">{errors.lastName.message as string}</p>}
+                                    <FieldError error={errors.lastName} />
                                 </div>
                             </div>
 
@@ -306,16 +310,20 @@ export default function ProfilePage() {
                                         id="phone"
                                         type="tel"
                                         placeholder="+1 (555) 000-0000"
-                                        {...register("phone")}
+                                        {...limitInputProps(FIELD_LIMITS.user.phone)}
+                                        {...register("phone", limitRules<UserDto, "phone">(FIELD_LIMITS.user.phone, "Phone number"))}
                                     />
+                                    <FieldError error={errors.phone} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="jobTitle">Job Title</Label>
                                     <Input
                                         id="jobTitle"
                                         placeholder="e.g. Software Engineer"
-                                        {...register("jobTitle")}
+                                        {...limitInputProps(FIELD_LIMITS.user.jobTitle)}
+                                        {...register("jobTitle", limitRules<UserDto, "jobTitle">(FIELD_LIMITS.user.jobTitle, "Job title"))}
                                     />
+                                    <FieldError error={errors.jobTitle} />
                                 </div>
                             </div>
 

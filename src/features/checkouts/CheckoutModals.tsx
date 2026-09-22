@@ -91,7 +91,7 @@ export function CheckOutModal({
                 <option key={a.id} value={a.id}>{a.name} ({a.assetTag || "no tag"})</option>
               ))}
           </Select>
-          {errors.assetId && <p className="mt-1 text-xs text-danger">{errors.assetId.message}</p>}
+          <FieldError error={errors.assetId} />
         </div>
         {canIssueToEmployees ? (
           <div className="space-y-1.5">
@@ -144,8 +144,9 @@ export function CheckOutModal({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="co-condition">Condition on checkout</Label>
-          <Input id="co-condition" maxLength={CONDITION_MAX_LENGTH} placeholder="e.g. Good, minor scratches…" {...register("conditionOnCheckout")} />
-          {errors.conditionOnCheckout && <p className="mt-1 text-xs text-danger">{errors.conditionOnCheckout.message}</p>}
+          <Input id="co-condition" maxLength={CONDITION_MAX_LENGTH} placeholder="e.g. Good, minor scratches…"
+            {...register("conditionOnCheckout", limitRules<CheckoutFormValues, "conditionOnCheckout">(FIELD_LIMITS.checkout.conditionOnCheckout, "Condition"))} />
+          <FieldError error={errors.conditionOnCheckout} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="co-notes">Notes</Label>
@@ -203,8 +204,9 @@ export function CheckInModal({
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="ci-condition">Condition on return</Label>
-          <Input id="ci-condition" maxLength={CONDITION_MAX_LENGTH} placeholder="e.g. Good, damaged screen…" {...register("conditionOnReturn")} />
-          {errors.conditionOnReturn && <p className="mt-1 text-xs text-danger">{errors.conditionOnReturn.message}</p>}
+          <Input id="ci-condition" maxLength={CONDITION_MAX_LENGTH} placeholder="e.g. Good, damaged screen…"
+            {...register("conditionOnReturn", limitRules<CheckInDto, "conditionOnReturn">(FIELD_LIMITS.checkout.conditionOnReturn, "Condition"))} />
+          <FieldError error={errors.conditionOnReturn} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ci-notes">Notes</Label>

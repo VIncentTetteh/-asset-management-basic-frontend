@@ -8,6 +8,8 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { PageHeader } from "@/components/ui/page-header";
 import { Loader2, Webhook as WebhookIcon, Plus, CheckCircle, XCircle, Trash2, Activity, Clock, AlertCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -301,9 +303,10 @@ export default function WebhooksPage() {
                         <Input
                             id="wh-name"
                             placeholder="e.g. Slack Alerts"
-                            {...register("name", { required: "Name is required" })}
+                            {...limitInputProps(FIELD_LIMITS.webhook.name)}
+                            {...register("name", limitRules<WebhookFormData, "name">(FIELD_LIMITS.webhook.name, "Name"))}
                         />
-                        {errors.name && <p className="text-sm text-danger">{errors.name.message}</p>}
+                        <FieldError error={errors.name} />
                     </div>
 
                     <div className="space-y-2">
@@ -312,9 +315,10 @@ export default function WebhooksPage() {
                             id="wh-url"
                             type="url"
                             placeholder="https://hooks.example.com/webhook"
-                            {...register("url", { required: "URL is required" })}
+                            {...limitInputProps(FIELD_LIMITS.webhook.url)}
+                            {...register("url", limitRules<WebhookFormData, "url">(FIELD_LIMITS.webhook.url, "URL"))}
                         />
-                        {errors.url && <p className="text-sm text-danger">{errors.url.message}</p>}
+                        <FieldError error={errors.url} />
                     </div>
 
                     <div className="space-y-2">
@@ -325,8 +329,10 @@ export default function WebhooksPage() {
                             id="wh-secret"
                             type="password"
                             placeholder="my-webhook-secret"
-                            {...register("secret")}
+                            {...limitInputProps(FIELD_LIMITS.webhook.secret)}
+                            {...register("secret", limitRules<WebhookFormData, "secret">(FIELD_LIMITS.webhook.secret, "Secret"))}
                         />
+                        <FieldError error={errors.secret} />
                     </div>
 
                     <div className="space-y-2">

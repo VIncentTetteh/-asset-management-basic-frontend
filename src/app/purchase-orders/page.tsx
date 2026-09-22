@@ -481,12 +481,12 @@ function PurchaseOrdersContent() {
                 <CurrencyOptions current={editing?.currency} />
               </Select>
               {budgetCurrencyMismatch ? (
-                <p className="text-sm text-danger">
+                <p role="alert" className="text-sm text-danger">
                   The budget is in {selectedBudget?.currency}; the order must use the same currency.
                 </p>
-              ) : errors.currency ? (
-                <p className="text-sm text-danger">{errors.currency.message as string}</p>
-              ) : null}
+              ) : (
+                <FieldError error={errors.currency} />
+              )}
             </div>
           </div>
 

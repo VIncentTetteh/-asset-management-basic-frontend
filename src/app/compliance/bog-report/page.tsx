@@ -19,6 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { AssetTag } from "@/components/ui/asset-tag";
 import DocumentAttachments from "@/components/DocumentAttachments";
 import { useBogReport, useBogControlsList, useUpsertBogControl, useUpdateBogControlStatus } from "@/features/compliance/bogReportHooks";
@@ -327,13 +329,14 @@ export default function BogReportPage() {
         <form onSubmit={handleSubmit(onUpsert)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="b-ref">Directive reference <span className="text-danger">*</span></Label>
-            <Input id="b-ref" className="data-mono" placeholder="BOG-ICT-2.1.3" {...register("directiveRef", { required: "Directive reference is required" })} />
-            {errors.directiveRef && <p className="text-sm text-danger">{errors.directiveRef.message}</p>}
+            <Input id="b-ref" className="data-mono" placeholder="BOG-ICT-2.1.3" {...limitInputProps(FIELD_LIMITS.bogControl.directiveRef)}
+              {...register("directiveRef", limitRules<BOGControlDto, "directiveRef">(FIELD_LIMITS.bogControl.directiveRef, "Directive reference"))} />
+            <FieldError error={errors.directiveRef} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="b-req">Requirement <span className="text-danger">*</span></Label>
-            <Textarea id="b-req" placeholder="Describe the BoG requirement…" {...register("requirement", { required: "Requirement is required" })} />
-            {errors.requirement && <p className="text-sm text-danger">{errors.requirement.message}</p>}
+            <Textarea id="b-req" placeholder="Describe the BoG requirement…" {...register("requirement", limitRules<BOGControlDto, "requirement">(FIELD_LIMITS.bogControl.requirement, "Requirement"))} />
+            <FieldError error={errors.requirement} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="b-status">Status</Label>
