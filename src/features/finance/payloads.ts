@@ -135,7 +135,11 @@ export function buildPurchaseOrderPayload(form: PurchaseOrderForm): PurchaseOrde
 
 export type LeaseForm = Raw<LeaseRecordDto>;
 
-/** Body for POST/PUT /leases. The lessor is a supplier id; its name is display-only. */
+/**
+ * Body for POST/PUT /leases. The lessor is a supplier id; its name is display-only.
+ * PUT replaces the asset, notes and department (a blank note or department is
+ * sent as null and clears it); status is never sent (terminate owns it).
+ */
 export function buildLeasePayload(form: LeaseForm): Partial<LeaseRecordDto> {
     return {
         assetId: optionalString(form.assetId) ?? undefined,
@@ -146,8 +150,14 @@ export function buildLeasePayload(form: LeaseForm): Partial<LeaseRecordDto> {
         currency: optionalString(form.currency) ?? undefined,
         autoRenew: form.autoRenew === true || form.autoRenew === "true",
         noticePeriodDays: optionalNumber(form.noticePeriodDays) ?? undefined,
-        notes: optionalString(form.notes) ?? undefined,
+        notes: optionalString(form.notes),
+        departmentId: optionalString(form.departmentId),
     };
+}
+
+/** The notice period to pre-fill: a stored 0 stays 0 (it used to become 30). */
+export function leaseNoticePrefill(noticePeriodDays: number | null | undefined): number {
+    return noticePeriodDays ?? 30;
 }
 
 // ── Software licenses ─────────────────────────────────────────────────────────

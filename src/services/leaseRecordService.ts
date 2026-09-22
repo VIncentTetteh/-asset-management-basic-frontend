@@ -18,9 +18,11 @@ export interface LeaseRecordDto {
   currency?: string;
   autoRenew?: boolean;
   noticePeriodDays?: number;
-  notes?: string;
+  /** Free-text notes; a termination reason is appended here. null clears on PUT. */
+  notes?: string | null;
   organisationId?: string;
-  departmentId?: string;
+  /** null clears on PUT. */
+  departmentId?: string | null;
   status?: LeaseStatus;
   createdAt?: string;
 }

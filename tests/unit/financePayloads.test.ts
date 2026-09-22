@@ -10,6 +10,7 @@ import {
     buildLicensePayload,
     buildPurchaseOrderPayload,
     buildSupplierPayload,
+    leaseNoticePrefill,
     buildExpensePayload,
     expenseFundsError,
     EXPENSE_FILTER_STATUSES,
@@ -131,9 +132,22 @@ describe("lease payload", () => {
             currency: "GHS",
             autoRenew: true,
             noticePeriodDays: 60,
-            notes: undefined,
+            notes: null,
+            departmentId: null,
         });
         expect(payload).not.toHaveProperty("lessorName");
+        expect(payload).not.toHaveProperty("status");
+    });
+
+    it("wires the department and keeps notes (with any termination reason) unless edited", () => {
+        const payload = buildLeasePayload({ departmentId: "d1", notes: "Termination reason: moved" });
+        expect(payload.departmentId).toBe("d1");
+        expect(payload.notes).toBe("Termination reason: moved");
+    });
+
+    it("pre-fills a stored notice period of 0 as 0, not 30", () => {
+        expect(leaseNoticePrefill(0)).toBe(0);
+        expect(leaseNoticePrefill(undefined)).toBe(30);
     });
 });
 

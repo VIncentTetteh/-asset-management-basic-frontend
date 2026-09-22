@@ -9,7 +9,10 @@ import { leaseRecordService, type LeaseRecordDto, type LeaseStatus } from "@/ser
 import { assetService } from "@/services/assetService";
 import { supplierService } from "@/services/supplierService";
 import { reportApiError } from "@/lib/api-validation";
-import { buildLeasePayload, type LeaseForm } from "@/features/finance/payloads";
+import { buildLeasePayload, leaseNoticePrefill, type LeaseForm } from "@/features/finance/payloads";
+import { departmentService } from "@/services/departmentService";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { qk } from "@/lib/queryClient";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -30,6 +33,8 @@ import { formatLocalDate } from "@/lib/local-date";
 
 
 const LEASE_STATUSES: LeaseStatus[] = ["ACTIVE", "PENDING_RENEWAL", "EXPIRED", "TERMINATED"];
+
+const L = FIELD_LIMITS.lease;
 
 export default function LeasesPage() {
   const { format, baseCurrency, sum } = useCurrency();
@@ -54,6 +59,12 @@ export default function LeasesPage() {
   const { data: suppliers = [] } = useQuery({
     queryKey: qk.module("suppliers").list(),
     queryFn: () => supplierService.getAll(),
+    staleTime: 300_000,
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: qk.module("departments").list(),
+    queryFn: () => departmentService.getAll(),
     staleTime: 300_000,
   });
 
@@ -102,10 +113,11 @@ export default function LeasesPage() {
             lessorId: editing.lessorId || "",
             startDate: editing.startDate?.split("T")[0] || "",
             endDate: editing.endDate?.split("T")[0] || "",
-            monthlyPayment: editing.monthlyPayment || 0,
+            monthlyPayment: editing.monthlyPayment ?? "",
             currency: editing.currency || baseCurrency,
             autoRenew: editing.autoRenew ?? false,
-            noticePeriodDays: editing.noticePeriodDays || 30,
+            noticePeriodDays: leaseNoticePrefill(editing.noticePeriodDays),
+            departmentId: editing.departmentId || "",
             notes: editing.notes || "",
           }
         : {
@@ -113,14 +125,20 @@ export default function LeasesPage() {
             lessorId: "",
             startDate: "",
             endDate: "",
-            monthlyPayment: 0,
+            monthlyPayment: "",
             currency: baseCurrency,
             autoRenew: false,
             noticePeriodDays: 30,
+            departmentId: "",
             notes: "",
           },
     );
   }, [isModalOpen, editing, reset, baseCurrency]);
+
+  const deptName = useMemo(() => {
+    const map = new Map(departments.map((d) => [d.id, d.name]));
+    return (id?: string | null) => (id ? map.get(id) ?? null : null);
+  }, [departments]);
 
   const assetLookup = useMemo(() => {
     const map = new Map(assets.map((a) => [a.id, a]));
@@ -162,9 +180,13 @@ export default function LeasesPage() {
 
   const handleTerminate = async () => {
     if (!terminating?.id) return;
-    await terminateLease.mutateAsync({ id: terminating.id, reason: terminateReason || undefined });
-    setTerminating(null);
-    setTerminateReason("");
+    try {
+      await terminateLease.mutateAsync({ id: terminating.id, reason: terminateReason.trim() || undefined });
+      setTerminating(null);
+      setTerminateReason("");
+    } catch {
+      // The mutation toasts the server's reason (e.g. "Lease is already terminated.").
+    }
   };
 
   const columns = useMemo<ColumnDef<LeaseRecordDto, unknown>[]>(
@@ -189,18 +211,34 @@ export default function LeasesPage() {
       {
         accessorKey: "lessorName",
         header: "Lessor",
-        cell: ({ row }) => <span className="text-muted-fg">{row.original.lessorName || "—"}</span>,
+        cell: ({ row }) => (
+          <div className="min-w-0 max-w-48">
+            <p className="truncate text-muted-fg">{row.original.lessorName || "—"}</p>
+            {deptName(row.original.departmentId) ? (
+              <p className="truncate text-xs text-faint-fg">{deptName(row.original.departmentId)}</p>
+            ) : null}
+          </div>
+        ),
       },
       {
         id: "period",
         header: "Period",
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="text-xs text-muted-fg">
-            {formatLocalDate(row.original.startDate)}
-            {" – "}
-            {formatLocalDate(row.original.endDate)}
-          </span>
+          <div className="text-xs text-muted-fg">
+            <p>
+              {formatLocalDate(row.original.startDate)}
+              {" – "}
+              {formatLocalDate(row.original.endDate)}
+            </p>
+            <p className="text-faint-fg">
+              {row.original.noticePeriodDays ?? 30}-day notice
+              {row.original.autoRenew ? " · auto-renews" : ""}
+            </p>
+            {row.original.notes ? (
+              <p className="max-w-56 truncate" title={row.original.notes}>{row.original.notes}</p>
+            ) : null}
+          </div>
         ),
       },
       {
@@ -272,7 +310,7 @@ export default function LeasesPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [assetLookup, format, baseCurrency],
+    [assetLookup, deptName, format, baseCurrency],
   );
 
   // Each active lease is converted into the display currency; leases without a rate are excluded and flagged.
@@ -360,13 +398,13 @@ export default function LeasesPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="ls-asset">Asset <span className="text-danger">*</span></Label>
-            <Select id="ls-asset" {...register("assetId", { required: "Asset is required" })}>
+            <Select id="ls-asset" {...register("assetId", limitRules<LeaseForm, "assetId">(L.assetId, "Asset"))}>
               <option value="">Select asset</option>
               {assets.map((a) => (
                 <option key={a.id} value={a.id}>{a.name} ({a.assetTag || "no tag"})</option>
               ))}
             </Select>
-            {errors.assetId && <p className="text-sm text-danger">{errors.assetId.message as string}</p>}
+            <FieldError error={errors.assetId} />
           </div>
 
           <div className="space-y-2">
@@ -380,14 +418,14 @@ export default function LeasesPage() {
             {suppliers.length === 0 ? (
               <p className="text-xs text-muted-fg">Add the leasing company under Suppliers first.</p>
             ) : null}
-            {errors.lessorId && <p className="text-sm text-danger">{errors.lessorId.message as string}</p>}
+            <FieldError error={errors.lessorId} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ls-start">Start date <span className="text-danger">*</span></Label>
-              <Input id="ls-start" type="date" {...register("startDate", { required: "Start date is required" })} />
-              {errors.startDate && <p className="text-sm text-danger">{errors.startDate.message as string}</p>}
+              <Input id="ls-start" type="date" {...register("startDate", limitRules<LeaseForm, "startDate">(L.startDate, "Start date"))} />
+              <FieldError error={errors.startDate} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="ls-end">End date <span className="text-danger">*</span></Label>
@@ -400,27 +438,32 @@ export default function LeasesPage() {
                     !end || !form.startDate || String(end) >= String(form.startDate) || "Must be on or after the start date",
                 })}
               />
-              {errors.endDate && <p className="text-sm text-danger">{errors.endDate.message as string}</p>}
+              <FieldError error={errors.endDate} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="ls-payment">Monthly payment</Label>
-              <Input id="ls-payment" type="number" step="0.01" min="0" {...register("monthlyPayment")} />
+              <Label htmlFor="ls-payment">Monthly payment <span className="text-danger">*</span></Label>
+              <Input id="ls-payment" type="number" {...limitInputProps(L.monthlyPayment)}
+                {...register("monthlyPayment", limitRules<LeaseForm, "monthlyPayment">(L.monthlyPayment, "Monthly payment"))} />
+              <FieldError error={errors.monthlyPayment} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="ls-currency">Currency</Label>
               <Select id="ls-currency" {...register("currency")}>
                 <CurrencyOptions current={editing?.currency} />
               </Select>
+              <FieldError error={errors.currency} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ls-notice">Notice period (days)</Label>
-              <Input id="ls-notice" type="number" min="0" {...register("noticePeriodDays")} />
+              <Input id="ls-notice" type="number" {...limitInputProps(L.noticePeriodDays)}
+                {...register("noticePeriodDays", limitRules<LeaseForm, "noticePeriodDays">(L.noticePeriodDays, "Notice period"))} />
+              <FieldError error={errors.noticePeriodDays} />
             </div>
             <div className="flex items-end gap-2 pb-2">
               <input
@@ -434,8 +477,21 @@ export default function LeasesPage() {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="ls-dept">Department</Label>
+            <Select id="ls-dept" {...register("departmentId")}>
+              <option value="">None</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </Select>
+            <FieldError error={errors.departmentId} />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="ls-notes">Notes</Label>
             <Textarea id="ls-notes" placeholder="Payment terms, insurance, conditions…" {...register("notes")} />
+            <p className="text-xs text-faint-fg">A termination reason is recorded here.</p>
+            <FieldError error={errors.notes} />
           </div>
 
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
