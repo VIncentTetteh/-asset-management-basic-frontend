@@ -19,10 +19,10 @@ export const discoveryService = {
         return response.data;
     },
 
-    /** GET /discovery/devices?page=0&size=20 */
-    getDevices: async (params?: { page?: number; size?: number }): Promise<PaginatedResponse<DiscoveredDevice>> => {
+    /** GET /discovery/devices?page=0&size=20[&status=ONLINE] — the API filters by status. */
+    getDevices: async (params?: { page?: number; size?: number; status?: string }): Promise<PaginatedResponse<DiscoveredDevice>> => {
         const response = await api.get<PaginatedResponse<DiscoveredDevice>>("/discovery/devices", {
-            params: withOrgParams({ page: params?.page ?? 0, size: params?.size ?? 20 }),
+            params: withOrgParams({ page: params?.page ?? 0, size: params?.size ?? 20, status: params?.status || undefined }),
         });
         return normalizePage<DiscoveredDevice>(response.data) as PaginatedResponse<DiscoveredDevice>;
     },
@@ -35,11 +35,14 @@ export const discoveryService = {
         return response.data;
     },
 
-    /** POST /discovery/devices/{id}/promote */
-    promote: async (id: string): Promise<{ assetId: string; assetName: string; deviceId: string }> => {
+    /** POST /discovery/devices/{id}/promote — optional name, category and location for the new asset. */
+    promote: async (
+        id: string,
+        body: { name?: string; categoryId?: string; locationId?: string } = {},
+    ): Promise<{ assetId: string; assetName: string; deviceId: string }> => {
         const response = await api.post<{ assetId: string; assetName: string; deviceId: string }>(
             `/discovery/devices/${id}/promote`,
-            {},
+            body,
             { params: withOrgParams() }
         );
         return response.data;

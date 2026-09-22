@@ -23,7 +23,12 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { cn } from "@/lib/utils";
 import { reportApiError } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
-import { buildScanPayload, canPromoteDevice, deviceTypeKey, promotedAssetHref, type ScanForm } from "@/features/discovery/lib";
+import {
+    buildScanPayload, canPromoteDevice, DEVICE_STATUS_FILTERS, deviceStatusCount, deviceTypeKey, promotedAssetHref,
+    validatePortsInput, MAX_SCAN_PORTS, type DeviceStatusFilter, type ScanForm,
+} from "@/features/discovery/lib";
+import { PromoteDeviceModal } from "@/features/discovery/PromoteDeviceModal";
+import { FieldError } from "@/components/ui/field-error";
 
 // ── Port → Service map ────────────────────────────────────────────────────────
 
@@ -118,25 +123,28 @@ export default function DiscoveryPage() {
     const [isScanModalOpen, setIsScanModalOpen] = useState(false);
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
-    const [promotingId, setPromotingId] = useState<string | null>(null);
+    const [promoteTarget, setPromoteTarget] = useState<DiscoveredDevice | null>(null);
+    const [isPromoting, setIsPromoting] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [statusFilter, setStatusFilter] = useState<"ALL" | "ONLINE" | "OFFLINE" | "PROMOTED">("ALL");
+    const [statusFilter, setStatusFilter] = useState<DeviceStatusFilter>("ALL");
     const [lastScanned, setLastScanned] = useState<Date | null>(null);
 
     const { hasPermission } = usePermissions();
     // Mirrors the API: scanning, promoting and removing need MANAGE_NETWORK_DISCOVERY.
     const canManage = hasPermission("MANAGE_NETWORK_DISCOVERY");
-    const { register, handleSubmit, formState: { isSubmitting } } = useForm<ScanForm>({
+    const { register, handleSubmit, formState: { isSubmitting, errors: scanErrors } } = useForm<ScanForm>({
         defaultValues: { cidrRange: "192.168.1.0/24", portScan: true, timeoutMs: 1000 },
     });
 
     const { confirm, ConfirmDialog } = useConfirm();
+    // The status filter is applied by the API, so the list and the chip counts
+    // (from /summary) cover every page, not just the one loaded.
     const fetchDevices = useCallback(async (p = 0) => {
         try {
             setIsLoading(true);
             const [devicesResult, summaryResult] = await Promise.allSettled([
-                discoveryService.getDevices({ page: p, size: 50 }),
+                discoveryService.getDevices({ page: p, size: 50, status: statusFilter === "ALL" ? undefined : statusFilter }),
                 discoveryService.getSummary(),
             ]);
             if (devicesResult.status === "fulfilled") {
@@ -151,9 +159,14 @@ export default function DiscoveryPage() {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [statusFilter]);
 
     useEffect(() => { fetchDevices(page); }, [page, fetchDevices]);
+
+    const changeStatusFilter = (status: DeviceStatusFilter) => {
+        setStatusFilter(status);
+        setPage(0);
+    };
 
     const onScan = async (data: ScanForm) => {
         const payload = buildScanPayload(data);
@@ -169,10 +182,11 @@ export default function DiscoveryPage() {
         }
     };
 
-    const handlePromote = async (id: string) => {
-        setPromotingId(id);
+    const handlePromote = async (device: DiscoveredDevice, body: { name?: string; categoryId?: string; locationId?: string }) => {
+        setIsPromoting(true);
         try {
-            const res = await discoveryService.promote(id);
+            const res = await discoveryService.promote(device.id, body);
+            setPromoteTarget(null);
             toast.success(`Promoted as asset: ${res.assetName}`);
             fetchDevices(page);
             if (res.assetId && await confirm({ message: `Open "${res.assetName}" in the asset registry?`, variant: "info" })) {
@@ -182,7 +196,7 @@ export default function DiscoveryPage() {
             // e.g. the plan's asset limit is reached.
             reportApiError(err, { fallback: "Failed to promote device to asset" });
         } finally {
-            setPromotingId(null);
+            setIsPromoting(false);
         }
     };
 
@@ -200,16 +214,7 @@ export default function DiscoveryPage() {
         }
     };
 
-    const filteredDevices = statusFilter === "ALL"
-        ? devices
-        : devices.filter(d => d.status === statusFilter);
-
-    const statusCounts = {
-        ALL: devices.length,
-        ONLINE: devices.filter(d => d.status === "ONLINE").length,
-        OFFLINE: devices.filter(d => d.status === "OFFLINE").length,
-        PROMOTED: devices.filter(d => d.status === "PROMOTED").length,
-    };
+    const filteredDevices = devices;
 
     return (
         <div className="space-y-6">
@@ -257,18 +262,19 @@ export default function DiscoveryPage() {
                 <CardHeader className="border-b border-edge-subtle bg-surface-muted/50 pb-3">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         <CardTitle className="text-base font-semibold text-foreground">
-                            {filteredDevices.length} device{filteredDevices.length !== 1 ? "s" : ""}
+                            {deviceStatusCount(summary, statusFilter) ?? filteredDevices.length} device
+                            {(deviceStatusCount(summary, statusFilter) ?? filteredDevices.length) !== 1 ? "s" : ""}
                             {statusFilter !== "ALL" && ` · ${statusFilter.toLowerCase()}`}
                         </CardTitle>
 
                         <div className="flex gap-1 rounded-control border border-edge-subtle bg-surface p-1">
-                            {(["ALL", "ONLINE", "OFFLINE", "PROMOTED"] as const).map(s => (
-                                <button key={s} onClick={() => setStatusFilter(s)}
+                            {DEVICE_STATUS_FILTERS.map(s => (
+                                <button key={s} type="button" onClick={() => changeStatusFilter(s)}
                                     className={cn(
                                         "rounded-control px-3 py-1 text-xs font-semibold transition-colors",
                                         statusFilter === s ? "bg-brand text-white" : "text-muted-fg hover:text-foreground",
                                     )}>
-                                    {s} <span className="ml-1 opacity-60">({statusCounts[s]})</span>
+                                    {s} <span className="ml-1 opacity-60">({deviceStatusCount(summary, s) ?? "—"})</span>
                                 </button>
                             ))}
                         </div>
@@ -284,14 +290,14 @@ export default function DiscoveryPage() {
                         <div className="flex flex-col items-center justify-center p-12 text-center">
                             <ScanLine className="mb-4 h-12 w-12 text-faint-fg" />
                             <h3 className="text-lg font-semibold text-foreground">
-                                {devices.length === 0 ? "No devices discovered yet" : `No ${statusFilter.toLowerCase()} devices`}
+                                {statusFilter === "ALL" ? "No devices discovered yet" : `No ${statusFilter.toLowerCase()} devices`}
                             </h3>
                             <p className="mt-1 max-w-sm text-muted-fg">
-                                {devices.length === 0
+                                {statusFilter === "ALL"
                                     ? "Run a network scan to discover IT assets on your network."
                                     : `Try selecting a different status filter.`}
                             </p>
-                            {canManage && devices.length === 0 && (
+                            {canManage && statusFilter === "ALL" && (
                                 <Button onClick={() => setIsScanModalOpen(true)} className="mt-4 gap-2">
                                     <ScanLine className="h-4 w-4" /> Start Scan
                                 </Button>
@@ -319,7 +325,6 @@ export default function DiscoveryPage() {
 
                                             <div className="hidden w-32 min-w-0 shrink-0 sm:block">
                                                 <p className="text-xs font-semibold text-muted-fg">{devMeta.label}</p>
-                                                <p className="data-mono text-[10px] text-faint-fg">{device.macAddress || "—"}</p>
                                             </div>
 
                                             <div className="hidden min-w-0 flex-1 md:block">
@@ -375,8 +380,7 @@ export default function DiscoveryPage() {
                                                     </Link>
                                                 )}
                                                 {canManage && canPromoteDevice(device) && (
-                                                    <Button variant="outline" size="sm" onClick={() => handlePromote(device.id)}
-                                                        isLoading={promotingId === device.id}
+                                                    <Button variant="outline" size="sm" onClick={() => setPromoteTarget(device)}
                                                         className="h-7 border-brand/30 px-2 text-xs text-brand hover:bg-brand-soft">
                                                         <ArrowUpRight className="mr-1 h-3 w-3" /> Promote
                                                     </Button>
@@ -404,10 +408,6 @@ export default function DiscoveryPage() {
                                                             <span className="data-mono font-semibold text-foreground">{device.ipAddress}</span>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span className="text-faint-fg">MAC Address</span>
-                                                            <span className="data-mono text-muted-fg">{device.macAddress || "Unknown"}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
                                                             <span className="text-faint-fg">Hostname</span>
                                                             <span className="font-medium text-muted-fg">{device.hostname || "Not resolved"}</span>
                                                         </div>
@@ -422,10 +422,6 @@ export default function DiscoveryPage() {
                                                         <div className="flex justify-between">
                                                             <span className="text-faint-fg">Device Type</span>
                                                             <span className="font-medium text-muted-fg">{devMeta.label}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-faint-fg">OS / Platform</span>
-                                                            <span className="font-medium text-muted-fg">{device.osHint || "Unknown"}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -522,8 +518,14 @@ export default function DiscoveryPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="portsInput">Ports (comma-separated)</Label>
-                            <Input id="portsInput" placeholder="22,80,443,3389,3306" {...register("portsInput")} />
-                            <p className="text-xs text-faint-fg">Leave blank to scan common ports.</p>
+                            <Input
+                                id="portsInput"
+                                placeholder="22,80,443,3389,3306"
+                                aria-invalid={scanErrors.portsInput ? true : undefined}
+                                {...register("portsInput", { validate: validatePortsInput })}
+                            />
+                            <FieldError error={scanErrors.portsInput} />
+                            <p className="text-xs text-faint-fg">1-65535, up to {MAX_SCAN_PORTS} ports. Leave blank to scan common ports.</p>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="timeoutMs">Timeout per host (ms)</Label>
@@ -547,6 +549,12 @@ export default function DiscoveryPage() {
                     </div>
                 </form>
             </Modal>
+            <PromoteDeviceModal
+                device={promoteTarget}
+                onClose={() => setPromoteTarget(null)}
+                onSubmit={handlePromote}
+                isSubmitting={isPromoting}
+            />
             {ConfirmDialog}
         </div>
     );

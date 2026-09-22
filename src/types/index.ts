@@ -1982,6 +1982,8 @@ export interface DiscoverySummary {
     online: number;
     offline: number;
     promoted: number;
+    /** Devices never classified; the four buckets add up to total. */
+    unknown?: number;
 }
 
 // ─── Cloud Assets ─────────────────────────────────────────────────────────────
