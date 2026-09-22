@@ -1,10 +1,13 @@
 "use client";
 
 import { safeInternalPath } from "@/lib/safe-url";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notificationService, resolveNotifId } from "@/services/notificationService";
-import { Notification, NotificationPreferences, NotificationSummary, NOTIFICATION_TYPES } from "@/types";
+import { notificationQueryKeys } from "@/components/notifications/NotificationBell";
+import { reportApiError } from "@/lib/api-validation";
+import { NotificationPreferences, NOTIFICATION_TYPES } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Bell, CheckCircle2, Trash2, Settings } from "lucide-react";
@@ -43,115 +46,86 @@ function TypeBadge({ type }: { type: string }) {
     );
 }
 
+type NotificationFilters = { type?: string; status?: "unread" | "read" | "all"; limit?: number };
+
+const DEFAULT_FILTERS: NotificationFilters = { status: "all", limit: 20 };
+
 export default function NotificationsPage() {
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
-    const [summary, setSummary] = useState<NotificationSummary | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [savingPrefs, setSavingPrefs] = useState(false);
-    const [markingAllRead, setMarkingAllRead] = useState(false);
-    const [clearingAll, setClearingAll] = useState(false);
-    const [markingReadId, setMarkingReadId] = useState<string | null>(null);
-    const [deletingNotifId, setDeletingNotifId] = useState<string | null>(null);
-    const [filters, setFilters] = useState<{ type?: string; status?: "unread" | "read" | "all"; limit?: number }>({
-        status: "all",
-        limit: 20,
+    const queryClient = useQueryClient();
+    // The bell polls the summary every minute. Before this page shared the same
+    // React Query cache, marking something read here left the badge stale until
+    // that poll came round; every mutation now invalidates the whole namespace.
+    const invalidate = () => queryClient.invalidateQueries({ queryKey: notificationQueryKeys.all });
+
+    const [filters, setFilters] = useState<NotificationFilters>(DEFAULT_FILTERS);
+    const [applied, setApplied] = useState<NotificationFilters>(DEFAULT_FILTERS);
+    // Unsaved checkbox changes, layered over what the server last returned, so
+    // the draft needs no effect to follow the query.
+    const [emailEdits, setEmailEdits] = useState<Record<string, boolean>>({});
+
+    const listQuery = useQuery({
+        queryKey: notificationQueryKeys.list(applied),
+        queryFn: () => notificationService.getNotifications(applied),
+    });
+    const summaryQuery = useQuery({
+        queryKey: notificationQueryKeys.summary,
+        queryFn: notificationService.getSummary,
+    });
+    const prefsQuery = useQuery({
+        queryKey: notificationQueryKeys.preferences,
+        queryFn: notificationService.getPreferences,
     });
 
-    const fetchData = useCallback(async (nextFilters: { type?: string; status?: "unread" | "read" | "all"; limit?: number }) => {
-        try {
-            const [notifsResult, prefsResult, summaryResult] = await Promise.allSettled([
-                notificationService.getNotifications(nextFilters),
-                notificationService.getPreferences(),
-                notificationService.getSummary(),
-            ]);
-            if (notifsResult.status === "fulfilled") {
-                setNotifications(notifsResult.value.notifications ?? []);
-            } else {
-                toast.error("Failed to load notifications");
-            }
-            if (prefsResult.status === "fulfilled") setPreferences(prefsResult.value);
-            if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    const notifications = listQuery.data?.notifications ?? [];
+    const summary = summaryQuery.data ?? null;
+    const loading = listQuery.isLoading || prefsQuery.isLoading;
 
     useEffect(() => {
-        void fetchData({ status: "all", limit: 20 });
-    }, [fetchData]);
+        if (listQuery.isError) toast.error("Failed to load notifications");
+    }, [listQuery.isError]);
 
-    const markAsRead = async (id: string) => {
-        setMarkingReadId(id);
-        try {
-            await notificationService.markAsRead(id);
-            fetchData(filters);
-        } catch {
-            toast.error("Action failed");
-        } finally {
-            setMarkingReadId(null);
-        }
-    };
+    const preferences: NotificationPreferences | null = prefsQuery.data ?? null;
+    const emailEnabled = (type: string) => emailEdits[type] ?? Boolean(preferences?.emailNotifications?.[type]);
+    const updateEmailPreference = (key: string, value: boolean) =>
+        setEmailEdits((prev) => ({ ...prev, [key]: value }));
 
-    const markAllRead = async () => {
-        setMarkingAllRead(true);
-        try {
-            await notificationService.markAllAsRead();
+    const markOne = useMutation({
+        mutationFn: (id: string) => notificationService.markAsRead(id),
+        onSuccess: invalidate,
+        onError: (err) => reportApiError(err, { fallback: "Action failed" }),
+    });
+    const markAll = useMutation({
+        mutationFn: notificationService.markAllAsRead,
+        onSuccess: () => {
             toast.success("All caught up!");
-            fetchData(filters);
-        } catch {
-            toast.error("Action failed");
-        } finally {
-            setMarkingAllRead(false);
-        }
-    };
-
-    const deleteNotif = async (id: string) => {
-        setDeletingNotifId(id);
-        try {
-            await notificationService.deleteNotification(id);
-            fetchData(filters);
-        } catch {
-            toast.error("Delete failed");
-        } finally {
-            setDeletingNotifId(null);
-        }
-    };
-
-    const deleteAll = async () => {
-        setClearingAll(true);
-        try {
-            await notificationService.deleteAllNotifications();
+            invalidate();
+        },
+        onError: (err) => reportApiError(err, { fallback: "Action failed" }),
+    });
+    const deleteOne = useMutation({
+        mutationFn: (id: string) => notificationService.deleteNotification(id),
+        onSuccess: invalidate,
+        onError: (err) => reportApiError(err, { fallback: "Delete failed" }),
+    });
+    const deleteAll = useMutation({
+        mutationFn: notificationService.deleteAllNotifications,
+        onSuccess: () => {
             toast.success("All notifications deleted");
-            fetchData(filters);
-        } catch {
-            toast.error("Delete all failed");
-        } finally {
-            setClearingAll(false);
-        }
-    };
-
-    const updateEmailPreference = (key: string, value: boolean) => {
-        setPreferences((prev) => {
-            if (!prev) return prev;
-            return { ...prev, emailNotifications: { ...prev.emailNotifications, [key]: value } };
-        });
-    };
-
-    const savePreferences = async () => {
-        if (!preferences) return;
-        try {
-            setSavingPrefs(true);
-            await notificationService.updatePreferences(preferences);
+            invalidate();
+        },
+        onError: (err) => reportApiError(err, { fallback: "Delete all failed" }),
+    });
+    const savePrefs = useMutation({
+        mutationFn: (prefs: NotificationPreferences) => notificationService.updatePreferences(prefs),
+        onSuccess: () => {
             toast.success("Preferences updated");
-        } catch {
-            toast.error("Failed to update preferences");
-        } finally {
-            setSavingPrefs(false);
-        }
-    };
+            setEmailEdits({});
+            void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.preferences });
+        },
+        onError: (err) => reportApiError(err, { fallback: "Failed to update preferences" }),
+    });
 
-    const applyFilters = () => fetchData(filters);
+    const applyFilters = () => setApplied(filters);
 
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="h-8 w-8 animate-spin text-faint-fg" /></div>;
 
@@ -161,8 +135,8 @@ export default function NotificationsPage() {
                 title="Notifications"
                 subtitle="Operational alerts, approvals, and compliance updates across your workspace."
                 actions={<>
-                    <Button variant="outline" onClick={markAllRead} isLoading={markingAllRead}><CheckCircle2 className="mr-2 h-4 w-4" /> Mark all read</Button>
-                    <Button variant="secondary" onClick={deleteAll} isLoading={clearingAll}><Trash2 className="mr-2 h-4 w-4" /> Clear all</Button>
+                    <Button variant="outline" onClick={() => markAll.mutate()} isLoading={markAll.isPending}><CheckCircle2 className="mr-2 h-4 w-4" /> Mark all read</Button>
+                    <Button variant="secondary" onClick={() => deleteAll.mutate()} isLoading={deleteAll.isPending}><Trash2 className="mr-2 h-4 w-4" /> Clear all</Button>
                 </>}
             />
 
@@ -263,7 +237,7 @@ export default function NotificationsPage() {
                                         )}
                                         <div className="mt-2 flex flex-wrap gap-2">
                                             {!n.read && (
-                                                <Button variant="ghost" size="sm" onClick={() => markAsRead(nid)} isLoading={markingReadId === nid}>
+                                                <Button variant="ghost" size="sm" onClick={() => markOne.mutate(nid)} isLoading={markOne.isPending && markOne.variables === nid}>
                                                     <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Mark read
                                                 </Button>
                                             )}
@@ -274,7 +248,7 @@ export default function NotificationsPage() {
                                             )}
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="icon" className="shrink-0" onClick={() => deleteNotif(nid)} isLoading={deletingNotifId === nid}>
+                                    <Button variant="ghost" size="icon" className="shrink-0" onClick={() => deleteOne.mutate(nid)} isLoading={deleteOne.isPending && deleteOne.variables === nid}>
                                         <Trash2 className="h-4 w-4 text-danger" />
                                     </Button>
                                 </CardContent>
@@ -309,14 +283,25 @@ export default function NotificationsPage() {
                                         </span>
                                         <input
                                             type="checkbox"
-                                            checked={Boolean(preferences?.emailNotifications?.[t])}
+                                            checked={emailEnabled(t)}
                                             onChange={(e) => updateEmailPreference(t, e.target.checked)}
                                             className="accent-[var(--primary)]"
                                         />
                                     </div>
                                 ))}
                             </div>
-                            <Button onClick={savePreferences} disabled={savingPrefs} isLoading={savingPrefs} className="w-full">
+                            <Button
+                                onClick={() =>
+                                    preferences &&
+                                    savePrefs.mutate({
+                                        ...preferences,
+                                        emailNotifications: { ...preferences.emailNotifications, ...emailEdits },
+                                    })
+                                }
+                                disabled={!preferences || savePrefs.isPending}
+                                isLoading={savePrefs.isPending}
+                                className="w-full"
+                            >
                                 Save Preferences
                             </Button>
                         </CardContent>

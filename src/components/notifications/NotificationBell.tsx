@@ -20,6 +20,9 @@ export const notificationQueryKeys = {
     all: ["notifications"] as const,
     summary: ["notifications", "summary"] as const,
     latestUnread: ["notifications", "latest-unread"] as const,
+    preferences: ["notifications", "preferences"] as const,
+    /** The /notifications list, per set of applied filters. */
+    list: (filters: unknown) => ["notifications", "list", filters] as const,
 };
 
 /** Only same-app paths are navigated to from the bell; anything else is ignored. */
