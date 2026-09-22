@@ -73,3 +73,12 @@ export function assetDepreciationMethods(current?: string | null): string[] {
     (m) => m !== DepreciationMethod.UNITS_OF_PRODUCTION || current === m,
   );
 }
+
+/** Mirrors the API: a residual value may not exceed the purchase cost (either blank passes). */
+export function residualWithinCost(residual: unknown, cost: unknown): boolean {
+  const blank = (v: unknown) => v === "" || v === null || v === undefined;
+  if (blank(residual) || blank(cost)) return true;
+  const r = Number(residual);
+  const c = Number(cost);
+  return Number.isNaN(r) || Number.isNaN(c) || r <= c;
+}

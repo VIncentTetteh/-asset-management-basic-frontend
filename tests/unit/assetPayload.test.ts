@@ -163,3 +163,14 @@ describe("asset depreciation methods", () => {
         expect(assetDepreciationMethods("UNITS_OF_PRODUCTION")).toContain("UNITS_OF_PRODUCTION");
     });
 });
+
+describe("residual value rule", () => {
+    it("allows a residual up to the cost, and blanks", async () => {
+        const { residualWithinCost } = await import("@/features/assets/assetPayload");
+        expect(residualWithinCost("100", "1000")).toBe(true);
+        expect(residualWithinCost("1000", "1000")).toBe(true);
+        expect(residualWithinCost("1000.01", "1000")).toBe(false);
+        expect(residualWithinCost("", "1000")).toBe(true);
+        expect(residualWithinCost("5", "")).toBe(true);
+    });
+});

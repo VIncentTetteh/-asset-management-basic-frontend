@@ -15,7 +15,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/ui/field-error";
 import {
-  assetDepreciationMethods, buildAssetUpdate, editableAssetStatuses, normaliseAssetForm,
+  assetDepreciationMethods, buildAssetUpdate, editableAssetStatuses, normaliseAssetForm, residualWithinCost,
 } from "@/features/assets/assetPayload";
 import { useSaveAsset } from "@/features/assets/hooks";
 import { useCurrency } from "@/contexts/CurrencyContext";
@@ -311,7 +311,10 @@ export function AssetFormModal({
                 type="number"
                 placeholder="Category policy"
                 {...limitInputProps(L.residualValue)}
-                {...register("residualValue", limitRules<AssetDto, "residualValue">(L.residualValue, "Residual value"))}
+                {...register("residualValue", {
+                  ...limitRules<AssetDto, "residualValue">(L.residualValue, "Residual value"),
+                  validate: (v, values) => residualWithinCost(v, values.purchaseCost) || "Residual value cannot exceed the cost",
+                })}
               />
               <FieldError error={errors.residualValue} />
             </div>
