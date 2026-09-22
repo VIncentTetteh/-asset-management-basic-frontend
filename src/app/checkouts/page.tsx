@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCheckouts, useCheckoutMasterData } from "@/features/checkouts/hooks";
 import { CheckoutTable, isOverdue } from "@/features/checkouts/CheckoutTable";
 import { CheckOutModal, CheckInModal } from "@/features/checkouts/CheckoutModals";
+import { usePermissions } from "@/contexts/PermissionContext";
 
 export default function CheckoutsPage() {
   const [view, setView] = useState<"all" | "overdue">("all");
@@ -20,12 +21,15 @@ export default function CheckoutsPage() {
   const [checkInTarget, setCheckInTarget] = useState<CheckoutRecordDto | null>(null);
 
   const { data: records = [], isLoading } = useCheckouts(view);
-  const master = useCheckoutMasterData();
+  const { hasPermission } = usePermissions();
+  // Mirrors POST /checkouts/assets/{a}/employees/{e}.
+  const canIssueToEmployees = hasPermission("CHECKOUT_ASSET") || hasPermission("MANAGE_EMPLOYEES");
+  const master = useCheckoutMasterData({ withEmployees: canIssueToEmployees });
 
   const stats = useMemo(
     () => ({
       active: records.filter((r) => r.status === "ACTIVE").length,
-      overdue: records.filter((r) => r.status === "OVERDUE" || isOverdue(r)).length,
+      overdue: records.filter(isOverdue).length,
       returned: records.filter((r) => r.status === "RETURNED").length,
     }),
     [records],
@@ -124,6 +128,8 @@ export default function CheckoutsPage() {
         onClose={() => setIsCheckoutOpen(false)}
         assets={master.assets}
         users={master.users}
+        employees={master.employees}
+        canIssueToEmployees={canIssueToEmployees}
       />
       <CheckInModal record={checkInTarget} onClose={() => setCheckInTarget(null)} />
     </ListPageTemplate>

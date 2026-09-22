@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { PackageCheck, CheckCircle2 } from "lucide-react";
 import type { Asset, User } from "@/types";
 import type { CheckInDto, CheckoutRecordDto } from "@/services/checkoutService";
@@ -10,13 +10,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { FieldError } from "@/components/ui/field-error";
 import { useCheckIn, useCheckOut } from "@/features/checkouts/hooks";
 import { applyApiFieldErrors } from "@/lib/api-validation";
-import { buildCheckInPayload, buildCheckOutPayload, CONDITION_MAX_LENGTH } from "@/features/checkouts/payload";
+import { FIELD_LIMITS, limitRules } from "@/lib/field-limits";
+import type { EmployeeDto } from "@/services/employeeService";
+import {
+  buildCheckInPayload, buildCheckOutPayload, checkoutRecipient, CONDITION_MAX_LENGTH, NOTES_MAX_LENGTH,
+} from "@/features/checkouts/payload";
 
 interface CheckoutFormValues {
   assetId: string;
+  recipientType: "user" | "employee";
   userId: string;
+  employeeId: string;
   expectedReturnDate?: string;
   conditionOnCheckout?: string;
   notes?: string;
@@ -27,24 +35,35 @@ export function CheckOutModal({
   onClose,
   assets,
   users,
+  employees = [],
+  canIssueToEmployees = false,
 }: {
   isOpen: boolean;
   onClose: () => void;
   assets: Asset[];
   users: User[];
+  /** Active employees; issuing to one needs CHECKOUT_ASSET or MANAGE_EMPLOYEES. */
+  employees?: EmployeeDto[];
+  canIssueToEmployees?: boolean;
 }) {
-  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<CheckoutFormValues>();
+  const { register, handleSubmit, reset, setError, control, formState: { errors } } = useForm<CheckoutFormValues>();
   const checkOut = useCheckOut();
+  const recipientType = useWatch({ control, name: "recipientType" });
 
   useEffect(() => {
-    if (isOpen) reset({ assetId: "", userId: "", expectedReturnDate: "", conditionOnCheckout: "", notes: "" });
+    if (isOpen) {
+      reset({
+        assetId: "", recipientType: "user", userId: "", employeeId: "",
+        expectedReturnDate: "", conditionOnCheckout: "", notes: "",
+      });
+    }
   }, [isOpen, reset]);
 
   const onSubmit = async (data: CheckoutFormValues) => {
     try {
       await checkOut.mutateAsync({
         assetId: data.assetId,
-        userId: data.userId,
+        recipient: checkoutRecipient(data),
         dto: buildCheckOutPayload(data),
       });
       onClose();
@@ -59,7 +78,7 @@ export function CheckOutModal({
       isOpen={isOpen}
       onClose={onClose}
       title="Check out asset"
-      description="Issue an asset to a user, with an optional expected return date."
+      description="Issue an asset to a user or an employee, with an optional expected return date."
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-1.5">
@@ -74,19 +93,54 @@ export function CheckOutModal({
           </Select>
           {errors.assetId && <p className="mt-1 text-xs text-danger">{errors.assetId.message}</p>}
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="co-user">User <span className="text-danger">*</span></Label>
-          <Select id="co-user" {...register("userId", { required: "User is required" })}>
-            <option value="">Select user…</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.email})</option>
-            ))}
-          </Select>
-          {errors.userId && <p className="mt-1 text-xs text-danger">{errors.userId.message}</p>}
-        </div>
+        {canIssueToEmployees ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="co-recipient-type">Issue to</Label>
+            <Select id="co-recipient-type" {...register("recipientType")}>
+              <option value="user">A user account</option>
+              <option value="employee">An employee (no login needed)</option>
+            </Select>
+          </div>
+        ) : null}
+        {recipientType === "employee" ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="co-employee">Employee <span className="text-danger">*</span></Label>
+            <Select
+              id="co-employee"
+              {...register("employeeId", {
+                validate: (v, values) => values.recipientType !== "employee" || Boolean(v) || "Employee is required",
+              })}
+            >
+              <option value="">Select employee…</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.firstName} {e.lastName}{e.employeeNumber ? ` (${e.employeeNumber})` : ""}
+                </option>
+              ))}
+            </Select>
+            <FieldError error={errors.employeeId} />
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label htmlFor="co-user">User <span className="text-danger">*</span></Label>
+            <Select
+              id="co-user"
+              {...register("userId", {
+                validate: (v, values) => values.recipientType === "employee" || Boolean(v) || "User is required",
+              })}
+            >
+              <option value="">Select user…</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.email})</option>
+              ))}
+            </Select>
+            <FieldError error={errors.userId} />
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label htmlFor="co-return">Expected return date</Label>
           <Input id="co-return" type="date" {...register("expectedReturnDate")} />
+          <FieldError error={errors.expectedReturnDate} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="co-condition">Condition on checkout</Label>
@@ -95,7 +149,14 @@ export function CheckOutModal({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="co-notes">Notes</Label>
-          <Input id="co-notes" placeholder="Optional notes…" {...register("notes")} />
+          <Textarea
+            id="co-notes"
+            rows={3}
+            placeholder="Optional notes…"
+            maxLength={NOTES_MAX_LENGTH}
+            {...register("notes", limitRules<CheckoutFormValues, "notes">(FIELD_LIMITS.checkout.notes, "Notes"))}
+          />
+          <FieldError error={errors.notes} />
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
@@ -147,7 +208,14 @@ export function CheckInModal({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ci-notes">Notes</Label>
-          <Input id="ci-notes" placeholder="Optional return notes…" {...register("notes")} />
+          <Textarea
+            id="ci-notes"
+            rows={3}
+            placeholder="Optional return notes…"
+            maxLength={NOTES_MAX_LENGTH}
+            {...register("notes", limitRules<CheckInDto, "notes">(FIELD_LIMITS.checkout.notes, "Notes"))}
+          />
+          <FieldError error={errors.notes} />
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>

@@ -63,7 +63,14 @@ export function CheckoutTable({
       {
         accessorKey: "actualReturnDate",
         header: "Returned",
-        cell: ({ row }) => <span className="text-muted-fg">{fmt(row.original.actualReturnDate)}</span>,
+        cell: ({ row }) => (
+          <span className="text-muted-fg">
+            {fmt(row.original.actualReturnDate)}
+            {row.original.checkedInByName ? (
+              <span className="block text-xs text-faint-fg">by {row.original.checkedInByName}</span>
+            ) : null}
+          </span>
+        ),
       },
       {
         id: "condition",
@@ -74,6 +81,20 @@ export function CheckoutTable({
             {row.original.conditionOnReturn || row.original.conditionOnCheckout || "—"}
           </span>
         ),
+      },
+      {
+        id: "notes",
+        header: "Notes",
+        enableSorting: false,
+        // Truncated in the row; the full text (checkout and return notes) is in the tooltip.
+        cell: ({ row }) =>
+          row.original.notes ? (
+            <span className="block max-w-48 truncate text-xs text-muted-fg" title={row.original.notes}>
+              {row.original.notes}
+            </span>
+          ) : (
+            <span className="text-faint-fg">—</span>
+          ),
       },
       {
         accessorKey: "status",

@@ -10,10 +10,13 @@ export interface CheckoutRecordDto {
   expectedReturnDate?: string;
   actualReturnDate?: string;
   checkedInById?: string;
+  /** Who checked the asset back in (read-only). */
+  checkedInByName?: string;
   conditionOnCheckout?: string;
   conditionOnReturn?: string;
   notes?: string;
-  status?: "ACTIVE" | "RETURNED" | "OVERDUE";
+  /** The API writes only these; "overdue" is derived from the expected return date. */
+  status?: "ACTIVE" | "RETURNED";
   organisationId?: string;
   /** Employee recipient (Phase 2 backend) — set when the asset was issued to a non-user employee. */
   employeeId?: string;
@@ -34,6 +37,19 @@ export const checkoutService = {
   ): Promise<CheckoutRecordDto> => {
     const response = await api.post<CheckoutRecordDto>(
       `/checkouts/assets/${assetId}/users/${userId}`,
+      dto ?? {}
+    );
+    return response.data;
+  },
+
+  /** POST /checkouts/assets/{assetId}/employees/{employeeId} — Check out an asset to an employee (no login needed). */
+  checkOutToEmployee: async (
+    assetId: string,
+    employeeId: string,
+    dto?: Partial<CheckoutRecordDto>
+  ): Promise<CheckoutRecordDto> => {
+    const response = await api.post<CheckoutRecordDto>(
+      `/checkouts/assets/${assetId}/employees/${employeeId}`,
       dto ?? {}
     );
     return response.data;
