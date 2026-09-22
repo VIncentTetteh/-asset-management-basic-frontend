@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { FIELD_LIMITS, fieldLimit, limitInputProps, limitRules } from "@/lib/field-limits";
+import { FIELD_LIMITS, fieldLimit, isAcceptableUrl, limitInputProps, limitRules } from "@/lib/field-limits";
 import { FieldError } from "@/components/ui/field-error";
 
 describe("FIELD_LIMITS mirrors the backend DTOs", () => {
@@ -67,5 +67,31 @@ describe("FieldError", () => {
     it("renders nothing without an error", () => {
         const { container } = render(<FieldError error={undefined} />);
         expect(container.innerHTML).toBe("");
+    });
+});
+
+describe("URL fields mirror @HttpUrl", () => {
+    it("accepts blank or absolute http(s) links only", () => {
+        expect(isAcceptableUrl("")).toBe(true);
+        expect(isAcceptableUrl("https://docs.example.com/a.pdf")).toBe(true);
+        expect(isAcceptableUrl("javascript:alert(1)")).toBe(false);
+        expect(isAcceptableUrl(" \u0001JaVa\tScript:alert(1)")).toBe(false);
+        expect(isAcceptableUrl("data:text/html,x")).toBe(false);
+        expect(isAcceptableUrl("relative.pdf")).toBe(false);
+    });
+
+    it("lets a reference field hold plain text but never a script URL", () => {
+        expect(isAcceptableUrl("Certificate #12345", true)).toBe(true);
+        expect(isAcceptableUrl("Ref: 12", true)).toBe(true);
+        expect(isAcceptableUrl("vbscript:x", true)).toBe(false);
+    });
+
+    it("puts the check on every link field's rules", () => {
+        const rules = limitRules(FIELD_LIMITS.contract.documentUrl, "Document URL");
+        const validate = rules.validate as (v: unknown) => true | string;
+        expect(validate("javascript:alert(1)")).toBe("Document URL must be an http:// or https:// link");
+        expect(validate("https://x.example/y")).toBe(true);
+        expect(FIELD_LIMITS.disposal.complianceDocumentUrl.url).toBe("httpOrText");
+        expect(FIELD_LIMITS.expense.receiptUrl.url).toBe("http");
     });
 });

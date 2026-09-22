@@ -1,5 +1,6 @@
 import type { FieldPath, FieldValues, RegisterOptions } from "react-hook-form";
 import { PASSWORD_MAX_BYTES, PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
+import { safeExternalUrl } from "@/lib/safe-url";
 
 /**
  * Per-field limits, mirroring the backend request DTOs exactly.
@@ -22,6 +23,11 @@ export interface FieldLimit {
     max?: number;
     /** HTML step for number inputs: the backend's fraction digits (0.01 for money). */
     step?: number | "any";
+    /**
+     * Mirrors `@HttpUrl`: "http" = blank or an absolute http(s) URL; "httpOrText" =
+     * also plain text with no URL scheme (a reference such as a certificate number).
+     */
+    url?: "http" | "httpOrText";
 }
 
 export type EntityLimits = Readonly<Record<string, FieldLimit>>;
@@ -34,6 +40,8 @@ const COUNT: FieldLimit = { min: 0, step: 1 };
 const CURRENCY: FieldLimit = { maxLength: 3 };
 const text = (maxLength: number, required = false): FieldLimit => (required ? { required, maxLength } : { maxLength });
 const REQUIRED: FieldLimit = { required: true };
+/** A link field (`@HttpUrl` + `@Size(max)`). */
+const url = (maxLength: number): FieldLimit => ({ maxLength, url: "http" });
 
 export const FIELD_LIMITS = {
     asset: {
@@ -90,7 +98,7 @@ export const FIELD_LIMITS = {
         endDate: REQUIRED,
         value: MONEY,
         currency: CURRENCY,
-        documentUrl: text(500),
+        documentUrl: url(500),
         alertDaysBefore: COUNT,
     },
     department: {
@@ -112,7 +120,7 @@ export const FIELD_LIMITS = {
         saleValue: MONEY,
         currency: CURRENCY,
         reason: text(5000),
-        complianceDocumentUrl: text(255),
+        complianceDocumentUrl: { maxLength: 255, url: "httpOrText" },
     },
     employee: {
         firstName: text(255, true),
@@ -133,7 +141,7 @@ export const FIELD_LIMITS = {
         amount: POSITIVE_MONEY,
         category: REQUIRED,
         currency: CURRENCY,
-        receiptUrl: text(500),
+        receiptUrl: url(500),
     },
     lease: {
         assetId: REQUIRED,
@@ -184,7 +192,7 @@ export const FIELD_LIMITS = {
         purchaseCost: MONEY,
         annualRenewalCost: MONEY,
         currency: CURRENCY,
-        licenseDocumentUrl: text(255),
+        licenseDocumentUrl: url(255),
     },
     ssoConfig: {
         provider: REQUIRED,
@@ -235,13 +243,13 @@ export const FIELD_LIMITS = {
         framework: REQUIRED,
         controlRef: text(64, true),
         controlName: text(255, true),
-        evidenceUrl: text(255),
+        evidenceUrl: url(255),
         lastReviewedByEmail: text(255),
     },
-    bogControl: { directiveRef: text(32, true), requirement: REQUIRED, evidenceUrl: text(255) },
+    bogControl: { directiveRef: text(32, true), requirement: REQUIRED, evidenceUrl: url(255) },
     icsAsset: { assetId: REQUIRED, firmwareVersion: text(64), protocol: text(128) },
     patchRecord: { assetId: REQUIRED, patchName: text(255, true), version: text(64), appliedByEmail: text(255) },
-    pciSaq: { requirementNumber: text(16, true), evidenceUrl: text(255) },
+    pciSaq: { requirementNumber: text(16, true), evidenceUrl: url(255) },
     regulatoryFiling: {
         filingType: text(255, true),
         regulator: text(32, true),
@@ -256,7 +264,7 @@ export const FIELD_LIMITS = {
         residualRisk: { min: 1, max: 25, step: 1 },
     },
     securityIncident: { title: text(255, true), severity: REQUIRED, category: text(64) },
-    securityPolicy: { title: text(255, true), version: text(16), documentUrl: text(255), approvedByEmail: text(255) },
+    securityPolicy: { title: text(255, true), version: text(16), documentUrl: url(255), approvedByEmail: text(255) },
     securityZone: {
         name: text(255, true),
         purdueLevel: { required: true, min: 0, max: 5, step: 1 },
@@ -278,7 +286,7 @@ export const FIELD_LIMITS = {
         scanDate: REQUIRED,
         scanType: REQUIRED,
         scannerTool: text(128),
-        reportUrl: text(255),
+        reportUrl: url(255),
         criticalCount: COUNT,
         highCount: COUNT,
         mediumCount: COUNT,
@@ -333,10 +341,34 @@ export function limitRules<T extends FieldValues, N extends FieldPath<T> = Field
     if (limit.max !== undefined) {
         rules.max = { value: limit.max, message: `${label} must be at most ${limit.max}` };
     }
+    const checks: ((value: unknown) => true | string)[] = [];
     if (limit.required && limit.maxLength !== undefined) {
         // Mirrors @NotBlank: whitespace alone is not a value.
-        rules.validate = (value: unknown) =>
-            typeof value !== "string" || value.trim().length > 0 || `${label} is required`;
+        checks.push((value) => typeof value !== "string" || value.trim().length > 0 || `${label} is required`);
+    }
+    if (limit.url) {
+        const allowText = limit.url === "httpOrText";
+        checks.push((value) => isAcceptableUrl(value, allowText) || `${label} must be an http:// or https:// link`);
+    }
+    if (checks.length > 0) {
+        rules.validate = (value: unknown) => {
+            for (const check of checks) {
+                const result = check(value);
+                if (result !== true) return result;
+            }
+            return true;
+        };
     }
     return rules;
+}
+
+/** A URL scheme after the whitespace/control-character stripping browsers apply. */
+const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:(?!\s)/;
+
+/** Mirrors the backend HttpUrlValidator. */
+export function isAcceptableUrl(value: unknown, allowPlainText = false): boolean {
+    if (typeof value !== "string" || value.trim() === "") return true;
+    const normalised = value.replace(/^[\u0000-\u0020]+/, "").replace(/[\t\n\r]/g, "");
+    if (!SCHEME.test(normalised)) return allowPlainText;
+    return safeExternalUrl(value) !== null;
 }
