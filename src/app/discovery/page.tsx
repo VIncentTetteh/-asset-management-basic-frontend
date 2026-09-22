@@ -16,7 +16,7 @@ import { toast } from "react-hot-toast";
 import {
     ScanLine, Trash2, ArrowUpRight, Wifi, WifiOff, CheckCircle2,
     Server, Monitor, Printer, Smartphone, Router, HardDrive, Globe,
-    RefreshCw, ChevronDown, ChevronUp, Shield, Clock, Tag, Network,
+    RefreshCw, ChevronDown, ChevronUp, Shield, Clock, Tag, Network, Info,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -120,6 +120,9 @@ export default function DiscoveryPage() {
     const router = useRouter();
     const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
     const [summary, setSummary] = useState<DiscoverySummary | null>(null);
+    // The API says whether this deployment may scan; older servers omit it, and
+    // an unknown answer keeps the button (the endpoint refuses it anyway).
+    const scanEnabled = summary?.scanEnabled !== false;
     const [isLoading, setIsLoading] = useState(true);
     const [isScanModalOpen, setIsScanModalOpen] = useState(false);
     const [page, setPage] = useState(0);
@@ -230,13 +233,28 @@ export default function DiscoveryPage() {
                     <Button variant="outline" onClick={() => fetchDevices(page)} className="gap-2">
                         <RefreshCw className="h-4 w-4" /> Refresh
                     </Button>
-                    {canManage && (
+                    {canManage && scanEnabled && (
                         <Button onClick={() => setIsScanModalOpen(true)} className="gap-2">
                             <ScanLine className="h-4 w-4" /> Scan Network
                         </Button>
                     )}
                 </>}
             />
+
+            {summary && !scanEnabled && (
+                <div className="flex items-start gap-3 rounded-card border border-info/40 bg-info-soft p-4">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-info" />
+                    <div>
+                        <p className="text-sm font-semibold text-foreground">Network scanning is off on this deployment</p>
+                        <p className="mt-0.5 text-xs text-muted-fg">
+                            A scan is run by the AssetIQ server itself, so on the hosted service it would sweep our
+                            network, not yours. Devices already discovered are still listed here and can be promoted to
+                            assets. Scanning is available on a self-hosted deployment, where the server sits on your own
+                            network.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {summary && (
                 <div className="grid gap-4 md:grid-cols-4">
@@ -295,10 +313,12 @@ export default function DiscoveryPage() {
                             </h3>
                             <p className="mt-1 max-w-sm text-muted-fg">
                                 {statusFilter === "ALL"
-                                    ? "Run a network scan to discover IT assets on your network."
+                                    ? scanEnabled
+                                        ? "Run a network scan to discover IT assets on your network."
+                                        : "Scanning is off on this deployment, so nothing has been discovered here."
                                     : `Try selecting a different status filter.`}
                             </p>
-                            {canManage && statusFilter === "ALL" && (
+                            {canManage && scanEnabled && statusFilter === "ALL" && (
                                 <Button onClick={() => setIsScanModalOpen(true)} className="mt-4 gap-2">
                                     <ScanLine className="h-4 w-4" /> Start Scan
                                 </Button>

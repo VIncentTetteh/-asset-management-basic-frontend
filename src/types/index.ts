@@ -2036,6 +2036,12 @@ export interface DiscoverySummary {
     promoted: number;
     /** Devices never classified; the four buckets add up to total. */
     unknown?: number;
+    /**
+     * Whether this deployment lets the server scan networks. Off on the hosted
+     * service, where the scan would come from the platform's own network; the
+     * scan endpoint answers 501 and the page says so rather than just failing.
+     */
+    scanEnabled?: boolean;
 }
 
 // ─── Cloud Assets ─────────────────────────────────────────────────────────────
