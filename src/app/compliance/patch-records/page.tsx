@@ -44,6 +44,7 @@ export default function PatchRecordsPage() {
       description="Patch deployments per asset with test validation and rollback plans."
       service={patchRecordService}
       moduleKey="patch-records"
+      limits="patchRecord"
       columns={[
         { header: "Patch", kind: "primary", key: "patchName", subKey: "version" },
         { header: "Asset", kind: "text", key: "assetName" },

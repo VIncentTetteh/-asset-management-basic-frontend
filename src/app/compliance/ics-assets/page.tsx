@@ -51,6 +51,7 @@ export default function IcsAssetsPage() {
       description="Industrial control system assets with firmware and isolation tracking."
       service={icsAssetService}
       moduleKey="ics-assets"
+      limits="icsAsset"
       columns={[
         { header: "Asset", kind: "primary", key: "assetName", subKey: "protocol" },
         { header: "Zone", kind: "text", key: "securityZoneName" },

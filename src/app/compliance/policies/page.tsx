@@ -28,6 +28,7 @@ export default function PoliciesPage() {
       description="Policy documents with versioning and review cycles."
       service={policyService}
       moduleKey="security-policies"
+      limits="securityPolicy"
       columns={[
         { header: "Policy", kind: "primary", key: "title" },
         { header: "Version", kind: "mono", key: "version" },

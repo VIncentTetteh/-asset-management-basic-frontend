@@ -19,6 +19,8 @@ import { applyApiFieldErrors } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { buildCompliancePayload } from "@/features/compliance/payload";
 import { useConfirm } from "@/hooks/useConfirm";
+import { FieldError } from "@/components/ui/field-error";
+import { fieldLimit, limitInputProps, limitRules, type FieldLimit, type LimitedEntity } from "@/lib/field-limits";
 
 /** One form control, rendered in a two-column grid (span2 for full width). */
 export interface FieldSpec<TDto> {
@@ -70,6 +72,8 @@ interface ComplianceCrudPageProps<T extends { id?: string }, TDto extends FieldV
   emptyDescription: string;
   /** Hook returning dynamic select options keyed by field name (e.g. asset lists). */
   useOptions?: () => Partial<Record<string, { value: string; label: string }[]>>;
+  /** Backend limits for this entity (see lib/field-limits.ts): lengths, ranges, required. */
+  limits?: LimitedEntity;
 }
 
 function cellFor<T extends { id?: string }>(spec: ColumnSpec<T>, row: T): React.ReactNode {
@@ -120,6 +124,7 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
   searchKeys,
   emptyDescription,
   useOptions,
+  limits,
   canDelete = true,
 }: ComplianceCrudPageProps<T, TDto>) {
   const { hasPermission } = usePermissions();
@@ -299,22 +304,36 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
               const id = `cc-${field.name}`;
               const common = { id, placeholder: field.placeholder };
               const err = errors[field.name as Path<TDto>];
+              // Backend limits win; the field spec fills in what the backend leaves open.
+              const backend = limits ? fieldLimit(limits, field.name) : {};
+              const limit: FieldLimit = {
+                ...backend,
+                required: field.required ?? backend.required,
+                min: backend.min ?? field.min,
+                max: backend.max ?? field.max,
+                step: backend.step ?? (field.step as FieldLimit["step"]),
+              };
+              const rules = limitRules<TDto>(limit, field.label);
               return (
                 <div key={field.name} className={`space-y-2 ${field.span2 || field.type === "textarea" ? "col-span-2" : ""}`}>
                   {field.type !== "checkbox" && (
                     <Label htmlFor={id}>
-                      {field.label} {field.required && <span className="text-danger">*</span>}
+                      {field.label} {limit.required && <span className="text-danger">*</span>}
                     </Label>
                   )}
                   {field.type === "select" ? (
-                    <Select {...common} {...register(field.name as Path<TDto>, { required: field.required })}>
-                      {!field.required && <option value="">—</option>}
+                    <Select {...common} {...register(field.name as Path<TDto>, rules)}>
+                      {!limit.required && <option value="">—</option>}
                       {(field.options ?? dynamicOptions[field.name] ?? []).map((o) => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </Select>
                   ) : field.type === "textarea" ? (
-                    <Textarea {...common} {...register(field.name as Path<TDto>, { required: field.required })} />
+                    <Textarea
+                      {...common}
+                      maxLength={limit.maxLength}
+                      {...register(field.name as Path<TDto>, rules)}
+                    />
                   ) : field.type === "checkbox" ? (
                     <div className="flex h-9 items-center gap-2">
                       <input
@@ -329,18 +348,12 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
                     <Input
                       {...common}
                       type={field.type}
-                      step={field.step}
-                      min={field.min}
-                      max={field.max}
+                      {...(field.type === "number" ? limitInputProps({ ...limit, maxLength: undefined }) : { maxLength: limit.maxLength })}
                       className={field.mono ? "data-mono" : undefined}
-                      {...register(field.name as Path<TDto>, { required: field.required })}
+                      {...register(field.name as Path<TDto>, rules)}
                     />
                   )}
-                  {err && (
-                    <p className="text-sm text-danger">
-                      {typeof err.message === "string" && err.message ? err.message : `${field.label} is required`}
-                    </p>
-                  )}
+                  <FieldError error={err} fallback={`${field.label} is required`} />
                 </div>
               );
             })}

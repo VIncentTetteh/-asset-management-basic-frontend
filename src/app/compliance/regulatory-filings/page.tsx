@@ -30,6 +30,7 @@ export default function RegulatoryFilingsPage() {
       description="Statutory returns and their submission deadlines."
       service={regulatoryFilingService}
       moduleKey="regulatory-filings"
+      limits="regulatoryFiling"
       columns={[
         { header: "Filing", kind: "primary", key: "filingType", subKey: "regulator" },
         { header: "Due", kind: "date", key: "dueDate" },

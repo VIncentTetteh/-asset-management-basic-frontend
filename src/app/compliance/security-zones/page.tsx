@@ -33,6 +33,7 @@ export default function SecurityZonesPage() {
       description="Purdue-model network segmentation for OT/ICS environments."
       service={securityZoneService}
       moduleKey="security-zones"
+      limits="securityZone"
       columns={[
         { header: "Zone", kind: "primary", key: "name", subKey: "description" },
         { header: "Purdue level", kind: "number", key: "purdueLevel", right: true },

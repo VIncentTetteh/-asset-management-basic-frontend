@@ -34,6 +34,7 @@ export default function IncidentsPage() {
       description="Incident log with severity, resolution, and lessons learned."
       service={incidentService}
       moduleKey="incidents"
+      limits="securityIncident"
       columns={[
         { header: "Incident", kind: "primary", key: "title", subKey: "category" },
         { header: "Severity", kind: "status", key: "severity" },

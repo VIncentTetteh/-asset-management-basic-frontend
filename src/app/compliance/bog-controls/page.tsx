@@ -26,6 +26,7 @@ export default function BogControlsPage() {
       description="BoG ICT directive requirements and their implementation status."
       service={bogControlService}
       moduleKey="bog-controls"
+      limits="bogControl"
       columns={[
         { header: "Directive", kind: "mono", key: "directiveRef" },
         { header: "Requirement", kind: "primary", key: "requirement" },

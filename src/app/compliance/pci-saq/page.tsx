@@ -30,6 +30,7 @@ export default function PciSaqPage() {
       description="Self-assessment questionnaire answers per PCI-DSS requirement."
       service={pciSaqService}
       moduleKey="pci-saq"
+      limits="pciSaq"
       columns={[
         { header: "Requirement", kind: "mono", key: "requirementNumber" },
         { header: "Text", kind: "primary", key: "requirementText" },

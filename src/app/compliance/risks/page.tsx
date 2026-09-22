@@ -36,6 +36,7 @@ export default function RisksPage() {
       description="Likelihood × impact scored risks with treatment plans."
       service={riskService}
       moduleKey="risks"
+      limits="riskRegister"
       columns={[
         { header: "Risk", kind: "primary", key: "title", subKey: "riskId" },
         { header: "Score", kind: "number", key: "likelihood", right: true,

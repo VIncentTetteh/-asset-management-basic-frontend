@@ -29,6 +29,7 @@ export default function ComplianceControlsPage() {
       description="Framework controls with implementation status, gaps, and evidence."
       service={complianceControlService}
       moduleKey="compliance-controls"
+      limits="complianceControl"
       columns={[
         { header: "Control", kind: "primary", key: "controlName", subKey: "controlRef" },
         { header: "Framework", kind: "text", key: "framework" },

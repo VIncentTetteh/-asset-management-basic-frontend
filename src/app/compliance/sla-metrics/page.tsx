@@ -36,6 +36,7 @@ export default function SlaMetricsPage() {
       description="Monthly uptime, downtime, and recovery objectives."
       service={slaMetricService}
       moduleKey="sla-metrics"
+      limits="slaMetric"
       columns={[
         { header: "Period", kind: "primary", key: "month",
           render: (m) => <span className="data-mono font-semibold text-foreground">{String(m.year)}-{String(m.month).padStart(2, "0")}</span> },
