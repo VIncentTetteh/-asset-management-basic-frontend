@@ -1,4 +1,4 @@
-import { AssetStatus, CLEARABLE_ASSET_FIELDS, type Asset, type AssetDto, type ClearableAssetField } from "@/types";
+import { AssetStatus, CLEARABLE_ASSET_FIELDS, DepreciationMethod, type Asset, type AssetDto, type ClearableAssetField } from "@/types";
 import { buildPatchPayload } from "@/lib/patch";
 
 const NUMERIC_FIELDS = [
@@ -30,9 +30,10 @@ export function normaliseAssetForm(form: AssetDto): AssetDto {
 
 /**
  * Build a PATCH body for an edited asset: only changed fields, plus `clearFields`
- * for every optional relation the user emptied. A relation is only cleared when
- * the form value is explicitly empty and the asset had a value, so a field the
- * user never touched (e.g. a purchase order missing from the dropdown) is kept.
+ * for every optional field the user emptied (relations, identifiers, dates, cost,
+ * procurement fields, depreciation overrides). A field is only cleared when the
+ * form value is explicitly empty and the asset had a value, so a field the user
+ * never touched (e.g. a purchase order missing from the dropdown) is kept.
  */
 export function buildAssetUpdate(original: Asset, form: AssetDto): Partial<AssetDto> {
   const patch = buildPatchPayload<AssetDto>(
@@ -60,4 +61,15 @@ export function editableAssetStatuses(current?: string | null): string[] {
 /** The register's "Book value": net book value from the depreciation engine, else cost. */
 export function assetBookValue(asset: Pick<Asset, "currentBookValue" | "purchaseCost">): number | undefined {
   return asset.currentBookValue ?? asset.purchaseCost;
+}
+
+/**
+ * Depreciation methods the asset form offers. UNITS_OF_PRODUCTION is left out:
+ * assets record no usage, so the engine applies it as straight-line. An asset
+ * that already has it keeps it selectable so an unrelated edit does not change it.
+ */
+export function assetDepreciationMethods(current?: string | null): string[] {
+  return Object.values(DepreciationMethod).filter(
+    (m) => m !== DepreciationMethod.UNITS_OF_PRODUCTION || current === m,
+  );
 }

@@ -141,6 +141,12 @@ export enum DepreciationMethod {
     UNITS_OF_PRODUCTION = "UNITS_OF_PRODUCTION",
 }
 
+/** CAPEX (owned, depreciated) or OPEX (leased, rented, subscribed); mirrors the API enum. */
+export enum ProcurementType {
+    CAPEX = "CAPEX",
+    OPEX = "OPEX",
+}
+
 // ─── Asset ────────────────────────────────────────────────────────────────────
 export interface Asset extends BaseEntity {
     name: string;
@@ -170,6 +176,8 @@ export interface Asset extends BaseEntity {
     insurancePolicyId?: string;
     departmentId?: string;
     purchaseOrderId?: string;
+    procurementType?: ProcurementType | string | null;
+    costCenter?: string | null;
     /** TCO inputs, in the asset's currency. */
     insurancePremiumPerYear?: number | null;
     downtimeCostPerDay?: number | null;
@@ -192,10 +200,17 @@ export interface Asset extends BaseEntity {
     effectiveResidualValue?: number | null;
 }
 
-/** Optional relations an asset update can clear (a missing/null field means "unchanged"). */
+/**
+ * Optional fields an asset update can clear (a missing/null field means "unchanged").
+ * Mirrors `AssetServiceImpl.CLEARABLE_FIELDS`; clearing a depreciation override
+ * falls back to the category's depreciation policy.
+ */
 export const CLEARABLE_ASSET_FIELDS = [
     "departmentId", "locationId", "supplierId", "purchaseOrderId", "assignedUserId",
-    "parentAssetId", "insurancePremiumPerYear", "downtimeCostPerDay", "insurancePolicyExpiry",
+    "parentAssetId", "categoryId", "insurancePremiumPerYear", "downtimeCostPerDay", "insurancePolicyExpiry",
+    "depreciationMethod", "usefulLifeMonths", "residualValue", "purchaseCost", "purchaseDate",
+    "warrantyExpiryDate", "assetTag", "serialNumber", "manufacturer", "model", "description",
+    "invoiceId", "insurancePolicyId", "costCenter", "procurementType",
 ] as const;
 export type ClearableAssetField = (typeof CLEARABLE_ASSET_FIELDS)[number];
 
@@ -228,6 +243,8 @@ export interface AssetDto {
     insurancePolicyId?: string;
     departmentId?: string;
     purchaseOrderId?: string;
+    procurementType?: ProcurementType | string | null;
+    costCenter?: string | null;
     /** TCO inputs, in the asset's currency. */
     insurancePremiumPerYear?: number | null;
     downtimeCostPerDay?: number | null;
@@ -235,7 +252,7 @@ export interface AssetDto {
     /** The asset this one is a component of. */
     parentAssetId?: string | null;
     currentBookValue?: number;
-    /** Update only: relations to clear explicitly. */
+    /** Update only: optional fields to clear explicitly. */
     clearFields?: ClearableAssetField[];
 }
 
@@ -318,7 +335,7 @@ export interface CategoryDto {
     parentCategoryId?: string | null;
     depreciationPolicyId?: string;
     defaultWarrantyPeriodMonths?: number;
-    /** Update only: relations to clear explicitly. */
+    /** Update only: optional fields to clear explicitly. */
     clearFields?: ("depreciationPolicyId" | "parentCategoryId")[];
 }
 

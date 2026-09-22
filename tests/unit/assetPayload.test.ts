@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { assetBookValue, buildAssetUpdate, editableAssetStatuses, normaliseAssetForm } from "@/features/assets/assetPayload";
+import {
+    assetBookValue, assetDepreciationMethods, buildAssetUpdate, editableAssetStatuses, normaliseAssetForm,
+} from "@/features/assets/assetPayload";
 import type { Asset, AssetDto } from "@/types";
 
 const original: Asset = {
@@ -110,5 +112,54 @@ describe("assetBookValue", () => {
         expect(assetBookValue({ purchaseCost: 1200, currentBookValue: 900 })).toBe(900);
         expect(assetBookValue({ purchaseCost: 1200, currentBookValue: 0 })).toBe(0);
         expect(assetBookValue({ purchaseCost: 1200 })).toBe(1200);
+    });
+});
+
+describe("clearing optional asset fields", () => {
+    it("clears emptied identifiers, dates, cost, category and depreciation overrides", () => {
+        const withValues: Asset = {
+            ...original,
+            categoryId: "c1",
+            assetTag: "LT-1",
+            serialNumber: "SN",
+            manufacturer: "Dell",
+            model: "XPS",
+            description: "Spare",
+            purchaseDate: "2024-01-01",
+            warrantyExpiryDate: "2026-01-01",
+            depreciationMethod: "DECLINING_BALANCE",
+            costCenter: "CC-1",
+            procurementType: "CAPEX",
+            invoiceId: "INV-1",
+        };
+        const emptied = {
+            ...untouchedForm(),
+            categoryId: "", assetTag: "", serialNumber: "", manufacturer: "", model: "", description: "",
+            purchaseDate: "", warrantyExpiryDate: "", depreciationMethod: "", usefulLifeMonths: "",
+            purchaseCost: "", costCenter: "", procurementType: "", invoiceId: "",
+        } as unknown as AssetDto;
+
+        const patch = buildAssetUpdate(withValues, emptied);
+
+        expect(new Set(patch.clearFields)).toEqual(new Set([
+            "categoryId", "assetTag", "serialNumber", "manufacturer", "model", "description", "purchaseDate",
+            "warrantyExpiryDate", "depreciationMethod", "usefulLifeMonths", "purchaseCost", "costCenter",
+            "procurementType", "invoiceId",
+        ]));
+        expect(patch).not.toHaveProperty("purchaseCost");
+    });
+
+    it("creates an asset without a cost", () => {
+        expect(normaliseAssetForm({ name: "Desk", purchaseCost: "" as unknown as number })).toEqual({ name: "Desk" });
+    });
+});
+
+describe("asset depreciation methods", () => {
+    it("hides units of production, which assets apply as straight-line", () => {
+        expect(assetDepreciationMethods()).not.toContain("UNITS_OF_PRODUCTION");
+    });
+
+    it("keeps units of production for an asset that already has it", () => {
+        expect(assetDepreciationMethods("UNITS_OF_PRODUCTION")).toContain("UNITS_OF_PRODUCTION");
     });
 });

@@ -37,14 +37,22 @@ export function AssignUserModal({
       toast.error("Select a user to assign");
       return;
     }
-    await assign.mutateAsync({ assetId: asset.id, userId: assigneeId });
-    onClose();
+    try {
+      await assign.mutateAsync({ assetId: asset.id, userId: assigneeId });
+      onClose();
+    } catch {
+      // The hook already showed the API's reason; keep the dialog open to retry.
+    }
   };
 
   const handleUnassign = async () => {
     if (!asset?.id) return;
-    await unassign.mutateAsync(asset.id);
-    onClose();
+    try {
+      await unassign.mutateAsync(asset.id);
+      onClose();
+    } catch {
+      // The hook already showed the API's reason.
+    }
   };
 
   return (

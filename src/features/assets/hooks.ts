@@ -13,6 +13,7 @@ import { supplierService } from "@/services/supplierService";
 import { purchaseOrderService } from "@/services/purchaseOrderService";
 import { userService } from "@/services/userService";
 import { qk } from "@/lib/queryClient";
+import { reportApiError } from "@/lib/api-validation";
 import type { AssetDto } from "@/types";
 
 /** URL-driven filter state shared by the toolbar, table, and pagination. */
@@ -141,7 +142,7 @@ export function useSaveAsset() {
       toast.success(vars.id ? "Asset updated" : "Asset created");
       invalidate();
     },
-    onError: () => toast.error("Failed to save asset"),
+    // AssetFormModal reports failures itself, mapping field errors onto the form.
   });
 }
 
@@ -154,7 +155,7 @@ export function useAssignAsset() {
       toast.success("Asset assigned");
       invalidate();
     },
-    onError: () => toast.error("Failed to assign asset"),
+    onError: (error) => reportApiError(error, { fallback: "Failed to assign asset" }),
   });
 }
 
@@ -166,6 +167,6 @@ export function useUnassignAsset() {
       toast.success("Asset unassigned");
       invalidate();
     },
-    onError: () => toast.error("Failed to unassign asset"),
+    onError: (error) => reportApiError(error, { fallback: "Failed to unassign asset" }),
   });
 }
