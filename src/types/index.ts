@@ -38,29 +38,6 @@ export interface OrganisationDto {
 }
 
 // ─── SSO Config ───────────────────────────────────────────────────────────────
-export type SsoProvider = "GOOGLE" | "MICROSOFT" | "OKTA" | "AUTH0";
-
-export interface SsoConfig extends BaseEntity {
-    provider: SsoProvider | string;
-    clientId: string;
-    clientSecret?: string;
-    tenantId?: string;
-    discoveryUrl?: string;
-    redirectUri?: string;
-    enabled: boolean;
-    organisationId?: string;
-}
-
-export interface SsoConfigDto {
-    provider: SsoProvider | string;    // required
-    clientId: string;                  // required
-    clientSecret: string;              // required
-    tenantId?: string;
-    discoveryUrl?: string;
-    redirectUri?: string;
-    enabled: boolean;
-}
-
 // ─── Department ───────────────────────────────────────────────────────────────
 export type DepartmentStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
@@ -1833,7 +1810,8 @@ export interface OrgSsoConfig {
     enabled: boolean;
     clientId?: string | null;
     issuerUri?: string | null;
-    scopes?: string[] | null;
+    /** Space-separated, e.g. "openid email profile" (a single string on the API). */
+    scopes?: string | null;
     redirectUri?: string | null;
     idpMetadataUrl?: string | null;
     spEntityId?: string | null;
@@ -1846,7 +1824,8 @@ export interface SsoOAuth2Dto {
     clientId: string;
     clientSecret: string;
     issuerUri: string;
-    scopes?: string[];
+    /** Space-separated, e.g. "openid email profile" (a single string on the API). */
+    scopes?: string | null;
     redirectUri?: string | null;
     emailDomain?: string | null;
 }

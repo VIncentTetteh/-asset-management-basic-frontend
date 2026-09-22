@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { Building2, Globe, Key, Pencil, ShieldCheck, Search } from "lucide-react";
-import type { Organisation, OrganisationDto, OrganisationStatus, SsoConfigDto } from "@/types";
+import { Building2, Pencil, ShieldCheck, Search } from "lucide-react";
+import Link from "next/link";
+import type { Organisation, OrganisationDto, OrganisationStatus } from "@/types";
 import { organisationService } from "@/services/organisationService";
-import { orgSsoService } from "@/services/orgSsoService";
 import { qk } from "@/lib/queryClient";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -15,7 +15,6 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { CountrySelect } from "@/components/ui/country-select";
 import { countryName } from "@/lib/countries";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,8 +22,6 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { reportApiError } from "@/lib/api-validation";
 import { buildPatchPayload } from "@/lib/patch";
 import { CurrencySettingsCard } from "@/components/currency/CurrencySettingsCard";
-
-const SSO_PROVIDERS = ["OKTA", "AUTH0", "AZURE_AD", "GOOGLE", "CUSTOM"];
 
 const getProfileCompleteness = (org: Organisation) => {
   const fields = [org.industry, org.contactEmail, org.contactPhone, org.address, org.country, org.timezone, org.registrationNumber, org.taxId];
@@ -53,12 +50,9 @@ export default function OrganisationsPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSSOModalOpen, setIsSSOModalOpen] = useState(false);
   const [editingOrg, setEditingOrg] = useState<Organisation | null>(null);
   const [formData, setFormData] = useState<Partial<OrganisationDto>>({});
   const [nameError, setNameError] = useState<string | null>(null);
-  const [ssoFormData, setSsoFormData] = useState<Partial<SsoConfigDto>>({});
-  const [isSubmittingSSO, setIsSubmittingSSO] = useState(false);
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -86,28 +80,6 @@ export default function OrganisationsPage() {
     setIsModalOpen(true);
   };
 
-  const openSSO = async (org: Organisation) => {
-    setEditingOrg(org);
-    setSsoFormData({ provider: "CUSTOM", enabled: false });
-    setIsSSOModalOpen(true);
-    try {
-      const config = await orgSsoService.get(org.id);
-      if (config) {
-        setSsoFormData({
-          provider: config.provider || "CUSTOM",
-          enabled: config.enabled,
-          clientId: config.clientId || "",
-          discoveryUrl: config.issuerUri || "",
-          redirectUri: config.redirectUri || "",
-          clientSecret: "",
-        });
-      }
-    } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response?.status;
-      toast.error(status === 403 ? "You need admin or security permission to manage SSO." : "Failed to load SSO configuration");
-    }
-  };
-
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name?.trim()) {
@@ -130,36 +102,6 @@ export default function OrganisationsPage() {
       setIsModalOpen(false);
     } catch {
       // Reported by the mutation; keep the form open.
-    }
-  };
-
-  const onSubmitSSO = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingOrg) {
-      toast.error("Choose an organisation before saving SSO");
-      return;
-    }
-    if (!ssoFormData.clientId || !ssoFormData.clientSecret || !ssoFormData.discoveryUrl) {
-      toast.error("Issuer URL, client ID, and client secret are required to save OAuth2 SSO");
-      return;
-    }
-    setIsSubmittingSSO(true);
-    try {
-      await orgSsoService.configureOAuth2(editingOrg.id, {
-        provider: ssoFormData.provider || "CUSTOM",
-        clientId: ssoFormData.clientId,
-        clientSecret: ssoFormData.clientSecret,
-        issuerUri: ssoFormData.discoveryUrl,
-        scopes: ["openid", "email", "profile"],
-        redirectUri: ssoFormData.redirectUri || null,
-      });
-      await orgSsoService.toggle(editingOrg.id, { enabled: Boolean(ssoFormData.enabled) });
-      toast.success("SSO configuration saved");
-      setIsSSOModalOpen(false);
-    } catch (error) {
-      toast.error((error as { message?: string })?.message || "Failed to save SSO configuration");
-    } finally {
-      setIsSubmittingSSO(false);
     }
   };
 
@@ -210,16 +152,15 @@ export default function OrganisationsPage() {
         enableSorting: false,
         cell: ({ row }) => (
           <div className="flex justify-end gap-0.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
+            {/* SSO lives on its own page, which knows the API's providers and scope format. */}
+            <Link
+              href="/sso-configuration"
               title="SSO configuration"
               aria-label="Configure SSO"
-              onClick={() => openSSO(row.original)}
+              className="ea-focus inline-flex h-7 w-7 items-center justify-center rounded-control text-muted-fg hover:bg-surface-muted hover:text-foreground"
             >
               <ShieldCheck className="h-3.5 w-3.5" />
-            </Button>
+            </Link>
             <Button
               variant="ghost"
               size="icon"
@@ -343,95 +284,6 @@ export default function OrganisationsPage() {
         </form>
       </Modal>
 
-      <Modal
-        isOpen={isSSOModalOpen}
-        onClose={() => setIsSSOModalOpen(false)}
-        title={`SSO configuration — ${editingOrg?.name ?? ""}`}
-        description="Configure an OAuth2 / OIDC identity provider for single sign-on."
-      >
-        <form onSubmit={onSubmitSSO} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sso-provider">Provider <span className="text-danger">*</span></Label>
-              <Select
-                id="sso-provider"
-                value={ssoFormData.provider || "CUSTOM"}
-                onChange={(e) => setSsoFormData({ ...ssoFormData, provider: e.target.value })}
-              >
-                {SSO_PROVIDERS.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </Select>
-            </div>
-            <div className="flex items-center gap-2 pt-6">
-              <input
-                type="checkbox"
-                id="sso-enabled"
-                checked={ssoFormData.enabled || false}
-                onChange={(e) => setSsoFormData({ ...ssoFormData, enabled: e.target.checked })}
-                className="ea-focus rounded border-edge accent-[var(--primary)]"
-              />
-              <Label htmlFor="sso-enabled" className="cursor-pointer">Enable SSO</Label>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="sso-discovery">
-              <Globe className="mr-1 inline h-3.5 w-3.5 text-faint-fg" />
-              Discovery URL (issuer)
-            </Label>
-            <Input
-              id="sso-discovery"
-              placeholder="https://accounts.google.com/.well-known/openid-configuration"
-              value={ssoFormData.discoveryUrl || ""}
-              onChange={(e) => setSsoFormData({ ...ssoFormData, discoveryUrl: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="sso-client-id">Client ID <span className="text-danger">*</span></Label>
-            <Input
-              id="sso-client-id"
-              className="data-mono"
-              placeholder="your-oauth-client-id"
-              value={ssoFormData.clientId || ""}
-              onChange={(e) => setSsoFormData({ ...ssoFormData, clientId: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="sso-secret">Client secret <span className="text-danger">*</span></Label>
-            <div className="relative">
-              <Input
-                id="sso-secret"
-                type="password"
-                placeholder="Enter client secret (never returned by API)"
-                value={ssoFormData.clientSecret || ""}
-                onChange={(e) => setSsoFormData({ ...ssoFormData, clientSecret: e.target.value })}
-              />
-              <Key className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-faint-fg" />
-            </div>
-            <p className="text-[11px] text-faint-fg">
-              Client secrets are <strong>never returned</strong> by the API for security. Always enter a value when saving.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="sso-redirect">Redirect URI</Label>
-            <Input
-              id="sso-redirect"
-              placeholder="https://myapp.com/auth/callback"
-              value={ssoFormData.redirectUri || ""}
-              onChange={(e) => setSsoFormData({ ...ssoFormData, redirectUri: e.target.value })}
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
-            <Button type="button" variant="outline" onClick={() => setIsSSOModalOpen(false)}>Cancel</Button>
-            <Button type="submit" isLoading={isSubmittingSSO}>Save SSO config</Button>
-          </div>
-        </form>
-      </Modal>
     </ListPageTemplate>
   );
 }

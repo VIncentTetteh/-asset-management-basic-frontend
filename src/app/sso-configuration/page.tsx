@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils";
 import { toastActionError } from "@/lib/step-up";
 import { reportApiError } from "@/lib/api-validation";
 import axios from "axios";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { activeSsoType, needsReplaceConfirmation, replaceWarning, type SsoType } from "@/features/sso/ssoType";
 
 type TabType = "oauth2" | "saml";
 
@@ -26,6 +28,10 @@ export default function SsoConfigurationPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>("oauth2");
     const [isToggling, setIsToggling] = useState(false);
+    // A save that would replace the other SSO type, held until the admin confirms.
+    const [pendingReplace, setPendingReplace] = useState<
+        { type: "oauth2"; data: SsoOAuth2Dto } | { type: "saml"; data: SsoSamlDto } | null
+    >(null);
     const orgId = getOrganisationIdFromStorage() || "";
 
     const oauth2Form = useForm<SsoOAuth2Dto>();
@@ -37,13 +43,14 @@ export default function SsoConfigurationPage() {
             setIsLoading(true);
             const data = await orgSsoService.get(orgId);
             setConfig(data);
+            setActiveTab(activeSsoType(data) ?? "oauth2");
             if (data) {
                 oauth2Form.reset({
                     provider: data.provider || "GOOGLE",
                     clientId: data.clientId || "",
                     clientSecret: "",
                     issuerUri: data.issuerUri || "",
-                    scopes: data.scopes || [],
+                    scopes: data.scopes ?? null,
                     redirectUri: data.redirectUri || "",
                     emailDomain: data.emailDomain || "",
                 });
@@ -82,12 +89,12 @@ export default function SsoConfigurationPage() {
         }
     };
 
-    const onSubmitOAuth2 = async (data: SsoOAuth2Dto) => {
+    const saveOAuth2 = async (data: SsoOAuth2Dto, replaceExisting: boolean) => {
         if (!orgId) return;
         try {
-            const updated = await orgSsoService.configureOAuth2(orgId, data);
-            setConfig(updated);
-            toast.success("OAuth2 SSO configured");
+            await orgSsoService.configureOAuth2(orgId, data, { replaceExisting });
+            toast.success(replaceExisting ? "OAuth2 SSO configured. Enable SSO to turn it on." : "OAuth2 SSO configured");
+            await loadConfig();
         } catch (error) {
             reportApiError(error, { fallback: axios.isAxiosError(error) && error.response?.status === 403
                 ? "You need admin or security permission to manage SSO."
@@ -95,20 +102,47 @@ export default function SsoConfigurationPage() {
         }
     };
 
-    const onSubmitSaml = async (data: SsoSamlDto) => {
+    const saveSaml = async (data: SsoSamlDto, replaceExisting: boolean) => {
         if (!orgId) return;
         try {
             // SAML is a single provider value on the API (SsoProvider.SAML); a free-text
             // name like "Okta SAML" was not an enum value and failed as malformed JSON.
-            const updated = await orgSsoService.configureSaml(orgId, { ...data, provider: "SAML" });
-            setConfig(updated);
-            toast.success("SAML SSO configured");
+            await orgSsoService.configureSaml(orgId, { ...data, provider: "SAML" }, { replaceExisting });
+            toast.success(replaceExisting ? "SAML SSO configured. Enable SSO to turn it on." : "SAML SSO configured");
+            await loadConfig();
         } catch (error) {
             reportApiError(error, { fallback: axios.isAxiosError(error) && error.response?.status === 403
                 ? "You need admin or security permission to manage SSO."
                 : "Failed to configure SAML SSO", setError: samlForm.setError });
         }
     };
+
+    // One SSO type per organisation: warn before OAuth2 and SAML replace each other.
+    const onSubmitOAuth2 = async (data: SsoOAuth2Dto) => {
+        if (needsReplaceConfirmation(config, "oauth2")) {
+            setPendingReplace({ type: "oauth2", data });
+            return;
+        }
+        await saveOAuth2(data, false);
+    };
+
+    const onSubmitSaml = async (data: SsoSamlDto) => {
+        if (needsReplaceConfirmation(config, "saml")) {
+            setPendingReplace({ type: "saml", data });
+            return;
+        }
+        await saveSaml(data, false);
+    };
+
+    const confirmReplace = async () => {
+        const pending = pendingReplace;
+        setPendingReplace(null);
+        if (!pending) return;
+        if (pending.type === "oauth2") await saveOAuth2(pending.data, true);
+        else await saveSaml(pending.data, true);
+    };
+
+    const activeType: SsoType | null = activeSsoType(config);
 
     if (isLoading) {
         return (
@@ -162,6 +196,11 @@ export default function SsoConfigurationPage() {
                 </CardContent>
             </Card>
 
+            <p className="text-sm text-muted-fg">
+                An organisation uses one SSO type at a time.
+                {activeType ? ` Currently configured: ${activeType === "saml" ? "SAML 2.0" : "OAuth2 / OIDC"}.` : ""}
+            </p>
+
             <div className="flex gap-2 border-b border-edge-subtle">
                 {(["oauth2", "saml"] as TabType[]).map((tab) => (
                     <button
@@ -200,8 +239,8 @@ export default function SsoConfigurationPage() {
                                     <Input id="clientId" placeholder="your-client-id" {...oauth2Form.register("clientId", { required: true })} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="clientSecret">Client Secret {!config && <span className="text-danger">*</span>}</Label>
-                                    <Input id="clientSecret" type="password" placeholder={config ? "Leave blank to keep existing" : "Enter client secret"} {...oauth2Form.register("clientSecret", { required: !config })} />
+                                    <Label htmlFor="clientSecret">Client Secret {activeType !== "oauth2" && <span className="text-danger">*</span>}</Label>
+                                    <Input id="clientSecret" type="password" placeholder={activeType === "oauth2" ? "Leave blank to keep existing" : "Enter client secret"} {...oauth2Form.register("clientSecret", { required: activeType !== "oauth2" })} />
                                 </div>
                             </div>
 
@@ -278,6 +317,15 @@ export default function SsoConfigurationPage() {
                     </CardContent>
                 </Card>
             )}
+            <ConfirmModal
+                isOpen={pendingReplace !== null}
+                variant="warning"
+                title="Replace the existing SSO configuration?"
+                message={pendingReplace ? replaceWarning(pendingReplace.type) : ""}
+                confirmLabel="Replace"
+                onCancel={() => setPendingReplace(null)}
+                onConfirm={() => { void confirmReplace(); }}
+            />
         </div>
     );
 }

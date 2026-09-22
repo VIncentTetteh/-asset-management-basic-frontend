@@ -30,16 +30,23 @@ export const orgSsoService = {
         }
     },
 
-    /** PUT /organisations/{orgId}/sso/oauth2 */
-    configureOAuth2: async (orgId: string, data: SsoOAuth2Dto): Promise<OrgSsoConfig> => {
-        const response = await api.put<OrgSsoConfig>(`/organisations/${orgId}/sso/oauth2`, data);
+    /**
+     * PUT /organisations/{orgId}/sso/oauth2. `replaceExisting` must be true to
+     * replace a SAML configuration (the API answers 409 otherwise).
+     */
+    configureOAuth2: async (orgId: string, data: SsoOAuth2Dto, options?: { replaceExisting?: boolean }): Promise<OrgSsoConfig> => {
+        const response = await api.put<OrgSsoConfig>(`/organisations/${orgId}/sso/oauth2`, data, {
+            params: options?.replaceExisting ? { replaceExisting: true } : undefined,
+        });
         invalidateRequestCache(`sso:${orgId}`);
         return response.data;
     },
 
-    /** PUT /organisations/{orgId}/sso/saml */
-    configureSaml: async (orgId: string, data: SsoSamlDto): Promise<OrgSsoConfig> => {
-        const response = await api.put<OrgSsoConfig>(`/organisations/${orgId}/sso/saml`, data);
+    /** PUT /organisations/{orgId}/sso/saml. See `configureOAuth2` for `replaceExisting`. */
+    configureSaml: async (orgId: string, data: SsoSamlDto, options?: { replaceExisting?: boolean }): Promise<OrgSsoConfig> => {
+        const response = await api.put<OrgSsoConfig>(`/organisations/${orgId}/sso/saml`, data, {
+            params: options?.replaceExisting ? { replaceExisting: true } : undefined,
+        });
         invalidateRequestCache(`sso:${orgId}`);
         return response.data;
     },
