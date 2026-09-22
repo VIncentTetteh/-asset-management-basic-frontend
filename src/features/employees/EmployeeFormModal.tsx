@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useSaveEmployee } from "@/features/employees/hooks";
+import { applyApiFieldErrors } from "@/lib/api-validation";
 
 export function EmployeeFormModal({
   isOpen,
@@ -25,7 +26,7 @@ export function EmployeeFormModal({
   departments: Department[];
   users: User[];
 }) {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<EmployeeDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<EmployeeDto>();
   const save = useSaveEmployee();
 
   useEffect(() => {
@@ -70,8 +71,13 @@ export function EmployeeFormModal({
     // Status transitions happen through onboarding/offboarding, not the form.
     if (!editingEmployee) delete payload.status;
 
-    await save.mutateAsync({ id: editingEmployee?.id, data: payload });
-    onClose();
+    try {
+      await save.mutateAsync({ id: editingEmployee?.id, data: payload });
+      onClose();
+    } catch (err) {
+      // Toasted by the mutation; keep the form open with the fields marked.
+      applyApiFieldErrors(err, setError);
+    }
   };
 
   return (
@@ -102,7 +108,8 @@ export function EmployeeFormModal({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="emp-number">Employee number</Label>
-            <Input id="emp-number" placeholder="EMP-0001" className="data-mono" {...register("employeeNumber")} />
+            <Input id="emp-number" placeholder="EMP-0001" className="data-mono" maxLength={100} {...register("employeeNumber")} />
+            {errors.employeeNumber && <p className="text-sm text-danger">{errors.employeeNumber.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="emp-title">Job title</Label>
@@ -114,6 +121,7 @@ export function EmployeeFormModal({
           <div className="space-y-2">
             <Label htmlFor="emp-email">Email</Label>
             <Input id="emp-email" type="email" placeholder="ama.mensah@example.com" {...register("email")} />
+            {errors.email && <p className="text-sm text-danger">{errors.email.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="emp-phone">Phone</Label>

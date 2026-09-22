@@ -7,6 +7,7 @@ import type { EmployeeDto, EmployeeStatus } from "@/services/employeeService";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/contexts/PermissionContext";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -26,6 +27,8 @@ function EmployeesPageInner() {
   const [departmentId, setDepartmentId] = useState("");
   const [page, setPage] = useState(0);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const { hasPermission } = usePermissions();
+  const canManage = hasPermission("MANAGE_EMPLOYEES");
 
   // Debounce the search box.
   useMemo(() => {
@@ -101,9 +104,11 @@ function EmployeesPageInner() {
       title="Employees"
       subtitle={isLoading ? "Loading employees…" : `${total.toLocaleString()} employees on record`}
       actions={
-        <Button onClick={() => setIsFormOpen(true)}>
-          <UserPlus className="mr-2 h-4 w-4" /> New employee
-        </Button>
+        canManage ? (
+          <Button onClick={() => setIsFormOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4" /> New employee
+          </Button>
+        ) : undefined
       }
       toolbar={
         <>
@@ -163,9 +168,11 @@ function EmployeesPageInner() {
         emptyTitle="No employees yet"
         emptyDescription="Employees can hold assets without needing a system login — add your first record."
         emptyAction={
-          <Button size="sm" onClick={() => setIsFormOpen(true)}>
-            <UserPlus className="mr-1.5 h-4 w-4" /> New employee
-          </Button>
+          canManage ? (
+            <Button size="sm" onClick={() => setIsFormOpen(true)}>
+              <UserPlus className="mr-1.5 h-4 w-4" /> New employee
+            </Button>
+          ) : undefined
         }
       />
 

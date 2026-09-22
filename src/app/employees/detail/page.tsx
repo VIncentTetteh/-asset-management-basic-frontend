@@ -10,6 +10,7 @@ import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
 import { EmptyState } from "@/components/patterns/EmptyState";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/contexts/PermissionContext";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PageSpinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
@@ -226,13 +227,17 @@ function EmployeeDetailContent() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [onboardTarget, setOnboardTarget] = useState<EmployeeDto | null>(null);
   const [offboardTarget, setOffboardTarget] = useState<EmployeeDto | null>(null);
+  const { hasPermission } = usePermissions();
 
   if (isLoading || !employee) return <PageSpinner label="Loading employee…" />;
 
   const activeAssets = assetRecords.filter((r) => r.status === "ACTIVE").length;
   const openChecklists = checklists.filter((c) => c.status === "OPEN").length;
-  const canOnboard = employee.status === "ONBOARDING" || employee.status === "ACTIVE";
-  const canOffboard = employee.status !== "TERMINATED" && employee.status !== "OFFBOARDING";
+  // Mirrors the API: edit/onboard need MANAGE_EMPLOYEES; offboarding also OFFBOARD_EMPLOYEE.
+  const canManage = hasPermission("MANAGE_EMPLOYEES");
+  const canOnboard = canManage && (employee.status === "ONBOARDING" || employee.status === "ACTIVE");
+  const canOffboard = (canManage || hasPermission("OFFBOARD_EMPLOYEE"))
+    && employee.status !== "TERMINATED" && employee.status !== "OFFBOARDING";
 
   return (
     <>
@@ -253,9 +258,11 @@ function EmployeeDetailContent() {
         }
         actions={
           <>
-            <Button variant="outline" onClick={() => setIsEditOpen(true)}>
-              <Pencil className="mr-1.5 h-4 w-4" /> Edit
-            </Button>
+            {canManage && (
+              <Button variant="outline" onClick={() => setIsEditOpen(true)}>
+                <Pencil className="mr-1.5 h-4 w-4" /> Edit
+              </Button>
+            )}
             {canOnboard && (
               <Button variant="outline" onClick={() => setOnboardTarget(employee)}>
                 <ClipboardList className="mr-1.5 h-4 w-4" /> Onboard

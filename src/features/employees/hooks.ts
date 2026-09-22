@@ -12,6 +12,7 @@ import { departmentService } from "@/services/departmentService";
 import { userService } from "@/services/userService";
 import { assetService } from "@/services/assetService";
 import { qk } from "@/lib/queryClient";
+import { reportApiError } from "@/lib/api-validation";
 
 export function usePagedEmployees(params: EmployeeFilterParams) {
   return useQuery({
@@ -87,12 +88,8 @@ export function useSaveEmployee() {
       toast.success(vars.id ? "Employee updated" : "Employee created");
       invalidate();
     },
-    onError: (error) => {
-      const message =
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        "Failed to save employee";
-      toast.error(message);
-    },
+    // Field-level 400s are listed by field (the modal also marks the inputs).
+    onError: (error) => reportApiError(error, { fallback: "Failed to save employee" }),
   });
 }
 
