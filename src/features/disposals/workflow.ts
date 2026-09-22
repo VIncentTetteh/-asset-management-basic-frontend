@@ -1,5 +1,6 @@
 import type { DisposalRecord, DisposalsDto } from "@/types";
 import { optionalNumber, optionalString } from "@/features/finance/payloads";
+import type { DisposalFilterParams } from "@/services/disposalService";
 
 export type DisposalAction = "approve" | "reject" | "edit" | "delete";
 
@@ -61,3 +62,31 @@ export function buildDisposalPayload(form: DisposalForm, approved?: DisposalReco
     complianceDocumentUrl: optionalString(form.complianceDocumentUrl),
   };
 }
+
+/** The list's filter bar: status ("" = any) and a disposal-date range. */
+export interface DisposalFilters {
+  status: "" | NonNullable<DisposalFilterParams["status"]>;
+  startDate: string;
+  endDate: string;
+}
+
+export const EMPTY_DISPOSAL_FILTERS: DisposalFilters = { status: "", startDate: "", endDate: "" };
+
+export const DISPOSAL_STATUS_FILTERS: { value: DisposalFilters["status"]; label: string }[] = [
+  { value: "", label: "All statuses" },
+  { value: "PENDING_APPROVAL", label: "Awaiting approval" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "REJECTED", label: "Rejected" },
+];
+
+/** GET /disposals params: blank filters omitted, the rest combined by the API. */
+export function disposalQueryParams(filters: DisposalFilters): DisposalFilterParams {
+  const params: DisposalFilterParams = {};
+  if (filters.status) params.status = filters.status;
+  if (filters.startDate) params.startDate = filters.startDate;
+  if (filters.endDate) params.endDate = filters.endDate;
+  return params;
+}
+
+/** A compliance reference that is a link opens in a new tab; anything else is shown as text. */
+export const isDocumentLink = (value?: string | null): boolean => !!value && /^https?:\/\//i.test(value.trim());

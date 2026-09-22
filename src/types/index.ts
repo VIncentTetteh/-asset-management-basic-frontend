@@ -590,6 +590,9 @@ export type DisposalStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
 
 export interface DisposalRecord extends BaseEntity {
     assetId: string;
+    /** The asset's name and tag (read-only), so the list needs no asset lookup. */
+    assetName?: string;
+    assetTag?: string | null;
     disposalMethod: DisposalMethod | string;
     disposalDate: string;
     saleValue?: number;
@@ -601,6 +604,12 @@ export interface DisposalRecord extends BaseEntity {
     approvedAt?: string;
     rejectedById?: string;
     rejectedAt?: string;
+    /** Why it was rejected or withdrawn. */
+    rejectionReason?: string | null;
+    /** Approval-trail display names (read-only). */
+    requestedByName?: string | null;
+    approvedByName?: string | null;
+    rejectedByName?: string | null;
     reason?: string;
     complianceDocumentUrl?: string;
     organisationId?: string;

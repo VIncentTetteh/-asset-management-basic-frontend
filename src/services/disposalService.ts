@@ -2,11 +2,13 @@ import api from "@/lib/axios";
 import { DisposalRecord, DisposalsDto } from "@/types";
 import { extractList } from "@/services/responseUtils";
 
+/** GET /disposals filters; every one is optional and they combine (AND). */
 export interface DisposalFilterParams {
     assetId?: string;
     startDate?: string;   // YYYY-MM-DD
     endDate?: string;     // YYYY-MM-DD
     approvedById?: string;
+    status?: "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
 }
 
 export const disposalService = {
@@ -40,9 +42,9 @@ export const disposalService = {
         return response.data;
     },
 
-    /** POST /disposals/{id}/reject — refuse (or withdraw) a pending disposal. */
-    reject: async (id: string): Promise<DisposalRecord> => {
-        const response = await api.post<DisposalRecord>(`/disposals/${id}/reject`);
+    /** POST /disposals/{id}/reject — refuse (or withdraw) a pending disposal, saying why. */
+    reject: async (id: string, reason: string): Promise<DisposalRecord> => {
+        const response = await api.post<DisposalRecord>(`/disposals/${id}/reject`, { reason });
         return response.data;
     },
 

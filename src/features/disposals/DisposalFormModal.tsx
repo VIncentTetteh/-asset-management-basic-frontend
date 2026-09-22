@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
-import { useForm, useWatch } from "react-hook-form";
-import type { Asset, DisposalRecord } from "@/types";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import type { DisposalRecord } from "@/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,21 +19,26 @@ import {
   type DisposalForm,
 } from "@/features/disposals/workflow";
 import { todayLocal } from "@/lib/local-date";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { AssetSearchPicker, type PickedAsset } from "@/components/assets/AssetSearchPicker";
+
+const L = FIELD_LIMITS.disposal;
 
 export function DisposalFormModal({
   isOpen,
   onClose,
   editingDisposal,
-  assets,
 }: {
   isOpen: boolean;
   onClose: () => void;
   editingDisposal: DisposalRecord | null;
-  assets: Asset[];
 }) {
-  const { register, handleSubmit, reset, control, setError, formState: { errors } } = useForm<DisposalForm>();
+  const { register, handleSubmit, reset, setValue, setError, formState: { errors } } = useForm<DisposalForm>();
   const save = useSaveDisposal();
   const locked = disposalTermsLocked(editingDisposal);
+  // The picked asset (searched server-side); its id is the form's assetId.
+  const [pickedAsset, setPickedAsset] = useState<PickedAsset | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -60,14 +65,25 @@ export function DisposalFormModal({
     );
   }, [isOpen, editingDisposal, reset]);
 
-  const watchedAssetId = useWatch({ control, name: "assetId" });
-  const selectedAsset = assets.find((a) => a.id === watchedAssetId);
+  // An edit shows the record's own asset (not changeable); a new request shows the pick.
+  const shownAsset: PickedAsset | null = editingDisposal
+    ? { id: editingDisposal.assetId, name: editingDisposal.assetName, assetTag: editingDisposal.assetTag }
+    : pickedAsset;
+  const close = () => {
+    setPickedAsset(null);
+    onClose();
+  };
+
+  const pickAsset = (asset: PickedAsset | null) => {
+    setPickedAsset(asset);
+    setValue("assetId", asset?.id ?? "", { shouldValidate: true });
+  };
 
   const onSubmit = async (data: DisposalForm) => {
     const payload = buildDisposalPayload(data, editingDisposal);
     try {
       await save.mutateAsync(editingDisposal ? { id: editingDisposal.id!, data: payload } : { data: payload });
-      onClose();
+      close();
     } catch (err) {
       // Toasted by the mutation; keep the form open with field errors marked.
       applyApiFieldErrors(err, setError);
@@ -77,7 +93,7 @@ export function DisposalFormModal({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={close}
       title={editingDisposal ? "Edit disposal record" : "Request disposal"}
       description={
         locked
@@ -90,22 +106,23 @@ export function DisposalFormModal({
       <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
         <div className="space-y-2">
           <Label htmlFor="dp-assetId">Asset to dispose <span className="text-danger">*</span></Label>
-          <Select id="dp-assetId" {...register("assetId", { required: "Asset is required" })} disabled={!!editingDisposal}>
-            <option value="">Select target asset</option>
-            {assets
-              .filter((a) => a.status !== "DISPOSED" || editingDisposal?.assetId === a.id)
-              .map((a) => (
-                <option key={a.id} value={a.id}>{a.name} ({a.assetTag || "no tag"})</option>
-              ))}
-          </Select>
-          {errors.assetId && <p className="text-sm text-danger">{errors.assetId.message as string}</p>}
+          <input type="hidden" {...register("assetId", { required: "Asset is required" })} />
+          <AssetSearchPicker
+            id="dp-assetId"
+            value={shownAsset}
+            onChange={(a) => pickAsset(a)}
+            disabled={!!editingDisposal}
+            exclude={(a) => a.status === "DISPOSED"}
+            invalid={!!errors.assetId}
+          />
+          <FieldError error={errors.assetId} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="dp-date">Disposal date <span className="text-danger">*</span></Label>
             <Input id="dp-date" type="date" disabled={locked} {...register("disposalDate", { required: "Disposal date is required" })} />
-            {errors.disposalDate && <p className="text-sm text-danger">{errors.disposalDate.message as string}</p>}
+            <FieldError error={errors.disposalDate} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="dp-method">Disposal method</Label>
@@ -117,39 +134,62 @@ export function DisposalFormModal({
               <option value="RETURN">Return</option>
               <option value="DONATION">Donation</option>
             </Select>
+            <FieldError error={errors.disposalMethod} />
           </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="dp-reason">Primary reason <span className="text-danger">*</span></Label>
-          <Textarea id="dp-reason" placeholder="e.g. End of life, irreparable damage, obsolete" {...register("reason", { required: "Reason is required" })} />
-          {errors.reason && <p className="text-sm text-danger">{errors.reason.message as string}</p>}
+          <Textarea
+            id="dp-reason"
+            placeholder="e.g. End of life, irreparable damage, obsolete"
+            {...limitInputProps(L.reason)}
+            {...register("reason", {
+              ...limitRules<DisposalForm, "reason">(L.reason, "Reason"),
+              required: "Reason is required",
+              validate: (v) => (v ?? "").trim().length > 0 || "Reason is required",
+            })}
+          />
+          <FieldError error={errors.reason} />
         </div>
 
         <div className="grid grid-cols-2 gap-4 border-y border-edge-subtle py-4">
           <div className="space-y-2">
             <Label htmlFor="dp-saleValue">Value recovered</Label>
-            <Input id="dp-saleValue" type="number" step="0.01" min="0" placeholder="0.00" disabled={locked} {...register("saleValue", { min: { value: 0, message: "Cannot be negative" } })} />
-            {errors.saleValue && <p className="text-sm text-danger">{errors.saleValue.message as string}</p>}
+            <Input
+              id="dp-saleValue"
+              type="number"
+              placeholder="0.00"
+              disabled={locked}
+              {...limitInputProps(L.saleValue)}
+              {...register("saleValue", limitRules<DisposalForm, "saleValue">(L.saleValue, "Value recovered"))}
+            />
+            <FieldError error={errors.saleValue} />
             <p className="text-[11px] text-faint-fg">If the asset was sold or scrapped for cash.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="dp-currency">Currency</Label>
             <Select id="dp-currency" disabled={locked} {...register("currency")}>
-              <option value="">{selectedAsset?.currency ? `Asset's currency (${selectedAsset.currency})` : "Asset's currency"}</option>
+              <option value="">Asset&apos;s currency</option>
               <CurrencyOptions current={editingDisposal?.currency ?? undefined} />
             </Select>
+            <FieldError error={errors.currency} />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="dp-doc">Notes / document references</Label>
-          <Textarea id="dp-doc" maxLength={DISPOSAL_DOC_MAX_LENGTH} placeholder="Certificate of destruction #12345…" {...register("complianceDocumentUrl")} />
-          {errors.complianceDocumentUrl && <p className="text-sm text-danger">{errors.complianceDocumentUrl.message as string}</p>}
+          <Label htmlFor="dp-doc">Compliance document (link or reference)</Label>
+          <Input
+            id="dp-doc"
+            maxLength={DISPOSAL_DOC_MAX_LENGTH}
+            placeholder="https://… or certificate of destruction #12345"
+            {...register("complianceDocumentUrl", limitRules<DisposalForm, "complianceDocumentUrl">(L.complianceDocumentUrl, "Compliance document"))}
+          />
+          <FieldError error={errors.complianceDocumentUrl} />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="button" variant="outline" onClick={close}>Cancel</Button>
           <Button type="submit" variant="destructive" isLoading={save.isPending}>
             {editingDisposal ? "Save changes" : "Request disposal"}
           </Button>

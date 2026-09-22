@@ -11,8 +11,14 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
-import { useDisposals, useDisposalAssets, useDeleteDisposal, useDisposalDecision } from "@/features/disposals/hooks";
-import { disposalActionsFor, disposalStatusOf } from "@/features/disposals/workflow";
+import { useDisposals, useDeleteDisposal, useDisposalDecision } from "@/features/disposals/hooks";
+import {
+  disposalActionsFor, disposalQueryParams, disposalStatusOf, DISPOSAL_STATUS_FILTERS, EMPTY_DISPOSAL_FILTERS,
+  isDocumentLink, type DisposalFilters,
+} from "@/features/disposals/workflow";
+import { RejectDisposalModal } from "@/features/disposals/RejectDisposalModal";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { DisposalFormModal } from "@/features/disposals/DisposalFormModal";
@@ -29,8 +35,9 @@ const METHOD_LABEL: Record<string, string> = {
 
 export default function DisposalsPage() {
   const { format, baseCurrency, sum } = useCurrency();
-  const { data: disposals = [], isLoading } = useDisposals();
-  const assets = useDisposalAssets();
+  const [filters, setFilters] = useState<DisposalFilters>(EMPTY_DISPOSAL_FILTERS);
+  const { data: disposals = [], isLoading } = useDisposals(disposalQueryParams(filters));
+  const [rejecting, setRejecting] = useState<DisposalRecord | null>(null);
   const remove = useDeleteDisposal();
   const decide = useDisposalDecision();
   const { user } = useAuth();
@@ -39,13 +46,6 @@ export default function DisposalsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDisposal, setEditingDisposal] = useState<DisposalRecord | null>(null);
 
-  const lookups = useMemo(() => {
-    const byId = new Map(assets.map((a) => [a.id, a]));
-    return {
-      assetName: (id?: string) => byId.get(id ?? "")?.name ?? "Unknown asset",
-      assetTag: (id?: string) => byId.get(id ?? "")?.assetTag,
-    };
-  }, [assets]);
 
   const openCreate = () => {
     setEditingDisposal(null);
@@ -66,7 +66,7 @@ export default function DisposalsPage() {
   const handleApprove = async (record: DisposalRecord) => {
     if (
       !(await confirm({
-        message: `Approve disposing "${lookups.assetName(record.assetId)}"? The asset will be marked disposed and its value locked.`,
+        message: `Approve disposing "${record.assetName ?? "this asset"}"? The asset will be marked disposed and its value locked.`,
         variant: "danger",
       }))
     )
@@ -81,10 +81,10 @@ export default function DisposalsPage() {
         header: "Asset",
         enableSorting: false,
         cell: ({ row }) => {
-          const tag = lookups.assetTag(row.original.assetId);
+          const tag = row.original.assetTag;
           return (
             <div className="flex min-w-0 max-w-56 flex-col gap-1">
-              <span className="truncate font-semibold text-foreground">{lookups.assetName(row.original.assetId)}</span>
+              <span className="truncate font-semibold text-foreground">{row.original.assetName ?? "Unknown asset"}</span>
               {tag ? <AssetTag tag={tag} /> : null}
             </div>
           );
@@ -121,15 +121,61 @@ export default function DisposalsPage() {
         header: () => <span className="block text-right">Recovered</span>,
         cell: ({ row }) => (
           <span className="data-mono block text-right">
-            {row.original.saleValue ? format(row.original.saleValue, row.original.currency || baseCurrency) : "—"}
+            {row.original.saleValue != null ? format(row.original.saleValue, row.original.currency || baseCurrency) : "—"}
           </span>
         ),
+      },
+      {
+        id: "document",
+        header: "Document",
+        enableSorting: false,
+        cell: ({ row }) => {
+          const doc = row.original.complianceDocumentUrl;
+          if (!doc) return <span className="text-faint-fg">—</span>;
+          return isDocumentLink(doc) ? (
+            <a
+              href={doc.trim()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ea-focus block max-w-40 truncate rounded-sm text-xs font-semibold text-brand hover:underline"
+              title={doc}
+            >
+              Open document
+            </a>
+          ) : (
+            <span className="block max-w-40 truncate text-xs text-muted-fg" title={doc}>{doc}</span>
+          );
+        },
       },
       {
         id: "status",
         header: "Status",
         enableSorting: false,
         cell: ({ row }) => <StatusBadge status={disposalStatusOf(row.original)} />,
+      },
+      {
+        id: "trail",
+        header: "Approval trail",
+        enableSorting: false,
+        cell: ({ row }) => {
+          const d = row.original;
+          const when = (at?: string) => (at ? new Date(at).toLocaleDateString() : "");
+          return (
+            <div className="max-w-56 space-y-0.5 text-xs text-muted-fg">
+              {d.requestedByName ? <p className="truncate">Requested by {d.requestedByName}</p> : null}
+              {d.approvedByName ? (
+                <p className="truncate">Approved by {d.approvedByName} {when(d.approvedAt)}</p>
+              ) : null}
+              {d.rejectedByName ? (
+                <p className="truncate" title={d.rejectionReason ?? undefined}>
+                  Rejected by {d.rejectedByName} {when(d.rejectedAt)}
+                  {d.rejectionReason ? `: ${d.rejectionReason}` : ""}
+                </p>
+              ) : null}
+              {!d.requestedByName && !d.approvedByName && !d.rejectedByName ? <p>—</p> : null}
+            </div>
+          );
+        },
       },
       {
         id: "actions",
@@ -158,7 +204,7 @@ export default function DisposalsPage() {
                   className="h-7 w-7 text-warn"
                   title="Reject"
                   aria-label="Reject disposal"
-                  onClick={() => decide.mutate({ id: row.original.id!, decision: "reject" })}
+                  onClick={() => setRejecting(row.original)}
                 >
                   <XCircle className="h-3.5 w-3.5" />
                 </Button>
@@ -194,7 +240,7 @@ export default function DisposalsPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookups, format, baseCurrency, user?.id],
+    [format, baseCurrency, user?.id],
   );
 
   // Sale values are recorded in the disposal's currency (base currency when unset).
@@ -222,6 +268,39 @@ export default function DisposalsPage() {
     >
       <MissingRatesNotice incomplete={!recovered.complete} missingRates={recovered.missingRates} />
 
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="dp-filter-status" className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Status</label>
+          <Select
+            id="dp-filter-status"
+            value={filters.status}
+            onChange={(e) => setFilters({ ...filters, status: e.target.value as DisposalFilters["status"] })}
+            className="h-8 w-44 text-xs"
+          >
+            {DISPOSAL_STATUS_FILTERS.map((f) => (
+              <option key={f.value || "all"} value={f.value}>{f.label}</option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="dp-filter-from" className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Disposed from</label>
+          <Input id="dp-filter-from" type="date" value={filters.startDate} onChange={(e) => setFilters({ ...filters, startDate: e.target.value })} className="h-8 text-xs" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="dp-filter-to" className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Disposed to</label>
+          <Input id="dp-filter-to" type="date" value={filters.endDate} onChange={(e) => setFilters({ ...filters, endDate: e.target.value })} className="h-8 text-xs" />
+        </div>
+        {filters.status || filters.startDate || filters.endDate ? (
+          <button
+            type="button"
+            onClick={() => setFilters(EMPTY_DISPOSAL_FILTERS)}
+            className="ea-focus mb-1.5 rounded-sm text-xs text-muted-fg underline underline-offset-2 hover:text-danger"
+          >
+            Clear filters
+          </button>
+        ) : null}
+      </div>
+
       <DataTable
         columns={columns}
         data={disposals}
@@ -244,7 +323,11 @@ export default function DisposalsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         editingDisposal={editingDisposal}
-        assets={assets}
+      />
+      <RejectDisposalModal
+        record={rejecting}
+        withdrawing={!!rejecting && !!user?.id && rejecting.requestedById === user.id}
+        onClose={() => setRejecting(null)}
       />
       {ConfirmDialog}
     </ListPageTemplate>

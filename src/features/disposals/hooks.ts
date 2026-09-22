@@ -2,28 +2,19 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { disposalService } from "@/services/disposalService";
-import { assetService } from "@/services/assetService";
+import { disposalService, type DisposalFilterParams } from "@/services/disposalService";
 import { qk } from "@/lib/queryClient";
 import type { DisposalsDto } from "@/types";
 import { reportApiError } from "@/lib/api-validation";
 
 const disposalsKey = qk.module("disposals");
 
-export function useDisposals() {
+export function useDisposals(params: DisposalFilterParams = {}) {
   return useQuery({
-    queryKey: disposalsKey.list(),
-    queryFn: () => disposalService.getAll(),
+    queryKey: [...disposalsKey.list(), params],
+    queryFn: () => disposalService.getAll(params),
+    placeholderData: (prev) => prev,
   });
-}
-
-export function useDisposalAssets() {
-  const assets = useQuery({
-    queryKey: qk.module("assets-all").list(),
-    queryFn: () => assetService.getAll(),
-    staleTime: 300_000,
-  });
-  return assets.data ?? [];
 }
 
 function useInvalidateDisposals() {
@@ -52,8 +43,8 @@ export function useSaveDisposal() {
 export function useDisposalDecision() {
   const invalidate = useInvalidateDisposals();
   return useMutation({
-    mutationFn: ({ id, decision }: { id: string; decision: "approve" | "reject" }) =>
-      decision === "approve" ? disposalService.approve(id) : disposalService.reject(id),
+    mutationFn: ({ id, decision, reason }: { id: string; decision: "approve" | "reject"; reason?: string }) =>
+      decision === "approve" ? disposalService.approve(id) : disposalService.reject(id, reason ?? ""),
     onSuccess: (_res, vars) => {
       toast.success(vars.decision === "approve" ? "Disposal approved — asset disposed" : "Disposal rejected");
       invalidate();

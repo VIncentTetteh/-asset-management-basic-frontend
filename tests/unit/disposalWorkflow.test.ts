@@ -56,3 +56,33 @@ describe("disposal workflow", () => {
         expect(body).toMatchObject({ disposalMethod: "SALE", disposalDate: "2026-09-01", saleValue: 500, currency: "GHS", reason: "Cert attached", complianceDocumentUrl: "CERT-1" });
     });
 });
+
+describe("disposal list filters", () => {
+    it("sends only the filters that are set, all together", async () => {
+        const { disposalQueryParams, EMPTY_DISPOSAL_FILTERS, DISPOSAL_STATUS_FILTERS } = await import("@/features/disposals/workflow");
+        expect(disposalQueryParams(EMPTY_DISPOSAL_FILTERS)).toEqual({});
+        expect(disposalQueryParams({ status: "PENDING_APPROVAL", startDate: "2026-01-01", endDate: "" }))
+            .toEqual({ status: "PENDING_APPROVAL", startDate: "2026-01-01" });
+        expect(DISPOSAL_STATUS_FILTERS.find((f) => f.value === "PENDING_APPROVAL")?.label).toBe("Awaiting approval");
+    });
+
+    it("links a compliance document only when it is a web address", async () => {
+        const { isDocumentLink } = await import("@/features/disposals/workflow");
+        expect(isDocumentLink("https://docs.example.com/cert.pdf")).toBe(true);
+        expect(isDocumentLink("Certificate #12345")).toBe(false);
+        expect(isDocumentLink("javascript:alert(1)")).toBe(false);
+    });
+});
+
+describe("disposal reject", () => {
+    it("sends the reason in the body", async () => {
+        const { vi } = await import("vitest");
+        const post = vi.fn().mockResolvedValue({ data: { id: "d1", status: "REJECTED" } });
+        vi.doMock("@/lib/axios", () => ({ default: { post } }));
+        vi.resetModules();
+        const { disposalService } = await import("@/services/disposalService");
+        await disposalService.reject("d1", "Still under warranty");
+        expect(post).toHaveBeenCalledWith("/disposals/d1/reject", { reason: "Still under warranty" });
+        vi.doUnmock("@/lib/axios");
+    });
+});
