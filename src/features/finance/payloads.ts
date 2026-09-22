@@ -227,6 +227,60 @@ export function expenseCurrencyFor(
     return { currency: budget.currency };
 }
 
+/**
+ * The API funds-checks an expense against its linked budget at submit (409 when
+ * the amount exceeds what is available, as for a purchase-order approval).
+ * Returns the message to show before submitting, or null when it fits.
+ */
+export function expenseFundsError(
+    budget: Pick<Budget, "name" | "currency" | "totalAmount" | "spentAmount" | "committedAmount" | "availableAmount"> | undefined,
+    amount: unknown,
+): string | null {
+    if (!budget) return null;
+    const value = optionalNumber(amount);
+    if (value === null) return null;
+    const available = budgetAvailable(budget);
+    if (value <= available) return null;
+    const left = [Math.max(available, 0).toFixed(2), budget.currency].filter(Boolean).join(" ");
+    return `Exceeds the ${left} available in budget "${budget.name}"`;
+}
+
+/** Statuses the expense workflow produces (submit creates SUBMITTED; no drafts). */
+export const EXPENSE_FILTER_STATUSES = ["SUBMITTED", "APPROVED", "REJECTED"] as const;
+
+export interface ExpenseForm {
+    title?: string | null;
+    description?: string | null;
+    amount?: number | string | null;
+    currency?: string | null;
+    category?: string | null;
+    expenseDate?: string | null;
+    linkedBudgetId?: string | null;
+    linkedAssetId?: string | null;
+    departmentId?: string | null;
+    receiptUrl?: string | null;
+}
+
+/** POST /expenses body (there is no update): blanks are left out. */
+export function buildExpensePayload(form: ExpenseForm, currency: string | undefined): Record<string, unknown> {
+    const payload: Record<string, unknown> = {
+        title: String(form.title ?? "").trim(),
+        description: optionalString(form.description),
+        amount: Number(form.amount),
+        currency: currency ?? optionalString(form.currency),
+        category: optionalString(form.category),
+        expenseDate: optionalString(form.expenseDate),
+        linkedBudgetId: optionalString(form.linkedBudgetId),
+        linkedAssetId: optionalString(form.linkedAssetId),
+        departmentId: optionalString(form.departmentId),
+        receiptUrl: optionalString(form.receiptUrl),
+    };
+    for (const key of Object.keys(payload)) {
+        if (payload[key] === null || payload[key] === undefined) delete payload[key];
+    }
+    return payload;
+}
+
 // ── Vendor reviews ────────────────────────────────────────────────────────────
 
 export type VendorReviewForm = Raw<VendorReviewDto>;

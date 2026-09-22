@@ -10,6 +10,9 @@ import {
     buildLicensePayload,
     buildPurchaseOrderPayload,
     buildSupplierPayload,
+    buildExpensePayload,
+    expenseFundsError,
+    EXPENSE_FILTER_STATUSES,
     ledgerSourceLink,
     SUPPLIER_STATUSES,
     expenseCurrencyFor,
@@ -293,5 +296,29 @@ describe("ledgerSourceLink", () => {
     it("has no link for adjustments or a missing source", () => {
         expect(ledgerSourceLink({ sourceType: "ADJUSTMENT", sourceId: null })).toBeNull();
         expect(ledgerSourceLink({ sourceType: "EXPENSE", sourceId: null })).toBeNull();
+    });
+});
+
+describe("expense payload and funds check", () => {
+    const budget = { name: "Travel", currency: "GHS", totalAmount: 1000, spentAmount: 700, committedAmount: 200, availableAmount: 100 };
+
+    it("wires department and receipt URL and drops blanks", () => {
+        expect(buildExpensePayload({
+            title: " Taxi ", amount: "12.5", category: "TRAVEL", departmentId: "d1", receiptUrl: "https://r/1.pdf",
+            linkedAssetId: "", description: " ", linkedBudgetId: "",
+        }, "GHS")).toEqual({
+            title: "Taxi", amount: 12.5, currency: "GHS", category: "TRAVEL", departmentId: "d1", receiptUrl: "https://r/1.pdf",
+        });
+    });
+
+    it("flags an amount above the budget's available funds, as the API's 409 does", () => {
+        expect(expenseFundsError(budget, "100")).toBeNull();
+        expect(expenseFundsError(budget, "100.01")).toBe('Exceeds the 100.00 GHS available in budget "Travel"');
+        expect(expenseFundsError(undefined, "5000")).toBeNull();
+        expect(expenseFundsError(budget, "")).toBeNull();
+    });
+
+    it("filters only on statuses the workflow produces (no DRAFT)", () => {
+        expect(EXPENSE_FILTER_STATUSES).toEqual(["SUBMITTED", "APPROVED", "REJECTED"]);
     });
 });
