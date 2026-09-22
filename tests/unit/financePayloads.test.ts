@@ -189,6 +189,24 @@ describe("contract payload", () => {
         expect(payload).toMatchObject({ notes: "4h response", startDate: "2026-02-01", endDate: "2027-01-31", value: 1200 });
         expect(payload).not.toHaveProperty("terms");
     });
+
+    it("sends blanks as null so a PUT unlinks the supplier and clears terms; blank value is unknown, not 0", () => {
+        const payload = buildContractPayload({
+            title: "SLA", contractType: "OTHER", startDate: "2026-01-01", endDate: "2026-12-31",
+            supplierId: "", assetId: "", value: "", notes: " ", contractNumber: "", documentUrl: "", alertDaysBefore: "",
+        });
+        expect(payload).toMatchObject({
+            supplierId: null, assetId: null, value: null, notes: null, contractNumber: null,
+            documentUrl: null, alertDaysBefore: null,
+        });
+    });
+
+    it("wires contract number, alert days, document URL and linked asset", () => {
+        expect(buildContractPayload({
+            title: "SLA", contractType: "OTHER", startDate: "2026-01-01", endDate: "2026-12-31",
+            contractNumber: " C-9 ", alertDaysBefore: "45", documentUrl: "https://x/y.pdf", assetId: "a1",
+        })).toMatchObject({ contractNumber: "C-9", alertDaysBefore: 45, documentUrl: "https://x/y.pdf", assetId: "a1" });
+    });
 });
 
 describe("expense currency", () => {

@@ -1655,28 +1655,42 @@ export interface Contract {
     status: ContractStatus;
     supplierId?: string | null;
     supplierName?: string | null;
+    contractNumber?: string | null;
+    assetId?: string | null;
+    assetName?: string | null;
     startDate: string;
     endDate: string;
-    value: number;
+    /** Days before the end date that renewal alerts start (API default 30). */
+    alertDaysBefore?: number | null;
+    /** Null when the value is not known. */
+    value: number | null;
     currency?: string | null;
     autoRenew: boolean;
+    documentUrl?: string | null;
     /** Key terms / free-text notes (API field `notes`). */
     notes?: string | null;
+    /** Computed by the API: negative once expired. */
+    daysUntilExpiry?: number | null;
     organisationId?: string | null;
     createdAt: string;
     updatedAt: string;
 }
 
+/** Create/replace (PUT) body: null clears a field. */
 export interface ContractDto {
     title: string;
+    contractNumber?: string | null;
     contractType: ContractType;
     status?: ContractStatus;
     supplierId?: string | null;
+    assetId?: string | null;
     startDate: string;
     endDate: string;
-    value: number;
+    alertDaysBefore?: number | null;
+    value: number | null;
     currency?: string | null;
     autoRenew?: boolean;
+    documentUrl?: string | null;
     notes?: string | null;
 }
 

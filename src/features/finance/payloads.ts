@@ -167,18 +167,27 @@ export function buildLicensePayload(form: LicenseForm): SoftwareLicenseDto {
 
 export type ContractForm = Raw<ContractDto>;
 
-/** Body for POST/PATCH /contracts. Key terms travel as `notes`; dates are required. */
+/**
+ * Full body for POST and PUT /contracts. Key terms travel as `notes`; dates are
+ * required. Every optional field is sent, blank as null, so an edit unlinks the
+ * supplier or asset and clears the number, value, URL or terms the user emptied.
+ * A blank value is "unknown" (null), never 0.
+ */
 export function buildContractPayload(form: ContractForm): ContractDto {
     return {
         title: String(form.title ?? "").trim(),
+        contractNumber: optionalString(form.contractNumber),
         contractType: form.contractType as ContractDto["contractType"],
         status: (optionalString(form.status) ?? undefined) as ContractDto["status"],
         supplierId: optionalString(form.supplierId),
+        assetId: optionalString(form.assetId),
         startDate: String(form.startDate ?? ""),
         endDate: String(form.endDate ?? ""),
-        value: optionalNumber(form.value) ?? 0,
+        alertDaysBefore: optionalNumber(form.alertDaysBefore),
+        value: optionalNumber(form.value),
         currency: optionalString(form.currency),
         autoRenew: form.autoRenew === true || form.autoRenew === "true",
+        documentUrl: optionalString(form.documentUrl),
         notes: optionalString(form.notes),
     };
 }

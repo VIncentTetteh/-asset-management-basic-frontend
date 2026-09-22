@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import toast from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, FileSignature, RefreshCw, AlertTriangle } from "lucide-react";
 import type { Contract, ContractDto } from "@/types";
 import { contractService } from "@/services/contractService";
 import { supplierService } from "@/services/supplierService";
+import { assetService } from "@/services/assetService";
 import { qk } from "@/lib/queryClient";
 import { makeCrudHooks } from "@/features/shared/crudHooks";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
@@ -19,7 +19,6 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { buildPatchPayload } from "@/lib/patch";
 import { applyApiFieldErrors } from "@/lib/api-validation";
 import { buildContractPayload, type ContractForm } from "@/features/finance/payloads";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -28,14 +27,26 @@ import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 import { formatLocalDate } from "@/lib/local-date";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 
 const CONTRACT_TYPES = ["PURCHASE", "LEASE", "MAINTENANCE", "SERVICE_LEVEL_AGREEMENT", "WARRANTY", "INSURANCE", "OTHER"];
 const CONTRACT_STATUSES = ["DRAFT", "ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATED", "RENEWED"];
 
-const contracts = makeCrudHooks<Contract, ContractDto>("contracts", contractService, {
-  entity: "Contract",
-  fields: { notes: "Key terms", startDate: "Start date", endDate: "End date" },
-});
+// Edits are a full-replace PUT so an unlinked supplier/asset or emptied field is saved
+// (PATCH skips nulls). Fields the form does not show are all in the payload builder.
+const contracts = makeCrudHooks<Contract, ContractDto>(
+  "contracts",
+  { ...contractService, update: (id, data) => contractService.replace(id, data as ContractDto) },
+  {
+    entity: "Contract",
+    fields: {
+      notes: "Key terms", startDate: "Start date", endDate: "End date", contractNumber: "Contract number",
+      alertDaysBefore: "Alert days", documentUrl: "Document URL", assetId: "Linked asset", supplierId: "Supplier",
+    },
+  },
+);
+const L = FIELD_LIMITS.contract;
 
 export default function ContractsPage() {
   const { format, baseCurrency, sum } = useCurrency();
@@ -59,6 +70,12 @@ export default function ContractsPage() {
     staleTime: 300_000,
   });
 
+  const { data: assets = [] } = useQuery({
+    queryKey: qk.module("assets-all").list(),
+    queryFn: () => assetService.getAll(),
+    staleTime: 300_000,
+  });
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
 
@@ -70,25 +87,34 @@ export default function ContractsPage() {
       editing
         ? {
             title: editing.title,
+            contractNumber: editing.contractNumber || "",
             contractType: editing.contractType,
             status: editing.status,
             supplierId: editing.supplierId || "",
+            assetId: editing.assetId || "",
             startDate: editing.startDate || "",
             endDate: editing.endDate || "",
-            value: editing.value,
+            alertDaysBefore: editing.alertDaysBefore ?? "",
+            value: editing.value ?? "",
             currency: editing.currency || baseCurrency,
             autoRenew: editing.autoRenew,
+            documentUrl: editing.documentUrl || "",
             notes: editing.notes || "",
           }
         : {
             title: "",
             contractType: "MAINTENANCE",
             status: "DRAFT",
-            value: 0,
+            contractNumber: "",
+            supplierId: "",
+            assetId: "",
+            value: "",
             currency: baseCurrency,
             autoRenew: false,
             startDate: "",
             endDate: "",
+            alertDaysBefore: 30,
+            documentUrl: "",
             notes: "",
           },
     );
@@ -112,16 +138,7 @@ export default function ContractsPage() {
   const onSubmit = async (data: ContractForm) => {
     const payload = buildContractPayload(data);
     try {
-      if (editing) {
-        const patch = buildPatchPayload<ContractDto>(editing as unknown as Partial<ContractDto>, payload);
-        if (Object.keys(patch).length === 0) {
-          toast("No changes to update");
-          return;
-        }
-        await save.mutateAsync({ id: editing.id, data: patch as ContractDto });
-      } else {
-        await save.mutateAsync({ data: payload });
-      }
+      await save.mutateAsync(editing ? { id: editing.id, data: payload } : { data: payload });
       setIsModalOpen(false);
     } catch (err) {
       applyApiFieldErrors(err, setError); // the save hook already toasted the field list
@@ -137,9 +154,23 @@ export default function ContractsPage() {
           <div className="min-w-0 max-w-64">
             <p className="truncate font-semibold text-foreground">{row.original.title}</p>
             <p className="truncate text-xs text-faint-fg">
+              {row.original.contractNumber ? <span className="data-mono">{row.original.contractNumber} · </span> : null}
               {String(row.original.contractType ?? "").replace(/_/g, " ")}
               {row.original.autoRenew ? " · auto-renews" : ""}
             </p>
+            {row.original.notes ? (
+              <p className="truncate text-xs text-muted-fg" title={row.original.notes}>{row.original.notes}</p>
+            ) : null}
+            {row.original.documentUrl ? (
+              <a
+                href={row.original.documentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-brand underline-offset-2 hover:underline"
+              >
+                Document
+              </a>
+            ) : null}
           </div>
         ),
       },
@@ -147,25 +178,45 @@ export default function ContractsPage() {
         id: "supplier",
         header: "Supplier",
         enableSorting: false,
-        cell: ({ row }) => <span className="text-muted-fg">{supplierName(row.original.supplierId ?? undefined)}</span>,
+        cell: ({ row }) => (
+          <div className="min-w-0 max-w-48">
+            <p className="truncate text-muted-fg">
+              {row.original.supplierName || supplierName(row.original.supplierId ?? undefined)}
+            </p>
+            {row.original.assetName ? (
+              <p className="truncate text-xs text-faint-fg">Asset · {row.original.assetName}</p>
+            ) : null}
+          </div>
+        ),
       },
       {
         id: "period",
         header: "Period",
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="text-xs text-muted-fg">
-            {formatLocalDate(row.original.startDate)}
-            {" – "}
-            {formatLocalDate(row.original.endDate)}
-          </span>
+          <div className="text-xs text-muted-fg">
+            <p>
+              {formatLocalDate(row.original.startDate)}
+              {" – "}
+              {formatLocalDate(row.original.endDate)}
+            </p>
+            {typeof row.original.daysUntilExpiry === "number" ? (
+              <p className={row.original.daysUntilExpiry < 0 ? "text-danger" : "text-faint-fg"}>
+                {row.original.daysUntilExpiry < 0
+                  ? `Ended ${-row.original.daysUntilExpiry} day(s) ago`
+                  : `${row.original.daysUntilExpiry} day(s) left · alert ${row.original.alertDaysBefore ?? 30}d before`}
+              </p>
+            ) : null}
+          </div>
         ),
       },
       {
         accessorKey: "value",
         header: () => <span className="block text-right">Value</span>,
         cell: ({ row }) => (
-          <span className="data-mono block text-right">{format(row.original.value, row.original.currency || baseCurrency)}</span>
+          <span className="data-mono block text-right">
+            {row.original.value == null ? "—" : format(row.original.value, row.original.currency || baseCurrency)}
+          </span>
         ),
       },
       {
@@ -221,7 +272,7 @@ export default function ContractsPage() {
 
   // Each contract is converted into the display currency; contracts without a rate are excluded and flagged.
   const totalValue = useMemo(
-    () => sum(rows.map((c) => ({ amount: c.value, currency: c.currency }))),
+    () => sum(rows.filter((c) => c.value != null).map((c) => ({ amount: c.value ?? 0, currency: c.currency }))),
     [rows, sum],
   );
 
@@ -279,20 +330,30 @@ export default function ContractsPage() {
         description="Supplier agreements with lifecycle and value tracking."
       >
         <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
-          <div className="space-y-2">
-            <Label htmlFor="ct-title">Title <span className="text-danger">*</span></Label>
-            <Input id="ct-title" placeholder="Annual maintenance — ATM fleet" {...register("title", { required: "Title is required" })} />
-            {errors.title && <p className="text-sm text-danger">{errors.title.message as string}</p>}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="ct-title">Title <span className="text-danger">*</span></Label>
+              <Input id="ct-title" placeholder="Annual maintenance — ATM fleet" {...limitInputProps(L.title)}
+                {...register("title", limitRules<ContractForm, "title">(L.title, "Title"))} />
+              <FieldError error={errors.title} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ct-number">Contract number</Label>
+              <Input id="ct-number" className="data-mono" {...limitInputProps(L.contractNumber)}
+                {...register("contractNumber", limitRules<ContractForm, "contractNumber">(L.contractNumber, "Contract number"))} />
+              <FieldError error={errors.contractNumber} />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ct-type">Type</Label>
-              <Select id="ct-type" {...register("contractType")}>
+              <Select id="ct-type" {...register("contractType", limitRules<ContractForm, "contractType">(L.contractType, "Type"))}>
                 {CONTRACT_TYPES.map((t) => (
                   <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
                 ))}
               </Select>
+              <FieldError error={errors.contractType} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="ct-status">Status</Label>
@@ -301,24 +362,38 @@ export default function ContractsPage() {
                   <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
                 ))}
               </Select>
+              <FieldError error={errors.status} />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="ct-supplier">Supplier</Label>
-            <Select id="ct-supplier" {...register("supplierId")}>
-              <option value="">— None —</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
+              <Label htmlFor="ct-supplier">Supplier</Label>
+              <Select id="ct-supplier" {...register("supplierId")}>
+                <option value="">— None —</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </Select>
+              <FieldError error={errors.supplierId} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ct-asset">Linked asset</Label>
+              <Select id="ct-asset" {...register("assetId")}>
+                <option value="">— None —</option>
+                {assets.map((a) => (
+                  <option key={a.id} value={a.id}>{a.assetTag ? `${a.name} (${a.assetTag})` : a.name}</option>
+                ))}
+              </Select>
+              <FieldError error={errors.assetId} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
               <Label htmlFor="ct-start">Start date <span className="text-danger">*</span></Label>
-              <Input id="ct-start" type="date" {...register("startDate", { required: "Start date is required" })} />
-              {errors.startDate && <p className="text-sm text-danger">{errors.startDate.message as string}</p>}
+              <Input id="ct-start" type="date" {...register("startDate", limitRules<ContractForm, "startDate">(L.startDate, "Start date"))} />
+              <FieldError error={errors.startDate} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="ct-end">End date <span className="text-danger">*</span></Label>
@@ -326,25 +401,34 @@ export default function ContractsPage() {
                 id="ct-end"
                 type="date"
                 {...register("endDate", {
-                  required: "End date is required",
+                  ...limitRules<ContractForm, "endDate">(L.endDate, "End date"),
                   validate: (end, form) =>
                     !end || !form.startDate || String(end) >= String(form.startDate) || "Must be on or after the start date",
                 })}
               />
-              {errors.endDate && <p className="text-sm text-danger">{errors.endDate.message as string}</p>}
+              <FieldError error={errors.endDate} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ct-alert">Alert days before end</Label>
+              <Input id="ct-alert" type="number" {...limitInputProps(L.alertDaysBefore)}
+                {...register("alertDaysBefore", limitRules<ContractForm, "alertDaysBefore">(L.alertDaysBefore, "Alert days"))} />
+              <FieldError error={errors.alertDaysBefore} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ct-value">Value</Label>
-              <Input id="ct-value" type="number" step="0.01" min="0" {...register("value")} />
+              <Input id="ct-value" type="number" placeholder="Unknown" {...limitInputProps(L.value)}
+                {...register("value", limitRules<ContractForm, "value">(L.value, "Value"))} />
+              <FieldError error={errors.value} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="ct-currency">Currency</Label>
               <Select id="ct-currency" {...register("currency")}>
                 <CurrencyOptions current={editing?.currency} />
               </Select>
+              <FieldError error={errors.currency} />
             </div>
           </div>
 
@@ -361,8 +445,16 @@ export default function ContractsPage() {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="ct-doc">Document URL</Label>
+            <Input id="ct-doc" type="url" placeholder="https://…" {...limitInputProps(L.documentUrl)}
+              {...register("documentUrl", limitRules<ContractForm, "documentUrl">(L.documentUrl, "Document URL"))} />
+            <FieldError error={errors.documentUrl} />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="ct-terms">Key terms</Label>
             <Textarea id="ct-terms" placeholder="Coverage, exclusions, notice period…" {...register("notes")} />
+            <FieldError error={errors.notes} />
           </div>
 
           <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
