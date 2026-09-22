@@ -10,6 +10,8 @@ import {
     buildLicensePayload,
     buildPurchaseOrderPayload,
     buildSupplierPayload,
+    exchangeRateError,
+    formatExchangeRate,
     leaseNoticePrefill,
     buildExpensePayload,
     expenseFundsError,
@@ -345,5 +347,24 @@ describe("expense payload and funds check", () => {
 
     it("filters only on statuses the workflow produces (no DRAFT)", () => {
         expect(EXPENSE_FILTER_STATUSES).toEqual(["SUBMITTED", "APPROVED", "REJECTED"]);
+    });
+});
+
+describe("exchange rates", () => {
+    it("shows every stored decimal (up to 8), never rounding a small rate away", () => {
+        expect(formatExchangeRate(0.00654321)).toBe("0.00654321");
+        expect(formatExchangeRate(15.25)).toBe("15.2500");
+        expect(formatExchangeRate("1234567.12345678")).toBe("1234567.12345678");
+        expect(formatExchangeRate(null)).toBe("—");
+    });
+
+    it("mirrors the API: greater than 0, at most 8 decimals and 10 integer digits", () => {
+        expect(exchangeRateError("")).toBe("Rate is required");
+        expect(exchangeRateError("0")).toBe("Rate must be greater than 0");
+        expect(exchangeRateError("-1")).toBe("Rate must be greater than 0");
+        expect(exchangeRateError("0.00000001")).toBeNull();
+        expect(exchangeRateError("0.000000001")).toBe("Rate can have at most 8 decimal places");
+        expect(exchangeRateError("12345678901")).toBe("Rate can have at most 10 digits before the decimal point");
+        expect(exchangeRateError("15.25")).toBeNull();
     });
 });

@@ -328,3 +328,34 @@ export function buildVendorReviewPayload(form: VendorReviewForm): VendorReviewDt
         periodEnd: optionalString(form.periodEnd),
     };
 }
+
+// ── Exchange rates ────────────────────────────────────────────────────────────
+
+/** Fraction digits the API stores for a rate (NUMERIC(18,8), @Digits(fraction = 8)). */
+export const RATE_FRACTION_DIGITS = 8;
+
+/**
+ * A rate with every significant decimal the API stores (up to 8), and at least 4,
+ * so a small rate such as JPY to USD (0.00654321) is not shown as 0.0065.
+ */
+export function formatExchangeRate(rate: number | string | null | undefined): string {
+    const n = Number(rate);
+    if (rate === null || rate === undefined || rate === "" || !Number.isFinite(n)) return "—";
+    return n.toLocaleString("en-US", {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: RATE_FRACTION_DIGITS,
+        useGrouping: false,
+    });
+}
+
+/** Mirrors @DecimalMin("0.00000001") @Digits(integer = 10, fraction = 8). */
+export function exchangeRateError(value: unknown): string | null {
+    const text = String(value ?? "").trim();
+    if (!text) return "Rate is required";
+    const n = Number(text);
+    if (!Number.isFinite(n) || n <= 0) return "Rate must be greater than 0";
+    const [whole, fraction = ""] = text.replace(/^[+]/, "").split(".");
+    if (fraction.length > RATE_FRACTION_DIGITS) return `Rate can have at most ${RATE_FRACTION_DIGITS} decimal places`;
+    if (whole.replace(/^0+/, "").length > 10) return "Rate can have at most 10 digits before the decimal point";
+    return null;
+}

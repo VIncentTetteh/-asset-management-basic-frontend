@@ -19,8 +19,14 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency, currencyQueryKeys } from "@/contexts/CurrencyContext";
 import { isoCurrencyCodes } from "@/lib/currency";
 import { formatLocalDate, todayLocal } from "@/lib/local-date";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { applyApiFieldErrors, reportApiError } from "@/lib/api-validation";
+import { exchangeRateError, formatExchangeRate } from "@/features/finance/payloads";
 
 type FormData = Omit<ExchangeRateDto, "id" | "organisationId">;
+
+const L = FIELD_LIMITS.exchangeRate;
 
 export default function ExchangeRatesPage() {
   const queryClient = useQueryClient();
@@ -45,12 +51,15 @@ export default function ExchangeRatesPage() {
   };
 
   const createRate = useMutation({
-    mutationFn: (data: FormData) => exchangeRateService.create({ ...data, rate: Number(data.rate) }),
+    mutationFn: (data: FormData) =>
+      exchangeRateService.create({ ...data, rate: Number(data.rate), source: data.source?.trim() || undefined }),
     onSuccess: () => {
       toast.success("Exchange rate added");
       invalidate();
     },
-    onError: () => toast.error("Failed to add exchange rate"),
+    // A duplicate pair and date, an unknown ISO code or a bad rate come back as field errors.
+    onError: (err) =>
+      reportApiError(err, { fallback: "Failed to add exchange rate", labels: { effectiveDate: "Effective date" } }),
   });
   const deleteRate = useMutation({
     mutationFn: (id: string) => exchangeRateService.delete(id),
@@ -71,14 +80,14 @@ export default function ExchangeRatesPage() {
   const [convResult, setConvResult] = useState<number | null>(null);
   const [isConverting, setIsConverting] = useState(false);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<FormData>();
 
   useEffect(() => {
     if (!isModalOpen) return;
     reset({
       baseCurrency: defaultSource,
       targetCurrency: baseCurrency,
-      rate: 0,
+      rate: "" as unknown as number,
       effectiveDate: todayLocal(),
       source: "",
     });
@@ -93,8 +102,12 @@ export default function ExchangeRatesPage() {
   }, [rates, searchTerm]);
 
   const onSubmit = async (data: FormData) => {
-    await createRate.mutateAsync(data);
-    setIsModalOpen(false);
+    try {
+      await createRate.mutateAsync(data);
+      setIsModalOpen(false);
+    } catch (err) {
+      applyApiFieldErrors(err, setError); // the mutation already toasted
+    }
   };
 
   const handleDelete = async (rate: ExchangeRateDto) => {
@@ -138,7 +151,7 @@ export default function ExchangeRatesPage() {
         accessorKey: "rate",
         header: () => <span className="block text-right">Rate</span>,
         cell: ({ row }) => (
-          <span className="data-mono block text-right font-semibold">{Number(row.original.rate).toFixed(4)}</span>
+          <span className="data-mono block text-right font-semibold">{formatExchangeRate(row.original.rate)}</span>
         ),
       },
       {
@@ -291,35 +304,54 @@ export default function ExchangeRatesPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="rate-base">Base currency</Label>
-              <Select id="rate-base" {...register("baseCurrency", { required: true })}>
+              <Select id="rate-base" {...register("baseCurrency", limitRules<FormData, "baseCurrency">(L.baseCurrency, "Base currency"))}>
                 {CURRENCIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </Select>
+              <FieldError error={errors.baseCurrency} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="rate-target">Target currency</Label>
-              <Select id="rate-target" {...register("targetCurrency", { required: true })}>
+              <Select
+                id="rate-target"
+                {...register("targetCurrency", {
+                  ...limitRules<FormData, "targetCurrency">(L.targetCurrency, "Target currency"),
+                  validate: (target, form) => target !== form.baseCurrency || "Must differ from the base currency",
+                })}
+              >
                 {CURRENCIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </Select>
+              <FieldError error={errors.targetCurrency} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="rate-value">Rate <span className="text-danger">*</span></Label>
-              <Input id="rate-value" type="number" step="0.0001" min="0" {...register("rate", { required: true, min: 0 })} />
-              {errors.rate && <p className="text-sm text-danger">Rate is required</p>}
+              <Input
+                id="rate-value"
+                type="number"
+                inputMode="decimal"
+                placeholder="0.00654321"
+                {...limitInputProps(L.rate)}
+                {...register("rate", { validate: (v) => exchangeRateError(v) ?? true })}
+              />
+              <p className="text-xs text-faint-fg">Up to 8 decimal places.</p>
+              <FieldError error={errors.rate} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="rate-date">Effective date</Label>
-              <Input id="rate-date" type="date" {...register("effectiveDate", { required: true })} />
+              <Input id="rate-date" type="date" {...register("effectiveDate", { required: "Effective date is required" })} />
+              <FieldError error={errors.effectiveDate} />
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="rate-source">Source</Label>
-            <Input id="rate-source" placeholder="e.g. Bank of Ghana mid-rate" {...register("source")} />
+            <Input id="rate-source" placeholder="e.g. Bank of Ghana mid-rate (blank = Manual)" {...limitInputProps(L.source)}
+              {...register("source", limitRules<FormData, "source">(L.source, "Source"))} />
+            <FieldError error={errors.source} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
