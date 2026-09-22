@@ -19,9 +19,14 @@ import { toastActionError } from "@/lib/step-up";
 import { reportApiError } from "@/lib/api-validation";
 import axios from "axios";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { emailDomainRule, httpUrlRule, httpsUrlRule } from "@/features/sso/ssoValidation";
 import { activeSsoType, needsReplaceConfirmation, replaceWarning, type SsoType } from "@/features/sso/ssoType";
 
 type TabType = "oauth2" | "saml";
+
+const L = FIELD_LIMITS.ssoConfig;
 
 export default function SsoConfigurationPage() {
     const [config, setConfig] = useState<OrgSsoConfig | null>(null);
@@ -36,6 +41,8 @@ export default function SsoConfigurationPage() {
 
     const oauth2Form = useForm<SsoOAuth2Dto>();
     const samlForm = useForm<SsoSamlDto>();
+    const o2e = oauth2Form.formState.errors;
+    const se = samlForm.formState.errors;
 
     const loadConfig = useCallback(async () => {
         if (!orgId) { setIsLoading(false); return; }
@@ -236,27 +243,32 @@ export default function SsoConfigurationPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="clientId">Client ID <span className="text-danger">*</span></Label>
-                                    <Input id="clientId" placeholder="your-client-id" {...oauth2Form.register("clientId", { required: true })} />
+                                    <Input id="clientId" placeholder="your-client-id" {...limitInputProps(L.clientId)} {...oauth2Form.register("clientId", { ...limitRules<SsoOAuth2Dto, "clientId">(L.clientId, "Client ID"), required: "Client ID is required" })} />
+                                    <FieldError error={o2e.clientId} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="clientSecret">Client Secret {activeType !== "oauth2" && <span className="text-danger">*</span>}</Label>
-                                    <Input id="clientSecret" type="password" placeholder={activeType === "oauth2" ? "Leave blank to keep existing" : "Enter client secret"} {...oauth2Form.register("clientSecret", { required: activeType !== "oauth2" })} />
+                                    <Input id="clientSecret" type="password" placeholder={activeType === "oauth2" ? "Leave blank to keep existing" : "Enter client secret"} {...oauth2Form.register("clientSecret", { required: activeType !== "oauth2" ? "Client secret is required" : false })} />
+                                    <FieldError error={o2e.clientSecret} />
                                 </div>
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="issuerUri">Issuer URI <span className="text-danger">*</span></Label>
-                                <Input id="issuerUri" placeholder="https://accounts.google.com" {...oauth2Form.register("issuerUri", { required: true })} />
+                                <Input id="issuerUri" type="url" placeholder="https://accounts.google.com" {...limitInputProps(L.issuerUri)} {...oauth2Form.register("issuerUri", { ...limitRules<SsoOAuth2Dto, "issuerUri">(L.issuerUri, "Issuer URI"), required: "Issuer URI is required", validate: httpsUrlRule })} />
+                                <FieldError error={o2e.issuerUri} />
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="redirectUri">Redirect URI</Label>
-                                <Input id="redirectUri" placeholder="https://yourapp.com/auth/callback" {...oauth2Form.register("redirectUri")} />
+                                <Input id="redirectUri" type="url" placeholder="https://yourapp.com/auth/callback" {...oauth2Form.register("redirectUri", { validate: httpUrlRule })} />
+                                <FieldError error={o2e.redirectUri} />
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="oauth2-emailDomain">Email Domain</Label>
-                                <Input id="oauth2-emailDomain" placeholder="company.com" {...oauth2Form.register("emailDomain")} />
+                                <Input id="oauth2-emailDomain" placeholder="company.com" {...limitInputProps(L.emailDomain)} {...oauth2Form.register("emailDomain", { ...limitRules<SsoOAuth2Dto, "emailDomain">(L.emailDomain, "Email domain"), validate: emailDomainRule })} />
+                                <FieldError error={o2e.emailDomain} />
                                 <p className="text-xs text-faint-fg">
                                     Users with this email domain will be automatically routed to your SSO provider at login.
                                 </p>
@@ -287,22 +299,26 @@ export default function SsoConfigurationPage() {
 
                             <div className="space-y-2">
                                 <Label htmlFor="idpMetadataUrl">IdP Metadata URL <span className="text-danger">*</span></Label>
-                                <Input id="idpMetadataUrl" placeholder="https://idp.company.com/metadata" {...samlForm.register("idpMetadataUrl", { required: true })} />
+                                <Input id="idpMetadataUrl" type="url" placeholder="https://idp.company.com/metadata" {...samlForm.register("idpMetadataUrl", { required: "IdP metadata URL is required", validate: httpUrlRule })} />
+                                <FieldError error={se.idpMetadataUrl} />
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="spEntityId">SP Entity ID <span className="text-danger">*</span></Label>
-                                <Input id="spEntityId" placeholder="https://yourapp.com" {...samlForm.register("spEntityId", { required: true })} />
+                                <Input id="spEntityId" placeholder="https://yourapp.com" {...limitInputProps(L.spEntityId)} {...samlForm.register("spEntityId", { ...limitRules<SsoSamlDto, "spEntityId">(L.spEntityId, "SP entity ID"), required: "SP entity ID is required" })} />
+                                <FieldError error={se.spEntityId} />
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="acsUrl">Assertion Consumer Service URL <span className="text-danger">*</span></Label>
-                                <Input id="acsUrl" placeholder="https://yourapp.com/saml/acs" {...samlForm.register("assertionConsumerServiceUrl", { required: true })} />
+                                <Input id="acsUrl" type="url" placeholder="https://yourapp.com/saml/acs" {...samlForm.register("assertionConsumerServiceUrl", { required: "ACS URL is required", validate: httpUrlRule })} />
+                                <FieldError error={se.assertionConsumerServiceUrl} />
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="saml-emailDomain">Email Domain</Label>
-                                <Input id="saml-emailDomain" placeholder="company.com" {...samlForm.register("emailDomain")} />
+                                <Input id="saml-emailDomain" placeholder="company.com" {...limitInputProps(L.emailDomain)} {...samlForm.register("emailDomain", { ...limitRules<SsoSamlDto, "emailDomain">(L.emailDomain, "Email domain"), validate: emailDomainRule })} />
+                                <FieldError error={se.emailDomain} />
                                 <p className="text-xs text-faint-fg">
                                     Users with this email domain will be automatically routed to your SSO provider at login.
                                 </p>
