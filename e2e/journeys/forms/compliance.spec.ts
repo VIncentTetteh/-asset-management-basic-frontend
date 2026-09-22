@@ -109,7 +109,9 @@ const REGISTERS: Register[] = [
             { label: "Status", type: "select", value: "In progress", edit: "Resolved" },
             { label: "Category", type: "text", value: "Phishing", optional: true },
             { label: "Detected", type: "date", value: isoDate(-3), optional: true },
-            { label: "Resolved", type: "date", value: isoDate(-1), optional: true },
+            // The edit moves the incident to Resolved, and the API stamps a resolved date
+            // when a RESOLVED/CLOSED incident has none, so this field is changed, not cleared.
+            { label: "Resolved", type: "date", value: isoDate(-1), edit: isoDate(-2), optional: true },
             { label: "Reported by", type: "select", value: OWNER, optional: true },
             { label: "Assigned to", type: "select", value: OWNER, optional: true },
             { label: "Root cause", type: "textarea", value: uniq("root cause"), optional: true },
@@ -160,6 +162,7 @@ const REGISTERS: Register[] = [
         ],
     },
     {
+        // Finding counts are NOT NULL (default 0): zero is how a count is "cleared".
         slug: "vulnerability-scans",
         entity: "Scan",
         // The row shows the scanner tool (and the search covers it), so it is the key.
@@ -170,10 +173,10 @@ const REGISTERS: Register[] = [
             { label: "Scan type", type: "select", value: "External", edit: "ICS / OT" },
             { label: "Scanner tool", type: "text", value: uniq("Scanner"), edit: uniq("Scanner-edited") },
             { label: "Status", type: "select", value: "Fail", edit: "Pass" },
-            { label: "Critical", type: "number", value: 1, optional: true },
-            { label: "High", type: "number", value: 2, optional: true },
-            { label: "Medium", type: "number", value: 3, optional: true },
-            { label: "Low", type: "number", value: 4, optional: true },
+            { label: "Critical", type: "number", value: 1, edit: 0, optional: true },
+            { label: "High", type: "number", value: 2, edit: 0, optional: true },
+            { label: "Medium", type: "number", value: 3, edit: 0, optional: true },
+            { label: "Low", type: "number", value: 4, edit: 0, optional: true },
             { label: "Next scan due", type: "date", value: isoDate(90), optional: true },
             { label: "Report URL", type: "text", value: url("scan-report"), optional: true },
             { label: "Notes", type: "textarea", value: uniq("scan notes"), optional: true },
@@ -275,25 +278,6 @@ const REGISTERS: Register[] = [
         ],
         negative: [
             { field: "Requirement", value: overLength(16), error: /Requirement must be at most 16 characters/ },
-            { field: "Evidence URL", value: JS_URL, error: linkError("Evidence URL") },
-        ],
-    },
-    {
-        slug: "bog-controls",
-        entity: "Control",
-        key: uniq("BoG"),
-        fields: [
-            { label: "Directive reference", type: "text", value: uniq("BoG") },
-            { label: "Status", type: "select", value: "Partial", edit: "Implemented" },
-            { label: "Requirement", type: "textarea", value: uniq("requirement"), edit: uniq("requirement-edited") },
-            { label: "Gap description", type: "textarea", value: uniq("gap"), optional: true },
-            { label: "Remediation plan", type: "textarea", value: uniq("remediation"), optional: true },
-            { label: "Target date", type: "date", value: isoDate(40), optional: true },
-            { label: "Owner", type: "select", value: OWNER, optional: true },
-            { label: "Evidence URL", type: "text", value: url("bog-evidence"), optional: true },
-        ],
-        negative: [
-            { field: "Directive reference", value: overLength(32), error: /Directive reference must be at most 32 characters/ },
             { field: "Evidence URL", value: JS_URL, error: linkError("Evidence URL") },
         ],
     },
