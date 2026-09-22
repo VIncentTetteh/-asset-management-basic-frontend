@@ -20,6 +20,8 @@ import { buildPatchPayload } from "@/lib/patch";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { usePermissions } from "@/contexts/PermissionContext";
+import Link from "next/link";
+import { reportApiError } from "@/lib/api-validation";
 
 export default function DepartmentsPage() {
   const { format, baseCurrency } = useCurrency();
@@ -42,14 +44,14 @@ export default function DepartmentsPage() {
       toast.success("Department deleted");
       invalidate();
     },
-    onError: () => toast.error("Failed to delete department"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to delete department" }),
   });
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<DepartmentDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm<DepartmentDto>();
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -117,9 +119,17 @@ export default function DepartmentsPage() {
 
     const payload: DepartmentDto = { ...data };
     delete payload.description;
-    if (!payload.departmentCode) delete payload.departmentCode;
-    if (!payload.costCenterCode) delete payload.costCenterCode;
-    if (payload.budgetLimit) payload.budgetLimit = Number(payload.budgetLimit);
+    // The API treats a missing field as "unchanged", so a cleared code/cost
+    // center is sent as "" (which clears it) and a cleared cap as 0 (no cap).
+    payload.departmentCode = data.departmentCode?.trim() ?? "";
+    payload.costCenterCode = data.costCenterCode?.trim() ?? "";
+    const rawCap = data.budgetLimit as unknown;
+    payload.budgetLimit = rawCap === undefined || rawCap === null || String(rawCap).trim() === "" ? 0 : Number(rawCap);
+    if (!editingDept) {
+      if (!payload.departmentCode) delete payload.departmentCode;
+      if (!payload.costCenterCode) delete payload.costCenterCode;
+      if (!payload.budgetLimit) delete payload.budgetLimit;
+    }
 
     try {
       if (editingDept) {
@@ -139,13 +149,7 @@ export default function DepartmentsPage() {
       setIsModalOpen(false);
       invalidate();
     } catch (error) {
-      const status = (error as { response?: { status?: number } })?.response?.status;
-      if (status === 409) {
-        toast.error("A department with that name, code, or cost center already exists.");
-      } else {
-        toast.error("Failed to save department");
-      }
-      console.error(error);
+      reportApiError(error, { fallback: "Failed to save department", setError });
     }
   };
 
@@ -178,7 +182,11 @@ export default function DepartmentsPage() {
       },
       {
         accessorKey: "budgetLimit",
-        header: () => <span className="block text-right">Budget limit</span>,
+        header: () => (
+          <span className="block text-right" title="An informational planning cap, not a budget. Spending is tracked and enforced under Budgets.">
+            Planning cap
+          </span>
+        ),
         cell: ({ row }) => (
           <span className="data-mono block text-right">
             {row.original.budgetLimit ? format(row.original.budgetLimit, baseCurrency) : "—"}
@@ -251,7 +259,7 @@ export default function DepartmentsPage() {
         data={filtered}
         isLoading={isLoading}
         emptyTitle="No departments yet"
-        emptyDescription="Structure your organisation into departments with codes and budget limits."
+        emptyDescription="Structure your organisation into departments with codes and cost centers."
         emptyAction={canManageDepartments ? (
           <Button size="sm" onClick={openCreate}>
             <Layers className="mr-1.5 h-4 w-4" /> New department
@@ -285,8 +293,12 @@ export default function DepartmentsPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="dept-budget">Budget limit</Label>
+              <Label htmlFor="dept-budget">Planning cap ({baseCurrency})</Label>
               <Input id="dept-budget" type="number" step="0.01" min="0" {...register("budgetLimit")} />
+              <p className="text-xs text-faint-fg">
+                Informational only — nothing is checked against it. To control spending, create a department budget
+                under <Link href="/budgets" className="text-brand underline">Budgets</Link>.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="dept-status">Status</Label>
