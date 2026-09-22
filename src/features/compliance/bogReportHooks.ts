@@ -52,6 +52,8 @@ export function useUpdateBogControlStatus() {
       toast.success("Status updated");
       invalidate();
     },
-    onError: () => toast.error("Failed to update status"),
+    // The server's reason (e.g. a 409 on a closed control) used to be replaced
+    // by a generic message.
+    onError: (err) => reportApiError(err, { fallback: "Failed to update status" }),
   });
 }

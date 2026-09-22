@@ -26,6 +26,7 @@ import DocumentAttachments from "@/components/DocumentAttachments";
 import { useBogReport, useBogControlsList, useUpsertBogControl, useUpdateBogControlStatus } from "@/features/compliance/bogReportHooks";
 import { todayLocal } from "@/lib/local-date";
 import { buildBogControlPayload } from "@/features/compliance/payload";
+import { applyApiFieldErrors } from "@/lib/api-validation";
 
 const STATUSES: ControlStatus[] = ["IMPLEMENTED", "PARTIAL", "NOT_IMPLEMENTED", "NOT_APPLICABLE"];
 
@@ -93,7 +94,7 @@ export default function BogReportPage() {
   const [isUpsertOpen, setIsUpsertOpen] = useState(false);
   const [editControl, setEditControl] = useState<BOGControl | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<BOGControlDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<BOGControlDto>();
 
   useEffect(() => {
     if (!isUpsertOpen) return;
@@ -133,8 +134,14 @@ export default function BogReportPage() {
   };
 
   const onUpsert = async (data: BOGControlDto) => {
-    await upsertControl.mutateAsync(buildBogControlPayload(data) as BOGControlDto);
-    setIsUpsertOpen(false);
+    try {
+      await upsertControl.mutateAsync(buildBogControlPayload(data) as BOGControlDto);
+      setIsUpsertOpen(false);
+    } catch (err) {
+      // Toasted by the mutation; the dialog stays open with the server's field
+      // errors marked. They used to be dropped, so a rejected save looked silent.
+      applyApiFieldErrors(err, setError);
+    }
   };
 
   const columns = useMemo<ColumnDef<BOGControl, unknown>[]>(
