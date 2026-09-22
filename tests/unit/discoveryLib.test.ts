@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildScanPayload, deviceTypeKey } from "@/features/discovery/lib";
+import { buildScanPayload, canPromoteDevice, deviceTypeKey, promotedAssetHref } from "@/features/discovery/lib";
 
 describe("discovery helpers", () => {
     it("maps the API's free-text device types onto the icon vocabulary", () => {
@@ -24,5 +24,20 @@ describe("discovery helpers", () => {
             portScan: false,
             timeoutMs: 1000,
         });
+    });
+});
+
+describe("promoted devices", () => {
+    it("link to their asset and are never offered Promote again", () => {
+        const d = { status: "ONLINE", promotedAssetId: "a-1" };
+        expect(promotedAssetHref(d)).toBe("/assets?id=a-1");
+        expect(canPromoteDevice(d)).toBe(false);
+    });
+
+    it("an unpromoted device has no link and can be promoted", () => {
+        const d = { status: "ONLINE", promotedAssetId: null };
+        expect(promotedAssetHref(d)).toBeNull();
+        expect(canPromoteDevice(d)).toBe(true);
+        expect(canPromoteDevice({ status: "PROMOTED" })).toBe(false);
     });
 });

@@ -50,3 +50,16 @@ export function buildScanPayload(form: ScanForm): DiscoveryScanDto {
   if (ports.length) payload.ports = ports;
   return payload;
 }
+
+/**
+ * Where a discovered row links: the asset it was promoted to, or nothing. A
+ * device keeps its asset link across rescans (the API keeps it PROMOTED).
+ */
+export function promotedAssetHref(device: { promotedAssetId?: string | null }): string | null {
+  return device.promotedAssetId ? `/assets?id=${encodeURIComponent(device.promotedAssetId)}` : null;
+}
+
+/** Promote is offered only for devices not already linked to an asset. */
+export function canPromoteDevice(device: { status?: string | null; promotedAssetId?: string | null }): boolean {
+  return device.status !== "PROMOTED" && !device.promotedAssetId;
+}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { DiscoveredDevice, DiscoverySummary } from "@/types";
 import { discoveryService } from "@/services/discoveryService";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { cn } from "@/lib/utils";
 import { reportApiError } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
-import { buildScanPayload, deviceTypeKey, type ScanForm } from "@/features/discovery/lib";
+import { buildScanPayload, canPromoteDevice, deviceTypeKey, promotedAssetHref, type ScanForm } from "@/features/discovery/lib";
 
 // ── Port → Service map ────────────────────────────────────────────────────────
 
@@ -367,7 +368,13 @@ export default function DiscoveryPage() {
                                                     className="rounded-control p-1.5 text-faint-fg transition-colors hover:bg-surface-muted hover:text-foreground">
                                                     {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                                 </button>
-                                                {canManage && device.status !== "PROMOTED" && (
+                                                {promotedAssetHref(device) && (
+                                                    <Link href={promotedAssetHref(device)!}
+                                                        className="ea-focus inline-flex h-7 items-center rounded-control border border-info/30 px-2 text-xs font-semibold text-info hover:bg-info-soft">
+                                                        <ArrowUpRight className="mr-1 h-3 w-3" /> View asset
+                                                    </Link>
+                                                )}
+                                                {canManage && canPromoteDevice(device) && (
                                                     <Button variant="outline" size="sm" onClick={() => handlePromote(device.id)}
                                                         isLoading={promotingId === device.id}
                                                         className="h-7 border-brand/30 px-2 text-xs text-brand hover:bg-brand-soft">
