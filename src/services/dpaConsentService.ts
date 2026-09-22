@@ -30,11 +30,8 @@ const PAGE_SIZE = 500;
 export const dpaConsentService = {
   /** POST /dpa/consent — grant (or decline) consent for a purpose, as the current user. */
   record: async (purpose: string, granted: boolean): Promise<ConsentRecordDto> => {
-    const response = await api.post<ConsentRecordDto>("/dpa/consent", {
-      purpose,
-      granted,
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 255) : undefined,
-    });
+    // The API records the IP address and user agent from the request itself.
+    const response = await api.post<ConsentRecordDto>("/dpa/consent", { purpose, granted });
     return response.data;
   },
 

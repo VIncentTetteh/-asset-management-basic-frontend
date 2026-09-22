@@ -8,7 +8,8 @@ import { FileText, Plus, Search, CheckCircle2, AlertTriangle, User } from "lucid
 import { dsarService, type DsarDto, type DsarType, type DsarStatus, type DsarStatusUpdate, type DsarSubmission } from "@/services/dsarService";
 import { reportApiError, applyApiFieldErrors } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
-import { dsarNextStatuses, isDsarClosed } from "@/features/dpa/dsar";
+import { buildDsarStatusUpdate, dsarNextStatuses, isDsarClosed, type DsarUpdateForm } from "@/features/dpa/dsar";
+import { userService } from "@/services/userService";
 import { qk } from "@/lib/queryClient";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -73,7 +74,19 @@ export default function DsarPage() {
   const { hasPermission } = usePermissions();
   // Mirrors the API: status changes need MANAGE_COMPLIANCE (or an admin role).
   const canManage = hasPermission("MANAGE_COMPLIANCE");
-  const { register: regU, handleSubmit: hsU, reset: resetU, formState: { isSubmitting: subU } } = useForm<DsarStatusUpdate>();
+  const { register: regU, handleSubmit: hsU, reset: resetU, formState: { isSubmitting: subU } } = useForm<DsarUpdateForm>();
+  // Assignee picker; an empty list (e.g. no VIEW_USERS) just leaves "Unassigned".
+  const { data: users = [] } = useQuery({
+    queryKey: qk.module("users").list(),
+    queryFn: () => userService.getAll(),
+    staleTime: 300_000,
+    enabled: canManage,
+  });
+  const userName = (id?: string) => {
+    if (!id) return "Unassigned";
+    const u = users.find((x) => x.id === id);
+    return u ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email || id : "Assigned";
+  };
 
   const filtered = useMemo(() => {
     let list = requests;
@@ -114,13 +127,13 @@ export default function DsarPage() {
 
   const openUpdate = (req: DsarDto) => {
     setUpdateTarget(req);
-    resetU({ status: req.status as DsarStatus, responseSummary: req.responseSummary || "" });
+    resetU({ status: req.status as DsarStatus, responseSummary: req.responseSummary || "", assignedToUserId: req.assignedToUserId || "" });
   };
 
-  const onUpdateStatus = async (data: DsarStatusUpdate) => {
+  const onUpdateStatus = async (form: DsarUpdateForm) => {
     if (!updateTarget?.id) return;
     try {
-      await updateDsarStatus.mutateAsync({ id: updateTarget.id, data });
+      await updateDsarStatus.mutateAsync({ id: updateTarget.id, data: buildDsarStatusUpdate(form, updateTarget) });
       setUpdateTarget(null);
     } catch {
       // Reported by the mutation; keep the dialog open.
@@ -321,6 +334,18 @@ export default function DsarPage() {
             <p className="text-xs text-faint-fg">Completing or rejecting a request is final.</p>
           </div>
           <div className="space-y-2">
+            <Label htmlFor="u-assignee">Assigned to</Label>
+            <Select id="u-assignee" {...regU("assignedToUserId")}>
+              <option value="">Unassigned</option>
+              {updateTarget?.assignedToUserId && !users.some((u) => u.id === updateTarget.assignedToUserId) ? (
+                <option value={updateTarget.assignedToUserId}>Current assignee</option>
+              ) : null}
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{userName(u.id)}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="u-notes">Response summary</Label>
             <Textarea id="u-notes" placeholder="How the request was handled…" {...regU("responseSummary")} />
           </div>
@@ -348,6 +373,7 @@ export default function DsarPage() {
               ["Submitted", fmt(detailTarget.submittedAt)],
               ["Due date", fmt(detailTarget.dueAt)],
               ["Completed", fmt(detailTarget.completedAt)],
+              ["Assigned to", userName(detailTarget.assignedToUserId)],
             ].map(([label, value]) => (
               <div key={label} className="flex justify-between border-b border-edge-subtle pb-2">
                 <span className="text-muted-fg">{label}</span>

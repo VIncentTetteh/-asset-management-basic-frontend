@@ -29,10 +29,14 @@ export interface DsarSubmission {
   notes?: string;
 }
 
+/** UpdateDsarStatusRequest on the API (PATCH body). */
 export interface DsarStatusUpdate {
   status: DsarStatus | string;
+  /** Omitted leaves it; "" clears it. */
   responseSummary?: string;
   assignedToUserId?: string;
+  /** True removes the assignee. */
+  clearAssignee?: boolean;
 }
 
 /** The list endpoint pages; the screen shows the most recent page of this size. */
@@ -57,15 +61,12 @@ export const dsarService = {
     return response.data;
   },
 
-  /** PATCH /dpa/dsar/{id}/status — the API takes query parameters, not a JSON body. */
+  /**
+   * PATCH /dpa/dsar/{id}/status with a JSON body: the response summary can hold
+   * personal data, which must not travel in the URL.
+   */
   updateStatus: async (id: string, update: DsarStatusUpdate): Promise<DsarDto> => {
-    const response = await api.patch<DsarDto>(`/dpa/dsar/${id}/status`, null, {
-      params: {
-        status: update.status,
-        responseSummary: update.responseSummary || undefined,
-        assignedToUserId: update.assignedToUserId || undefined,
-      },
-    });
+    const response = await api.patch<DsarDto>(`/dpa/dsar/${id}/status`, update);
     return response.data;
   },
 };
