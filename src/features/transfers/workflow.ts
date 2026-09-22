@@ -9,12 +9,15 @@ export type TransferAction = "approve" | "reject" | "complete" | "delete";
  *   anything but COMPLETED can be deleted (a completed move is the audit trail)
  *
  * The requester never sees Approve on their own request (maker-checker; the API
- * refuses it too).
+ * refuses it too). Every action needs TRANSFER_ASSET (admins hold every
+ * permission), so a viewer without it sees none.
  */
 export function transferActionsFor(
   transfer: { status?: string; requestedById?: string },
   currentUserId?: string,
+  canManage = true,
 ): TransferAction[] {
+  if (!canManage) return [];
   const isRequester = !!currentUserId && transfer.requestedById === currentUserId;
   switch (transfer.status ?? "REQUESTED") {
     case "REQUESTED":

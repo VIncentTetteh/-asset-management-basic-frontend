@@ -17,7 +17,11 @@ describe("transfer row actions", () => {
     it("offers nothing on a completed transfer and only delete on closed ones", () => {
         expect(transferActionsFor({ status: "COMPLETED" }, "u2")).toEqual([]);
         expect(transferActionsFor({ status: "REJECTED" }, "u2")).toEqual(["delete"]);
-        expect(transferActionsFor({ status: "CANCELLED" }, "u2")).toEqual(["delete"]);
+    });
+
+    it("offers no actions without TRANSFER_ASSET", () => {
+        expect(transferActionsFor({ status: "REQUESTED", requestedById: "u1" }, "u2", false)).toEqual([]);
+        expect(transferActionsFor({ status: "APPROVED" }, "u2", false)).toEqual([]);
     });
 });
 

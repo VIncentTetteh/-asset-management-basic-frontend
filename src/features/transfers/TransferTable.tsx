@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { AssetTag } from "@/components/ui/asset-tag";
 import { Button } from "@/components/ui/button";
 import { transferActionsFor, type TransferAction } from "@/features/transfers/workflow";
+import { formatLocalDate } from "@/lib/local-date";
 
 export interface TransferLookups {
   assetName: (id?: string) => string;
@@ -32,6 +33,7 @@ export function TransferTable({
   onAction,
   onCreate,
   currentUserId,
+  canManage,
 }: {
   transfers: AssetTransfer[];
   isLoading: boolean;
@@ -40,6 +42,8 @@ export function TransferTable({
   onCreate: () => void;
   /** Hides Approve on the viewer's own requests. */
   currentUserId?: string;
+  /** Holds TRANSFER_ASSET: approve, reject, complete and delete. */
+  canManage: boolean;
 }) {
   const columns = useMemo<ColumnDef<AssetTransfer, unknown>[]>(
     () => [
@@ -88,11 +92,45 @@ export function TransferTable({
         ),
       },
       {
+        id: "reason",
+        header: "Reason",
+        enableSorting: false,
+        cell: ({ row }) =>
+          row.original.reason ? (
+            <span className="block max-w-56 truncate text-xs text-muted-fg" title={row.original.reason}>
+              {row.original.reason}
+            </span>
+          ) : (
+            <span className="text-faint-fg">—</span>
+          ),
+      },
+      {
         accessorKey: "createdAt",
         header: "Requested",
         cell: ({ row }) => (
           <span className="text-muted-fg">
             {row.original.createdAt ? new Date(row.original.createdAt).toLocaleDateString() : "—"}
+            {row.original.requestedByName ? (
+              <span className="block text-xs text-faint-fg">by {row.original.requestedByName}</span>
+            ) : null}
+          </span>
+        ),
+      },
+      {
+        id: "approvedBy",
+        header: "Approved by",
+        enableSorting: false,
+        cell: ({ row }) => <span className="text-muted-fg">{row.original.approvedByName || "—"}</span>,
+      },
+      {
+        accessorKey: "transferDate",
+        header: "Completed",
+        cell: ({ row }) => (
+          <span className="text-muted-fg">
+            {formatLocalDate(row.original.transferDate)}
+            {row.original.completedByName ? (
+              <span className="block text-xs text-faint-fg">by {row.original.completedByName}</span>
+            ) : null}
           </span>
         ),
       },
@@ -107,7 +145,7 @@ export function TransferTable({
         enableSorting: false,
         cell: ({ row }) => {
           const t = row.original;
-          const actions = transferActionsFor(t, currentUserId);
+          const actions = transferActionsFor(t, currentUserId, canManage);
           return (
             <div className="flex justify-end gap-0.5">
               {actions.includes("approve") && (
@@ -135,7 +173,7 @@ export function TransferTable({
         },
       },
     ],
-    [lookups, onAction, currentUserId],
+    [lookups, onAction, currentUserId, canManage],
   );
 
   return (

@@ -11,6 +11,7 @@ import { TransferTable } from "@/features/transfers/TransferTable";
 import { TransferFormModal } from "@/features/transfers/TransferFormModal";
 import type { TransferAction } from "@/features/transfers/workflow";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionContext";
 
 export default function TransfersPage() {
   const { data: transfers = [], isLoading } = useTransfers();
@@ -19,6 +20,9 @@ export default function TransfersPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
+  // Mirrors the API: approve/reject/complete/delete need TRANSFER_ASSET (admins hold every permission).
+  const canManage = hasPermission("TRANSFER_ASSET");
 
   const lookups = useMemo(() => {
     const assetMap = new Map(master.assets.map((a) => [a.id, a]));
@@ -62,6 +66,7 @@ export default function TransfersPage() {
         onAction={handleAction}
         onCreate={() => setIsModalOpen(true)}
         currentUserId={user?.id}
+        canManage={canManage}
       />
 
       <TransferFormModal

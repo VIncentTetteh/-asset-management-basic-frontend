@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCreateTransfer } from "@/features/transfers/hooks";
 import { applyApiFieldErrors } from "@/lib/api-validation";
 import { buildTransferRequest } from "@/features/transfers/workflow";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 
 export function TransferFormModal({
   isOpen,
@@ -91,7 +93,7 @@ export function TransferFormModal({
               <option key={a.id} value={a.id}>{a.name} ({a.assetTag || "no tag"})</option>
             ))}
           </Select>
-          {errors.assetId && <p className="text-sm text-danger">{errors.assetId.message as string}</p>}
+          <FieldError error={errors.assetId} />
         </div>
 
         <div className="grid grid-cols-2 gap-4 rounded-card border border-edge bg-surface-muted p-3">
@@ -135,7 +137,7 @@ export function TransferFormModal({
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </Select>
-            {errors.toDepartmentId && <p className="text-sm text-danger">{errors.toDepartmentId.message as string}</p>}
+            <FieldError error={errors.toDepartmentId} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="toLocationId" className="text-xs">To location (optional)</Label>
@@ -150,7 +152,13 @@ export function TransferFormModal({
 
         <div className="space-y-2 pt-2">
           <Label htmlFor="reason">Reason / notes</Label>
-          <Textarea id="reason" placeholder="Department relocation / project requirement" {...register("reason")} />
+          <Textarea
+            id="reason"
+            placeholder="Department relocation / project requirement"
+            {...limitInputProps(FIELD_LIMITS.assetTransfer.reason)}
+            {...register("reason", limitRules<AssetTransferDto, "reason">(FIELD_LIMITS.assetTransfer.reason, "Reason"))}
+          />
+          <FieldError error={errors.reason} />
         </div>
 
         <div className="mt-4 flex justify-end gap-2 border-t border-edge-subtle pt-4">

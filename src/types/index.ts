@@ -534,13 +534,12 @@ export interface AssetAuditDto {
 }
 
 // ─── Asset Transfer ───────────────────────────────────────────────────────────
+/** Statuses the transfer workflow produces (the API enum also lists IN_TRANSIT/CANCELLED, never written). */
 export enum TransferStatus {
     REQUESTED = "REQUESTED",
     APPROVED = "APPROVED",
     REJECTED = "REJECTED",
-    IN_TRANSIT = "IN_TRANSIT",
     COMPLETED = "COMPLETED",
-    CANCELLED = "CANCELLED",
 }
 
 export interface AssetTransfer extends BaseEntity {
@@ -553,6 +552,11 @@ export interface AssetTransfer extends BaseEntity {
     approvedById?: string;
     /** Who completed the move (API V43+). */
     completedById?: string;
+    /** Display names of the requester, approver and completer (read-only). */
+    requestedByName?: string;
+    approvedByName?: string;
+    completedByName?: string;
+    /** Read-only: the day the transfer was completed. */
     transferDate?: string;
     reason?: string;
     status?: TransferStatus | string;
