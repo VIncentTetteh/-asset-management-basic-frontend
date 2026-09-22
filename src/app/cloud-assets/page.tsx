@@ -20,6 +20,8 @@ import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
+import { reportApiError } from "@/lib/api-validation";
+import { usePermissions } from "@/contexts/PermissionContext";
 
 const PROVIDER_COLORS: Record<string, string> = {
     AWS: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
@@ -64,6 +66,10 @@ export default function CloudAssetsPage() {
     const { format, baseCurrency } = useCurrency();
     const costForm = useForm<CloudMonthlyCostDto>();
     const { confirm, ConfirmDialog } = useConfirm();
+    const { hasPermission } = usePermissions();
+    // Mirrors the API: edits accept EDIT_ASSET or MANAGE_CLOUD_ASSETS; cost and sync need the latter.
+    const canManage = hasPermission("MANAGE_CLOUD_ASSETS");
+    const canEdit = canManage || hasPermission("EDIT_ASSET");
 
     const fetchAll = useCallback(async (p = 0) => {
         try {
@@ -80,6 +86,8 @@ export default function CloudAssetsPage() {
                 const data = assetsResult.value;
                 setAssets(data.items ?? data.content ?? []);
                 setTotalPages(data.totalPages ?? Math.ceil((data.total ?? 0) / (data.limit || 20)));
+            } else {
+                reportApiError(assetsResult.reason, { fallback: "Failed to load cloud assets" });
             }
             if (summaryResult.status === "fulfilled") setCostSummary(summaryResult.value);
         } catch {
@@ -123,8 +131,8 @@ export default function CloudAssetsPage() {
             await cloudAssetService.delete(id);
             toast.success("Asset deleted");
             fetchAll(page);
-        } catch {
-            toast.error("Failed to delete");
+        } catch (err) {
+            reportApiError(err, { fallback: "Failed to delete" });
         } finally {
             setDeletingId(null);
         }
@@ -141,8 +149,8 @@ export default function CloudAssetsPage() {
             }
             setIsModalOpen(false);
             fetchAll(page);
-        } catch {
-            toast.error("Failed to save asset");
+        } catch (err) {
+            reportApiError(err, { fallback: "Failed to save asset", setError: assetForm.setError });
         }
     };
 
@@ -152,8 +160,8 @@ export default function CloudAssetsPage() {
             toast.success("Cost recorded");
             setIsCostModalOpen(false);
             fetchAll(page);
-        } catch {
-            toast.error("Failed to record cost");
+        } catch (err) {
+            reportApiError(err, { fallback: "Failed to record cost", setError: costForm.setError });
         }
     };
 
@@ -163,8 +171,10 @@ export default function CloudAssetsPage() {
             const res = await cloudAssetService.syncAll();
             toast.success(res.message || `Sync complete. ${res.assetsUpserted} assets updated.`);
             fetchAll(page);
-        } catch {
-            toast.error("Failed to sync cloud assets");
+        } catch (err) {
+            // Sync is off on the hosted service (it would read the platform's own
+            // cloud account); the API answers 501 and says so.
+            reportApiError(err, { fallback: "Cloud sync is not available on this deployment" });
         } finally {
             setIsSyncing(false);
         }
@@ -176,12 +186,16 @@ export default function CloudAssetsPage() {
                 title="Cloud Assets"
                 subtitle="Track and manage your cloud infrastructure resources."
                 actions={<>
-                    <Button onClick={handleSyncAll} variant="outline" isLoading={isSyncing}>
-                        <RefreshCw className="mr-2 h-4 w-4" /> Sync Hub
-                    </Button>
-                    <Button onClick={handleOpenCreate}>
-                        <Plus className="mr-2 h-4 w-4" /> Add Cloud Asset
-                    </Button>
+                    {canManage && (
+                        <Button onClick={handleSyncAll} variant="outline" isLoading={isSyncing}>
+                            <RefreshCw className="mr-2 h-4 w-4" /> Sync Hub
+                        </Button>
+                    )}
+                    {canEdit && (
+                        <Button onClick={handleOpenCreate}>
+                            <Plus className="mr-2 h-4 w-4" /> Add Cloud Asset
+                        </Button>
+                    )}
                 </>}
             />
 
@@ -298,15 +312,21 @@ export default function CloudAssetsPage() {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex justify-end gap-1">
-                                                        <Button variant="outline" size="sm" onClick={() => handleOpenCost(asset.id)} className="h-7 border-ok/30 px-2 text-xs text-ok hover:bg-ok-soft">
-                                                            Cost
-                                                        </Button>
-                                                        <Button variant="outline" size="sm" onClick={() => handleOpenEdit(asset)} className="h-7 px-2">
-                                                            <Pencil className="h-3 w-3" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(asset.id)} isLoading={deletingId === asset.id} className="h-7 px-2 text-danger hover:bg-danger-soft">
-                                                            <Trash2 className="h-3 w-3" />
-                                                        </Button>
+                                                        {canManage && (
+                                                            <Button variant="outline" size="sm" onClick={() => handleOpenCost(asset.id)} className="h-7 border-ok/30 px-2 text-xs text-ok hover:bg-ok-soft">
+                                                                Cost
+                                                            </Button>
+                                                        )}
+                                                        {canEdit && (
+                                                            <>
+                                                                <Button variant="outline" size="sm" aria-label="Edit cloud asset" onClick={() => handleOpenEdit(asset)} className="h-7 px-2">
+                                                                    <Pencil className="h-3 w-3" />
+                                                                </Button>
+                                                                <Button variant="ghost" size="sm" aria-label="Delete cloud asset" onClick={() => handleDelete(asset.id)} isLoading={deletingId === asset.id} className="h-7 px-2 text-danger hover:bg-danger-soft">
+                                                                    <Trash2 className="h-3 w-3" />
+                                                                </Button>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -335,7 +355,7 @@ export default function CloudAssetsPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="costAmount">Amount <span className="text-danger">*</span></Label>
-                            <Input id="costAmount" type="number" step="0.01" {...costForm.register("amount", { required: true, valueAsNumber: true })} />
+                            <Input id="costAmount" type="number" step="0.01" min="0" {...costForm.register("amount", { required: true, valueAsNumber: true, min: { value: 0, message: "Cannot be negative" } })} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="serviceName">Service Name</Label>
