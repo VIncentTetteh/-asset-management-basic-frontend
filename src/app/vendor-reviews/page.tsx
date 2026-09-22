@@ -337,7 +337,7 @@ export default function VendorReviewsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="vr-start">Period start <span className="text-danger">*</span></Label>
-              <Input id="vr-start" type="date" {...register("periodStart", { required: "Period start is required" })} />
+              <Input id="vr-start" type="date" {...register("periodStart", limitRules<VendorReviewForm, "periodStart">(FIELD_LIMITS.vendorReview.periodStart, "Period start"))} />
               <FieldError error={errors.periodStart} />
             </div>
             <div className="space-y-2">
@@ -346,7 +346,7 @@ export default function VendorReviewsPage() {
                 id="vr-end"
                 type="date"
                 {...register("periodEnd", {
-                  required: "Period end is required",
+                  ...limitRules<VendorReviewForm, "periodEnd">(FIELD_LIMITS.vendorReview.periodEnd, "Period end"),
                   validate: (end, values) =>
                     !end || !values.periodStart || String(end) >= String(values.periodStart) || "Period end must be on or after the start",
                 })}
@@ -358,6 +358,7 @@ export default function VendorReviewsPage() {
           <div className="space-y-2">
             <Label htmlFor="vr-feedback">Feedback</Label>
             <Textarea id="vr-feedback" placeholder="Delivery delays in Q2; strong support response…" {...register("feedback")} />
+            <FieldError error={errors.feedback} />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

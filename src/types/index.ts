@@ -1847,10 +1847,6 @@ export interface VendorReviewSummary {
     supplierName?: string | null;
     totalReviews: number;
     averageRating: number;
-    avgQualityScore?: number;
-    avgDeliveryScore?: number;
-    avgSupportScore?: number;
-    avgOverallScore?: number;
 }
 
 // ─── MFA ──────────────────────────────────────────────────────────────────────

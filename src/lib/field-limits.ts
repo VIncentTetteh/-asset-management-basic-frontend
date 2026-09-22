@@ -223,6 +223,8 @@ export const FIELD_LIMITS = {
         qualityScore: { min: 1, max: 5, step: 1 },
         deliveryScore: { min: 1, max: 5, step: 1 },
         supportScore: { min: 1, max: 5, step: 1 },
+        periodStart: REQUIRED,
+        periodEnd: REQUIRED,
     },
     webhook: { name: text(200, true), url: text(2048, true), secret: text(512) },
     dsar: { requestType: REQUIRED, requesterEmail: text(255, true) },
