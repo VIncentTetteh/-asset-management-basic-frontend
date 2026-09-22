@@ -16,7 +16,8 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Shield, Lock, ShieldAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
-import { toastActionError } from "@/lib/step-up";
+import { reportApiError } from "@/lib/api-validation";
+import { usePermissions } from "@/contexts/PermissionContext";
 import { useConfirm } from "@/hooks/useConfirm";
 
 
@@ -48,7 +49,11 @@ export default function RolesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRole, setEditingRole] = useState<Role | null>(null);
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<RoleDto>();
+    const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm<RoleDto>();
+    const { hasPermission } = usePermissions();
+    // Mirrors the API: role writes take MANAGE_ROLES or MANAGE_ORGANIZATION_SETTINGS.
+    const canManage = hasPermission("MANAGE_ROLES") || hasPermission("MANAGE_ORGANIZATION_SETTINGS") || hasPermission("SYSTEM_ADMIN");
+    const readOnly = !!editingRole?.systemRole || !canManage;
 
     const queryClient = useQueryClient();
     const rolesKey = qk.module("roles");
@@ -65,7 +70,8 @@ export default function RolesPage() {
     const deleteRole = useMutation({
         mutationFn: (id: string) => roleService.delete(id),
         onSuccess: () => { toast.success("Role deleted"); invalidate(); },
-        onError: (err) => toastActionError(err, "Failed to delete role"),
+        // e.g. 409 while the role is still assigned to users.
+        onError: (err) => reportApiError(err, { fallback: "Failed to delete role" }),
     });
 
     // Build the grouped permission list: known groups first, then any extra from the server
@@ -178,8 +184,9 @@ export default function RolesPage() {
             setIsModalOpen(false);
             invalidate();
         } catch (error) {
-            toastActionError(error, "Failed to save role");
-            console.error(error);
+            // Shows step-up cancellation, 403 "permissions you do not hold",
+            // 409 duplicate names and 400 reserved names/unknown permissions.
+            reportApiError(error, { fallback: "Failed to save role", setError });
         }
     };
 
@@ -190,9 +197,11 @@ export default function RolesPage() {
                     <h1 className="text-[22px] font-extrabold tracking-tight text-foreground">Access roles</h1>
                     <p className="text-[13px] text-muted-fg">Role-based access control profiles for your workspace.</p>
                 </div>
-                <Button onClick={handleOpenCreate}>
-                    <Plus className="mr-2 h-4 w-4" /> Create custom role
-                </Button>
+                {canManage && (
+                    <Button onClick={handleOpenCreate}>
+                        <Plus className="mr-2 h-4 w-4" /> Create custom role
+                    </Button>
+                )}
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -253,9 +262,9 @@ export default function RolesPage() {
                                 </div>
 
                                 <div className="flex justify-end items-center gap-2 pt-4">
-                                    {role.systemRole ? (
+                                    {role.systemRole || !canManage ? (
                                         <Button variant="outline" size="sm" onClick={() => handleOpenEdit(role)} className="h-8">
-                                            <ShieldAlert className="h-3.5 w-3.5 mr-1" /> View System Policy
+                                            <ShieldAlert className="h-3.5 w-3.5 mr-1" /> {role.systemRole ? "View System Policy" : "View permissions"}
                                         </Button>
                                     ) : (
                                         <>
@@ -294,7 +303,7 @@ export default function RolesPage() {
                             id="name"
                             placeholder="e.g. Finance Auditor"
                             {...register("name", { required: "Name is required" })}
-                            disabled={!!(editingRole?.systemRole)}
+                            disabled={readOnly}
                         />
                         {errors.name && <p className="text-sm text-danger">{errors.name.message as string}</p>}
                     </div>
@@ -303,7 +312,7 @@ export default function RolesPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="description">Profile Description</Label>
-                        <Textarea id="description" placeholder="Read-only access to POs and Audits..." {...register("description")} disabled={!!(editingRole?.systemRole)} />
+                        <Textarea id="description" placeholder="Read-only access to POs and Audits..." {...register("description")} disabled={readOnly} />
                     </div>
 
                     <div className="space-y-3 border-t border-edge-subtle pt-4 border-b pb-4">
@@ -323,8 +332,8 @@ export default function RolesPage() {
                                                     id={`perm-${perm}`}
                                                     className="ea-focus rounded border-edge accent-[var(--primary)]"
                                                     checked={selectedPermissions.includes(perm)}
-                                                    onChange={() => !editingRole?.systemRole && togglePermission(perm)}
-                                                    disabled={!!(editingRole?.systemRole)}
+                                                    onChange={() => !readOnly && togglePermission(perm)}
+                                                    disabled={readOnly}
                                                 />
                                                 <Label htmlFor={`perm-${perm}`} className="data-mono text-xs cursor-pointer leading-tight">
                                                     {perm.replace(/_/g, ' ')}
@@ -342,9 +351,9 @@ export default function RolesPage() {
 
                     <div className="flex justify-end gap-2 pt-2">
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                            {editingRole?.systemRole ? "Close" : "Cancel"}
+                            {readOnly ? "Close" : "Cancel"}
                         </Button>
-                        {!editingRole?.systemRole && (
+                        {!readOnly && (
                             <Button type="submit" isLoading={isSubmitting}>
                                 {editingRole ? "Save Updates" : "Issue Custom Role"}
                             </Button>
