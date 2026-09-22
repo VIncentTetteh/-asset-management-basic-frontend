@@ -520,8 +520,8 @@ export default function BudgetsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="bd-start">Period start <span className="text-danger">*</span></Label>
-              <Input id="bd-start" type="date" {...register("periodStart", { required: "Period start is required" })} />
-              {errors.periodStart && <p className="text-sm text-danger">{errors.periodStart.message as string}</p>}
+              <Input id="bd-start" type="date" {...register("periodStart", limitRules<BudgetForm, "periodStart">(L.periodStart, "Period start"))} />
+              <FieldError error={errors.periodStart} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="bd-end">Period end <span className="text-danger">*</span></Label>
@@ -529,12 +529,12 @@ export default function BudgetsPage() {
                 id="bd-end"
                 type="date"
                 {...register("periodEnd", {
-                  required: "Period end is required",
+                  ...limitRules<BudgetForm, "periodEnd">(L.periodEnd, "Period end"),
                   validate: (end, form) =>
                     !end || !form.periodStart || String(end) >= String(form.periodStart) || "Must be on or after the start",
                 })}
               />
-              {errors.periodEnd && <p className="text-sm text-danger">{errors.periodEnd.message as string}</p>}
+              <FieldError error={errors.periodEnd} />
             </div>
           </div>
 
@@ -555,11 +555,10 @@ export default function BudgetsPage() {
               <Input
                 id="bd-threshold"
                 type="number"
-                min="1"
-                max="100"
-                {...register("alertThresholdPct", { min: { value: 1, message: "1–100" }, max: { value: 100, message: "1–100" } })}
+                {...limitInputProps(L.alertThresholdPct)}
+                {...register("alertThresholdPct", limitRules<BudgetForm, "alertThresholdPct">(L.alertThresholdPct, "Alert threshold"))}
               />
-              {errors.alertThresholdPct && <p className="text-sm text-danger">{errors.alertThresholdPct.message as string}</p>}
+              <FieldError error={errors.alertThresholdPct} />
             </div>
           </div>
 
