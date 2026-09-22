@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import toast from "react-hot-toast";
-import { Pencil, UserX, UserPlus, ShieldOff, Search } from "lucide-react";
+import { Pencil, UserX, UserCheck, UserPlus, ShieldOff, Search } from "lucide-react";
 import type { User, UserDto } from "@/types";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -13,14 +12,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { usePermissions } from "@/contexts/PermissionContext";
+import { applyApiFieldErrors } from "@/lib/api-validation";
 import { useConfirm } from "@/hooks/useConfirm";
-import { getOrganisationIdFromStorage } from "@/lib/authContext";
 import {
   useUsers,
   useUserMasterData,
   useCreateUser,
   useUpdateUser,
-  useDeactivateUser,
+  useSetUserActive,
   useResetMfa,
 } from "@/features/users/hooks";
 
@@ -29,7 +29,10 @@ export default function UsersPage() {
   const master = useUserMasterData();
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
-  const deactivate = useDeactivateUser();
+  const setActive = useSetUserActive();
+  const { hasPermission } = usePermissions();
+  // Mirrors the API: every user write takes MANAGE_USERS, EDIT_USER or DELETE_USER.
+  const canManage = hasPermission("MANAGE_USERS") || hasPermission("EDIT_USER") || hasPermission("DELETE_USER");
   const resetMfa = useResetMfa();
   const { confirm, ConfirmDialog } = useConfirm();
 
@@ -37,7 +40,7 @@ export default function UsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<UserDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<UserDto>();
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -98,7 +101,12 @@ export default function UsersPage() {
       }))
     )
       return;
-    deactivate.mutate(user.id!);
+    setActive.mutate({ id: user.id!, active: false });
+  };
+
+  const handleReactivate = async (user: User) => {
+    if (!(await confirm({ message: `Reactivate ${user.firstName} ${user.lastName}? They will be able to sign in again.`, variant: "info" }))) return;
+    setActive.mutate({ id: user.id!, active: true });
   };
 
   const handleResetMfa = async (user: User) => {
@@ -113,28 +121,26 @@ export default function UsersPage() {
   };
 
   const onSubmit = async (data: UserDto) => {
-    const payload: UserDto = {
-      ...data,
-      phone: data.phone || undefined,
-      jobTitle: data.jobTitle || undefined,
-      departmentId: data.departmentId || undefined,
-      roleId: data.roleId || undefined,
-    };
-
-    if (editingUser) {
-      await updateUser.mutateAsync({ existing: editingUser, data: payload });
-    } else {
-      if (!payload.password) {
-        toast.error("Password is required");
-        return;
+    try {
+      if (editingUser) {
+        await updateUser.mutateAsync({ existing: editingUser, data });
+      } else {
+        await createUser.mutateAsync({
+          firstName: data.firstName.trim(),
+          lastName: data.lastName.trim(),
+          email: data.email.trim(),
+          password: data.password ?? "",
+          phone: data.phone || undefined,
+          jobTitle: data.jobTitle || undefined,
+          departmentId: data.departmentId || undefined,
+          roleId: data.roleId || undefined,
+        });
       }
-      await createUser.mutateAsync({
-        ...(payload as UserDto & { password: string }),
-        organisationId: payload.organisationId || getOrganisationIdFromStorage() || undefined,
-        status: payload.status || "ACTIVE",
-      });
+      setIsModalOpen(false);
+    } catch (err) {
+      // Toasted by the mutation; keep the form open with the fields marked.
+      applyApiFieldErrors(err, setError);
     }
-    setIsModalOpen(false);
   };
 
   const columns = useMemo<ColumnDef<User, unknown>[]>(
@@ -183,7 +189,7 @@ export default function UsersPage() {
         id: "actions",
         header: "",
         enableSorting: false,
-        cell: ({ row }) => (
+        cell: ({ row }) => !canManage ? null : (
           <div className="flex justify-end gap-0.5">
             <Button
               variant="ghost"
@@ -208,22 +214,35 @@ export default function UsersPage() {
             >
               <ShieldOff className="h-3.5 w-3.5" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-danger"
-              aria-label="Deactivate user"
-              title="Deactivate"
-              onClick={() => handleDeactivate(row.original)}
-            >
-              <UserX className="h-3.5 w-3.5" />
-            </Button>
+            {row.original.status === "INACTIVE" ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-ok"
+                aria-label="Reactivate user"
+                title="Reactivate"
+                onClick={() => handleReactivate(row.original)}
+              >
+                <UserCheck className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-danger"
+                aria-label="Deactivate user"
+                title="Deactivate"
+                onClick={() => handleDeactivate(row.original)}
+              >
+                <UserX className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
         ),
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookups],
+    [lookups, canManage],
   );
 
   return (
@@ -231,9 +250,11 @@ export default function UsersPage() {
       title="Users"
       subtitle={isLoading ? "Loading users…" : `${users.length} accounts with platform access`}
       actions={
-        <Button onClick={openCreate}>
-          <UserPlus className="mr-2 h-4 w-4" /> Provision user
-        </Button>
+        canManage ? (
+          <Button onClick={openCreate}>
+            <UserPlus className="mr-2 h-4 w-4" /> Provision user
+          </Button>
+        ) : undefined
       }
       toolbar={
         <div className="relative w-full max-w-xs">
@@ -254,9 +275,11 @@ export default function UsersPage() {
         emptyTitle="No users provisioned"
         emptyDescription="Give teammates access to the platform; asset custodians without logins live under Employees."
         emptyAction={
-          <Button size="sm" onClick={openCreate}>
-            <UserPlus className="mr-1.5 h-4 w-4" /> Provision user
-          </Button>
+          canManage ? (
+            <Button size="sm" onClick={openCreate}>
+              <UserPlus className="mr-1.5 h-4 w-4" /> Provision user
+            </Button>
+          ) : undefined
         }
       />
 
@@ -289,8 +312,11 @@ export default function UsersPage() {
           {!editingUser && (
             <div className="space-y-2">
               <Label htmlFor="us-password">Temporary password <span className="text-danger">*</span></Label>
-              <Input id="us-password" type="password" {...register("password", { required: !editingUser })} />
-              {errors.password && <p className="text-sm text-danger">Password is required</p>}
+              <Input id="us-password" type="password" autoComplete="new-password" {...register("password", {
+                required: editingUser ? false : "Password is required",
+                minLength: { value: 8, message: "At least 8 characters" },
+              })} />
+              {errors.password && <p className="text-sm text-danger">{errors.password.message}</p>}
             </div>
           )}
 
@@ -318,7 +344,8 @@ export default function UsersPage() {
             <div className="space-y-2">
               <Label htmlFor="us-role">Role</Label>
               <Select id="us-role" {...register("roleId")}>
-                <option value="">None</option>
+                {/* A role can be changed but not removed once assigned. */}
+                <option value="" disabled={!!editingUser?.roleId}>None</option>
                 {master.roles.map((r) => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}

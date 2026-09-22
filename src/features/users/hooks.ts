@@ -8,8 +8,8 @@ import { roleService } from "@/services/roleService";
 import { mfaService } from "@/services/mfaService";
 import { qk } from "@/lib/queryClient";
 import type { User, UserDto } from "@/types";
-import { buildPatchPayload } from "@/lib/patch";
-import { toastActionError } from "@/lib/step-up";
+import { reportApiError } from "@/lib/api-validation";
+import { buildUserProfileUpdate, roleChangeFor } from "@/features/users/payload";
 
 const usersKey = qk.module("users");
 
@@ -47,47 +47,40 @@ export function useCreateUser() {
       toast.success("User created");
       invalidate();
     },
-    onError: () => toast.error("Failed to create user"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to create user" }),
   });
 }
 
-/** Profile fields go through PATCH; role changes go through /users/{id}/role. */
+/** Profile fields go through a full PUT; role changes go through /users/{id}/role (fresh MFA). */
 export function useUpdateUser() {
   const invalidate = useInvalidateUsers();
   return useMutation({
     mutationFn: async ({ existing, data }: { existing: User; data: UserDto }) => {
-      const { password: _password, roleId, ...profileData } = data;
-      void _password;
-      const patch = buildPatchPayload<UserDto>(existing as unknown as Partial<UserDto>, profileData);
-      if (Object.keys(patch).length > 0) {
-        await userService.update(existing.id!, patch);
-      }
-      if (roleId && roleId !== existing.roleId) {
+      await userService.replaceProfile(existing.id!, buildUserProfileUpdate(existing, data));
+      const roleId = roleChangeFor(existing.roleId, data.roleId);
+      if (roleId) {
         await userService.assignRole(existing.id!, roleId);
       }
-      return Object.keys(patch).length > 0 || (roleId && roleId !== existing.roleId);
     },
-    onSuccess: (changed) => {
-      if (changed) {
-        toast.success("Profile updated");
-      } else {
-        toast("No changes to update");
-      }
+    onSuccess: () => {
+      toast.success("User updated");
       invalidate();
     },
-    onError: (err) => toastActionError(err, "Failed to save profile"),
+    // Shows step-up cancellation, 403 escalation refusals and field errors.
+    onError: (err) => reportApiError(err, { fallback: "Failed to save user" }),
   });
 }
 
-export function useDeactivateUser() {
+export function useSetUserActive() {
   const invalidate = useInvalidateUsers();
   return useMutation({
-    mutationFn: (id: string) => userService.deactivate(id),
-    onSuccess: () => {
-      toast.success("User deactivated");
+    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
+      active ? userService.activate(id) : userService.deactivate(id),
+    onSuccess: (_res, vars) => {
+      toast.success(vars.active ? "User reactivated" : "User deactivated");
       invalidate();
     },
-    onError: (err) => toastActionError(err, "Failed to deactivate user"),
+    onError: (err, vars) => reportApiError(err, { fallback: `Failed to ${vars.active ? "reactivate" : "deactivate"} user` }),
   });
 }
 
@@ -99,6 +92,6 @@ export function useResetMfa() {
       toast.success((result as { message?: string })?.message || "MFA reset");
       invalidate();
     },
-    onError: () => toast.error("Failed to reset MFA"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to reset MFA" }),
   });
 }

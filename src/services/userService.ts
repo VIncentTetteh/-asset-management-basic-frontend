@@ -2,8 +2,18 @@ import api from "@/lib/axios";
 import { User, UserDto } from "@/types";
 import { extractList } from "@/services/responseUtils";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
-import { AxiosError } from "axios";
 import { invalidateRequestCache, withRequestCache } from "@/services/requestCache";
+
+/** Body of PUT /users/{id}. */
+export interface UserProfileUpdate {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string | null;
+    jobTitle: string | null;
+    employeeId: string | null;
+    departmentId: string | null;
+}
 
 export const userService = {
     /** GET /users — all users in org (JWT-scoped, no organisationId param) */
@@ -37,44 +47,13 @@ export const userService = {
         return response.data;
     },
 
-    /** Update user: prefer PATCH (partial), fallback to PUT (full DTO) */
-    update: async (id: string, data: Partial<UserDto>): Promise<User> => {
-        const organisationId = data.organisationId || getOrganisationIdFromStorage();
-        const patchPayload: Partial<UserDto> = {
-            ...data,
-            organisationId,
-        };
-
-        try {
-            const patchResponse = await api.patch<User>(`/users/${id}`, patchPayload);
-            invalidateRequestCache("users:");
-            return patchResponse.data;
-        } catch (error) {
-            const status = (error as AxiosError)?.response?.status;
-            // If PATCH is unsupported on this backend, fallback to PUT.
-            if (status !== 404 && status !== 405) {
-                throw error;
-            }
-        }
-
-        const existing = await userService.get(id);
-        const putOrganisationId = data.organisationId || existing.organisationId || organisationId;
-
-        const payload: UserDto = {
-            id,
-            firstName: data.firstName ?? existing.firstName,
-            lastName: data.lastName ?? existing.lastName,
-            email: data.email ?? existing.email,
-            phone: data.phone ?? existing.phone,
-            employeeId: data.employeeId ?? existing.employeeId,
-            jobTitle: data.jobTitle ?? existing.jobTitle,
-            roleId: data.roleId ?? existing.roleId,
-            departmentId: data.departmentId ?? existing.departmentId,
-            status: data.status ?? existing.status ?? "ACTIVE",
-            organisationId: putOrganisationId,
-        };
-
-        const response = await api.put<User>(`/users/${id}`, payload);
+    /**
+     * PUT /users/{id} — replaces the profile (name, phone, job title, employee id,
+     * department). A missing optional field is cleared. Role and status have their
+     * own endpoints (/role, /deactivate, /activate).
+     */
+    replaceProfile: async (id: string, data: UserProfileUpdate): Promise<User> => {
+        const response = await api.put<User>(`/users/${id}`, data);
         invalidateRequestCache("users:");
         return response.data;
     },
@@ -101,6 +80,12 @@ export const userService = {
     /** PUT /users/{id}/deactivate — sets status → INACTIVE */
     deactivate: async (id: string): Promise<void> => {
         await api.put(`/users/${id}/deactivate`);
+        invalidateRequestCache("users:");
+    },
+
+    /** PUT /users/{id}/activate — re-enable a deactivated user (fresh MFA). */
+    activate: async (id: string): Promise<void> => {
+        await api.put(`/users/${id}/activate`);
         invalidateRequestCache("users:");
     },
 
