@@ -7,6 +7,8 @@ vi.mock("react-hot-toast", () => ({ toast: toastMock, default: toastMock }));
 import {
     applyApiFieldErrors,
     describeFieldErrors,
+    DUPLICATE,
+    getApiErrorCode,
     getApiFieldErrors,
     humaniseField,
     reportApiError,
@@ -110,5 +112,50 @@ describe("applyApiFieldErrors", () => {
         expect(applyApiFieldErrors(validationFailed({ startDate: "must not be null" }), setError)).toBe(1);
         expect(setError).toHaveBeenCalledWith("startDate", { type: "server", message: "must not be null" });
         expect(toastMock.error).not.toHaveBeenCalled();
+    });
+});
+
+describe("database integrity errors (GlobalExceptionHandler SQLState split)", () => {
+    beforeEach(() => {
+        toastMock.error.mockClear();
+    });
+
+    it("puts a DUPLICATE field on the form", () => {
+        const error = apiError(409, {
+            status: 409,
+            errorCode: "DUPLICATE",
+            message: "A record with this asset tag already exists",
+            errors: { assetTag: "already in use" },
+        });
+        const setError = vi.fn();
+
+        expect(getApiErrorCode(error)).toBe(DUPLICATE);
+        expect(reportApiError(error, { fallback: "Failed", setError })).toBe(true);
+        expect(setError).toHaveBeenCalledWith("assetTag", { type: "server", message: "already in use" });
+        expect(toastMock.error).toHaveBeenCalledWith("Please fix this field:\nAsset tag: already in use");
+    });
+
+    it("puts a NOT NULL column on its field", () => {
+        const error = apiError(400, {
+            status: 400,
+            errorCode: "VALIDATION_FAILED",
+            message: "Category id is required",
+            errors: { categoryId: "is required" },
+        });
+        const setError = vi.fn();
+
+        expect(applyApiFieldErrors(error, setError, { categoryId: "category" })).toBe(1);
+        expect(setError).toHaveBeenCalledWith("category", { type: "server", message: "is required" });
+    });
+
+    it("toasts the message when no field is known", () => {
+        const error = apiError(400, {
+            status: 400,
+            errorCode: "VALUE_TOO_LONG",
+            message: "A value is too long for its field",
+        });
+
+        expect(reportApiError(error, { fallback: "Failed" })).toBe(false);
+        expect(toastMock.error).toHaveBeenCalledWith("A value is too long for its field");
     });
 });

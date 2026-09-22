@@ -7,14 +7,28 @@ import { isMfaEnrolmentRequiredError, isStepUpCancelledError, toastActionError }
 /**
  * Backend validation errors → form field errors.
  *
- * GlobalExceptionHandler answers a failed `@Valid` with
- * `400 { errorCode: "VALIDATION_FAILED", message: "Validation failed", errors: { field: message } }`.
- * Forms used to show a generic "Failed to save" for that, hiding which field was
+ * GlobalExceptionHandler puts field-level problems in one `errors: { field: message }`
+ * map, whatever caused them:
+ * - a failed `@Valid`: `400 VALIDATION_FAILED`, e.g. `{ name: "size must be between 0 and 255" }`;
+ * - a NOT NULL column the request left empty: `400 VALIDATION_FAILED`, `{ categoryId: "is required" }`;
+ * - a unique index: `409 DUPLICATE`, `{ assetTag: "already in use" }`.
+ * Database errors with no identifiable field (`VALUE_TOO_LONG`, `NUMBER_OUT_OF_RANGE`,
+ * `CHECK_VIOLATION`, `IN_USE`) carry only a message.
+ *
+ * Forms used to show a generic "Failed to save" for these, hiding which field was
  * wrong. {@link reportApiError} puts each message on its react-hook-form field and
  * lists the fields in one toast; any other failure toasts the server's message.
  */
 
 export const VALIDATION_FAILED = "VALIDATION_FAILED";
+export const DUPLICATE = "DUPLICATE";
+
+/** The backend `errorCode` of a failed request, if any. */
+export function getApiErrorCode(error: unknown): string | undefined {
+    if (!axios.isAxiosError(error)) return undefined;
+    const code = (error.response?.data as { errorCode?: unknown } | undefined)?.errorCode;
+    return typeof code === "string" ? code : undefined;
+}
 
 /** The `errors` map of a backend validation failure, or `{}` for any other error. */
 export function getApiFieldErrors(error: unknown): Record<string, string> {
