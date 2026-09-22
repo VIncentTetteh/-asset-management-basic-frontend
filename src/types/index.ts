@@ -622,10 +622,9 @@ export interface DepreciationPolicyDto {
     id?: string;
     name: string;                 // required
     method: DepreciationMethod | string;  // required
-    usefulLifeMonths?: number;
-    salvageValuePercent?: number;
-    description?: string;
-    organisationId?: string;
+    usefulLifeMonths?: number | null;
+    salvageValuePercent?: number | null;
+    description?: string | null;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
