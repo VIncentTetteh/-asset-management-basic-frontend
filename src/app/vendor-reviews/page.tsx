@@ -321,7 +321,7 @@ export default function VendorReviewsPage() {
                   type="number"
                   {...limitInputProps(FIELD_LIMITS.vendorReview[field])}
                   {...register(field, {
-                    ...limitRules<VendorReviewForm>(FIELD_LIMITS.vendorReview[field], SCORE_LABEL[field]),
+                    ...limitRules<VendorReviewForm, typeof field>(FIELD_LIMITS.vendorReview[field], SCORE_LABEL[field]),
                     required: `${SCORE_LABEL[field]} score is required`,
                     validate: (v) => Number.isInteger(Number(v)) || "Use a whole number from 1 to 5",
                   })}

@@ -1,4 +1,4 @@
-import type { FieldValues, RegisterOptions } from "react-hook-form";
+import type { FieldPath, FieldValues, RegisterOptions } from "react-hook-form";
 
 /**
  * Per-field limits, mirroring the backend request DTOs exactly.
@@ -306,8 +306,11 @@ export function limitInputProps(limit: FieldLimit): {
  * react-hook-form rules with a message for every limit, so an out-of-range value
  * shows an inline field error instead of failing silently or reaching the server.
  */
-export function limitRules<T extends FieldValues>(limit: FieldLimit, label: string): RegisterOptions<T> {
-    const rules: RegisterOptions<T> = {};
+export function limitRules<T extends FieldValues, N extends FieldPath<T> = FieldPath<T>>(
+    limit: FieldLimit,
+    label: string,
+): RegisterOptions<T, N> {
+    const rules: RegisterOptions<T, N> = {};
     if (limit.required) {
         rules.required = `${label} is required`;
     }

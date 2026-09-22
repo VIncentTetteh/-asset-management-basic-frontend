@@ -27,6 +27,8 @@ import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 import { formatLocalDate, todayLocal } from "@/lib/local-date";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { FieldError } from "@/components/ui/field-error";
 
 const CATEGORY_LABELS: Record<string, string> = {
   MAINTENANCE: "Maintenance",
@@ -174,6 +176,7 @@ export default function ExpensesPage() {
     }
     const payload: Partial<ExpenseDto> = {
       ...data,
+      title: data.title?.trim(),
       currency,
       amount: Number(data.amount),
     };
@@ -378,13 +381,25 @@ export default function ExpensesPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="ex-title">Title <span className="text-danger">*</span></Label>
-            <Input id="ex-title" placeholder="Generator fuel — Kumasi branch" {...register("title", { required: true })} />
+            <Input
+              id="ex-title"
+              placeholder="Generator fuel — Kumasi branch"
+              {...limitInputProps(FIELD_LIMITS.expense.title)}
+              {...register("title", limitRules<FormData, "title">(FIELD_LIMITS.expense.title, "Title"))}
+            />
+            <FieldError error={errors.title} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ex-amount">Amount <span className="text-danger">*</span></Label>
-              <Input id="ex-amount" type="number" step="0.01" min="0.01" {...register("amount", { required: true })} />
+              <Input
+                id="ex-amount"
+                type="number"
+                {...limitInputProps(FIELD_LIMITS.expense.amount)}
+                {...register("amount", limitRules<FormData, "amount">(FIELD_LIMITS.expense.amount, "Amount"))}
+              />
+              <FieldError error={errors.amount} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="ex-currency">Currency</Label>
@@ -405,12 +420,13 @@ export default function ExpensesPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="ex-category">Category</Label>
-              <Select id="ex-category" {...register("category")}>
+              <Label htmlFor="ex-category">Category <span className="text-danger">*</span></Label>
+              <Select id="ex-category" {...register("category", { required: "Category is required" })}>
                 {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
               </Select>
+              <FieldError error={errors.category} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="ex-date">Expense date</Label>
