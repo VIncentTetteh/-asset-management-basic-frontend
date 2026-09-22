@@ -52,6 +52,20 @@ export function presignMinutesError(value: unknown): string | null {
     return null;
 }
 
+/** Mirrors the API's @Pattern on bucketName: 3 to 63 lower-case letters, digits, dots or hyphens. */
+export const S3_BUCKET_NAME_PATTERN = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
+export const S3_BUCKET_NAME_MESSAGE = "Use a valid S3 bucket name: 3 to 63 lower-case letters, digits, dots or hyphens";
+
+/**
+ * An error for the bucket override input, or null. Blank is valid (it clears the
+ * override); the value is checked trimmed, as {@link buildStoragePayload} sends it.
+ */
+export function bucketNameError(value: unknown): string | null {
+    const name = typeof value === "string" ? value.trim() : "";
+    if (name === "") return null;
+    return S3_BUCKET_NAME_PATTERN.test(name) ? null : S3_BUCKET_NAME_MESSAGE;
+}
+
 export const storageConfigService = {
     get: async (orgId: string): Promise<OrgStorageConfig | null> => {
         try {

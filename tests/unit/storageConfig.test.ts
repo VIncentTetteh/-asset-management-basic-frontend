@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
     MAX_PRESIGN_MINUTES,
     buildStoragePayload,
+    bucketNameError,
     presignMinutesError,
     storageFormFromResponse,
 } from "@/services/storageConfigService";
@@ -31,5 +32,22 @@ describe("storage settings form", () => {
         expect(presignMinutesError(721)).toMatch(/1 to 720/);
         expect(presignMinutesError(0)).toMatch(/1 to 720/);
         expect(presignMinutesError(1.5)).toMatch(/whole/);
+    });
+
+    describe("bucketNameError mirrors the API's S3 naming rule", () => {
+        it.each(["", "   ", "abc", "my-org.assets-01", " padded-bucket ", "a".repeat(63)])("accepts %j", (name) => {
+            expect(bucketNameError(name)).toBeNull();
+        });
+
+        it.each(["ab", "a".repeat(64), "My-Bucket", "-leading", "trailing-", "under_score", "has space"])(
+            "rejects %j",
+            (name) => {
+                expect(bucketNameError(name)).toMatch(/valid S3 bucket name/);
+            },
+        );
+
+        it("keeps the input limit at the rule's 63 characters", () => {
+            expect(FIELD_LIMITS.storageConfig.bucketName.maxLength).toBe(63);
+        });
     });
 });

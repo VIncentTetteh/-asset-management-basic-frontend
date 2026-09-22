@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
-import { reportApiError } from "@/lib/api-validation";
+import { getApiFieldErrors, reportApiError } from "@/lib/api-validation";
 import { extractErrorMessage } from "@/lib/error";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,14 @@ import { Spinner } from "@/components/ui/spinner";
 import {
     MAX_PRESIGN_MINUTES,
     buildStoragePayload,
+    bucketNameError,
     presignMinutesError,
     storageConfigService,
     storageFormFromResponse,
     OrgStorageConfig,
 } from "@/services/storageConfigService";
-import { FIELD_LIMITS } from "@/lib/field-limits";
+import { FIELD_LIMITS, limitInputProps } from "@/lib/field-limits";
+import { FieldError } from "@/components/ui/field-error";
 import { Database, HardDrive, Info } from "lucide-react";
 
 interface StorageSettingsProps {
@@ -39,7 +41,11 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
     const [loadError, setLoadError] = useState<string | null>(null);
     const [defaultBucket, setDefaultBucket] = useState<string | null>(null);
     const [effectiveBucket, setEffectiveBucket] = useState<string | null>(null);
+    /** Server field errors from the last save, cleared as the field is edited. */
+    const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
     const ttlError = presignMinutesError(config.presignMinutes);
+    const bucketError = bucketNameError(config.bucketName) ?? serverErrors.bucketName ?? null;
+    const fieldError = (field: keyof OrgStorageConfig) => (serverErrors[field] ? { message: serverErrors[field] } : null);
 
     useEffect(() => {
         if (!orgId) {
@@ -61,10 +67,11 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
     }, [orgId]);
 
     const handleSave = async () => {
-        if (config.s3Enabled && ttlError) {
-            toast.error(ttlError);
+        if (config.s3Enabled && (ttlError || bucketNameError(config.bucketName))) {
+            toast.error(ttlError ?? bucketNameError(config.bucketName));
             return;
         }
+        setServerErrors({});
         setSaving(true);
         try {
             const saved = await storageConfigService.save(orgId, buildStoragePayload(config));
@@ -73,14 +80,22 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
             setEffectiveBucket(saved.bucketName ?? null);
             toast.success("Storage settings saved");
         } catch (err) {
+            setServerErrors(getApiFieldErrors(err));
             reportApiError(err, { fallback: "Failed to save storage settings" });
         } finally {
             setSaving(false);
         }
     };
 
-    const set = <K extends keyof OrgStorageConfig>(key: K, value: OrgStorageConfig[K]) =>
+    const set = <K extends keyof OrgStorageConfig>(key: K, value: OrgStorageConfig[K]) => {
         setConfig((prev) => ({ ...prev, [key]: value }));
+        setServerErrors((prev) => {
+            if (!(key in prev)) return prev;
+            const rest = { ...prev };
+            delete rest[key];
+            return rest;
+        });
+    };
 
     if (loading) {
         return (
@@ -153,11 +168,17 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
                             <Input
                                 id="bucketName"
                                 placeholder={defaultBucket ? `Default: ${defaultBucket}` : "my-org-assets-bucket"}
-                                maxLength={FIELD_LIMITS.storageConfig.bucketName.maxLength}
+                                {...limitInputProps(FIELD_LIMITS.storageConfig.bucketName)}
                                 value={config.bucketName ?? ""}
                                 onChange={(e) => set("bucketName", e.target.value)}
+                                aria-invalid={bucketError ? true : undefined}
+                                aria-describedby={bucketError ? "bucketName-error" : undefined}
                             />
-                            <p className="text-xs text-faint-fg">Leave blank to use the default bucket.</p>
+                            {bucketError ? (
+                                <FieldError id="bucketName-error" error={{ message: bucketError }} />
+                            ) : (
+                                <p className="text-xs text-faint-fg">Leave blank to use the default bucket.</p>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -166,9 +187,11 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
                                 <Input
                                     id="reportPrefix"
                                     placeholder="reports"
+                                    {...limitInputProps(FIELD_LIMITS.storageConfig.reportPrefix)}
                                     value={config.reportPrefix}
                                     onChange={(e) => set("reportPrefix", e.target.value)}
                                 />
+                                <FieldError error={fieldError("reportPrefix")} />
                                 <p className="text-xs text-faint-fg">S3 key prefix for generated reports</p>
                             </div>
 
@@ -177,9 +200,11 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
                                 <Input
                                     id="importPrefix"
                                     placeholder="imports"
+                                    {...limitInputProps(FIELD_LIMITS.storageConfig.importPrefix)}
                                     value={config.importPrefix}
                                     onChange={(e) => set("importPrefix", e.target.value)}
                                 />
+                                <FieldError error={fieldError("importPrefix")} />
                                 <p className="text-xs text-faint-fg">S3 key prefix for import files</p>
                             </div>
                         </div>
@@ -198,8 +223,8 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
                                 className="w-40"
                                 aria-invalid={ttlError ? true : undefined}
                             />
-                            {ttlError ? (
-                                <p role="alert" className="text-sm text-danger">{ttlError}</p>
+                            {ttlError || serverErrors.presignMinutes ? (
+                                <FieldError error={{ message: ttlError ?? serverErrors.presignMinutes }} />
                             ) : (
                                 <p className="text-xs text-faint-fg">How long a presigned download URL remains valid (1–{MAX_PRESIGN_MINUTES} min)</p>
                             )}
