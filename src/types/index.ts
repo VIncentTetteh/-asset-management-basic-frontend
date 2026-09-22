@@ -436,8 +436,33 @@ export enum POStatus {
     CANCELLED = "CANCELLED",
 }
 
+/** One itemised line of a purchase order (backend V56). */
+export interface PoLineItem {
+    id?: string;
+    /** Server-assigned 1..n in the order the lines were sent. */
+    lineNumber?: number;
+    description: string;
+    supplierPartNumber?: string | null;
+    categoryId?: string | null;
+    /** Read-only display name of categoryId. */
+    categoryName?: string | null;
+    quantity: number;
+    unitPrice: number;
+    /** Percentage, e.g. 12.5 for 12.5%. */
+    taxRate?: number | null;
+    /** Money. Derived from taxRate when one is given. */
+    taxAmount?: number | null;
+    /** Read-only: quantity x unit price + tax. */
+    lineTotal?: number | null;
+}
+
+/** What a line looks like on the way to the API: line number and totals are server-owned. */
+export type PoLineItemDto = Omit<PoLineItem, "id" | "lineNumber" | "lineTotal" | "categoryName">;
+
 export interface PurchaseOrder extends BaseEntity {
     poNumber: string;
+    /** Itemised lines; empty when the order is a single lump sum. */
+    lineItems?: PoLineItem[];
     totalAmount: number;
     currency?: string;
     /** Server-owned: changed only through submit/approve/reject/receive/cancel. */
@@ -478,6 +503,12 @@ export interface PurchaseOrderDto {
     /** null unlinks the budget on PUT. */
     linkedBudgetId?: string | null;
     organisationId?: string;
+    /**
+     * The order's lines. Omitted or empty leaves the order a lump sum; when lines
+     * are present the server derives totalAmount from them and ignores the one
+     * sent here. PUT replaces the whole set; PATCH leaves it alone when absent.
+     */
+    lineItems?: PoLineItemDto[];
 }
 
 // ─── Maintenance ──────────────────────────────────────────────────────────────
@@ -545,6 +576,64 @@ export interface Audit extends BaseEntity {
     conductedByName?: string | null;
     status?: AuditStatus | string;
     remarks?: string;
+    /** Count-sheet progress, read-only and counted from the items. */
+    totalItemCount?: number;
+    verifiedItemCount?: number;
+    discrepancyCount?: number;
+    /**
+     * True only when the sheet exists and every item on it is verified. This is
+     * the only thing the "Verified" seal may key off.
+     */
+    allItemsVerified?: boolean;
+}
+
+/** Where one line of an audit count sheet has got to (backend V57). */
+export enum AuditItemStatus {
+    PENDING = "PENDING",
+    VERIFIED = "VERIFIED",
+    DISCREPANCY = "DISCREPANCY",
+}
+
+/** What is wrong with an audited asset. */
+export enum AuditDiscrepancyType {
+    MISSING = "MISSING",
+    WRONG_LOCATION = "WRONG_LOCATION",
+    UNEXPECTED = "UNEXPECTED",
+    DAMAGED = "DAMAGED",
+}
+
+/** One asset on an audit's count sheet. Read-only: the endpoints change it, never a PUT. */
+export interface AuditItem extends BaseEntity {
+    auditId: string;
+    assetId: string;
+    assetTag?: string | null;
+    assetName?: string | null;
+    status: AuditItemStatus | string;
+    expectedLocation?: string | null;
+    actualLocation?: string | null;
+    condition?: string | null;
+    discrepancyFlag?: boolean;
+    discrepancyType?: AuditDiscrepancyType | string | null;
+    discrepancyReason?: string | null;
+    remarks?: string | null;
+    verifiedAt?: string | null;
+    verifiedByName?: string | null;
+}
+
+/** Body of POST /audits/{id}/items/verify. */
+export interface AuditItemVerifyRequest {
+    /** A scanned QR link, `asset:<uuid>`, a bare asset id, or an asset tag. */
+    scan: string;
+    actualLocation?: string | null;
+    condition?: string | null;
+    remarks?: string | null;
+}
+
+/** Body of POST /audits/{id}/items/{itemId}/discrepancy. */
+export interface AuditItemDiscrepancyRequest {
+    discrepancyType: AuditDiscrepancyType | string;
+    reason: string;
+    actualLocation?: string | null;
 }
 
 export interface AssetAuditDto {
