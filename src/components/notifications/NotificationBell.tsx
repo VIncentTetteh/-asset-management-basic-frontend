@@ -1,5 +1,6 @@
 "use client";
 
+import { safeInternalPath } from "@/lib/safe-url";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,8 +23,7 @@ export const notificationQueryKeys = {
 };
 
 /** Only same-app paths are navigated to from the bell; anything else is ignored. */
-const internalPath = (url?: string): string | null =>
-    url && url.startsWith("/") && !url.startsWith("//") && !url.startsWith("/\\") ? url : null;
+const internalPath = safeInternalPath;
 
 /**
  * Header notification bell: unread badge (polled every minute) and a popover

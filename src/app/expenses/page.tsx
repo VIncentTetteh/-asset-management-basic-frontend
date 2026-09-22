@@ -1,5 +1,6 @@
 "use client";
 
+import { ExternalLink as SafeExternalLink } from "@/components/ui/external-link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -259,10 +260,9 @@ function ExpensesContent() {
               <p className="truncate text-xs text-faint-fg">Asset · {lookups.assetName(row.original.linkedAssetId)}</p>
             ) : null}
             {row.original.receiptUrl ? (
-              <a href={row.original.receiptUrl} target="_blank" rel="noopener noreferrer"
-                className="text-xs text-brand underline-offset-2 hover:underline">
+              <SafeExternalLink href={row.original.receiptUrl} className="text-xs text-brand underline-offset-2 hover:underline">
                 Receipt
-              </a>
+              </SafeExternalLink>
             ) : null}
           </div>
         ),

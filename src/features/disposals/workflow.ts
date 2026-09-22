@@ -1,4 +1,5 @@
 import type { DisposalRecord, DisposalsDto } from "@/types";
+import { safeExternalUrl } from "@/lib/safe-url";
 import { optionalNumber, optionalString } from "@/features/finance/payloads";
 import type { DisposalFilterParams } from "@/services/disposalService";
 
@@ -89,4 +90,4 @@ export function disposalQueryParams(filters: DisposalFilters): DisposalFilterPar
 }
 
 /** A compliance reference that is a link opens in a new tab; anything else is shown as text. */
-export const isDocumentLink = (value?: string | null): boolean => !!value && /^https?:\/\//i.test(value.trim());
+export const isDocumentLink = (value?: string | null): boolean => safeExternalUrl(value) !== null;

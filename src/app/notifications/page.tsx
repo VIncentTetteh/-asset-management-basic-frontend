@@ -1,5 +1,6 @@
 "use client";
 
+import { safeInternalPath } from "@/lib/safe-url";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { notificationService, resolveNotifId } from "@/services/notificationService";
@@ -266,9 +267,9 @@ export default function NotificationsPage() {
                                                     <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Mark read
                                                 </Button>
                                             )}
-                                            {n.actionUrl && (
+                                            {safeInternalPath(n.actionUrl) && (
                                                 <Button variant="outline" size="sm" asChild>
-                                                    <Link href={n.actionUrl}>View Item</Link>
+                                                    <Link href={safeInternalPath(n.actionUrl)!}>View Item</Link>
                                                 </Button>
                                             )}
                                         </div>

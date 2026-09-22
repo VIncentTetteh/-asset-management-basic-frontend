@@ -1,5 +1,6 @@
 "use client";
 
+import { safeExternalUrl } from "@/lib/safe-url";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "react-hot-toast";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -137,8 +138,11 @@ export function DocumentAttachments({
             const isExternal = !(url.includes("/api/v1/documents/") && url.includes("/download"));
 
             if (isExternal) {
-                // S3 presigned URL — open directly (no auth needed, already signed)
-                window.open(url, "_blank", "noopener,noreferrer");
+                // S3 presigned URL — open directly (no auth needed, already signed).
+                // Only an http(s) URL is ever opened (never javascript:/data:).
+                const safe = safeExternalUrl(url);
+                if (!safe) throw new Error("Unsupported download URL");
+                window.open(safe, "_blank", "noopener,noreferrer");
             } else {
                 // Backend streaming URL — must fetch with auth headers, then create blob URL
                 const response = await api.get(url, { responseType: "blob" });

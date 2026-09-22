@@ -1,5 +1,6 @@
 "use client";
 
+import { ExternalLink as SafeExternalLink } from "@/components/ui/external-link";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -149,14 +150,12 @@ export default function BogReportPage() {
           <div className="max-w-64">
             <p className="truncate text-foreground" title={row.original.requirement}>{row.original.requirement}</p>
             {row.original.evidenceUrl ? (
-              <a
+              <SafeExternalLink
                 href={row.original.evidenceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="ea-focus mt-0.5 inline-flex items-center gap-1 rounded-sm text-xs text-brand hover:underline"
               >
                 Evidence <ExternalLink className="h-3 w-3" />
-              </a>
+              </SafeExternalLink>
             ) : null}
           </div>
         ),
@@ -362,9 +361,7 @@ export default function BogReportPage() {
               {editControl.evidenceUrl ? (
                 <p className="mb-1 text-xs text-muted-fg">
                   Legacy link:{" "}
-                  <a href={editControl.evidenceUrl} target="_blank" rel="noreferrer" className="text-brand hover:underline">
-                    {editControl.evidenceUrl}
-                  </a>
+                  <SafeExternalLink href={editControl.evidenceUrl} className="text-brand hover:underline" />
                 </p>
               ) : null}
               <DocumentAttachments entityType="BOG_CONTROL" entityId={editControl.id} />

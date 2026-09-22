@@ -1,5 +1,6 @@
 "use client";
 
+import { ExternalLink as SafeExternalLink } from "@/components/ui/external-link";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
@@ -162,14 +163,9 @@ export default function ContractsPage() {
               <p className="truncate text-xs text-muted-fg" title={row.original.notes}>{row.original.notes}</p>
             ) : null}
             {row.original.documentUrl ? (
-              <a
-                href={row.original.documentUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-brand underline-offset-2 hover:underline"
-              >
+              <SafeExternalLink href={row.original.documentUrl} className="text-xs text-brand underline-offset-2 hover:underline">
                 Document
-              </a>
+              </SafeExternalLink>
             ) : null}
           </div>
         ),

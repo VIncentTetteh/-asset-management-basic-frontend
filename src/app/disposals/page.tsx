@@ -1,5 +1,6 @@
 "use client";
 
+import { ExternalLink as SafeExternalLink } from "@/components/ui/external-link";
 import { useMemo, useState } from "react";
 import { Trash, Pencil, Trash2, ThumbsUp, XCircle } from "lucide-react";
 import type { DisposalRecord } from "@/types";
@@ -133,15 +134,13 @@ export default function DisposalsPage() {
           const doc = row.original.complianceDocumentUrl;
           if (!doc) return <span className="text-faint-fg">—</span>;
           return isDocumentLink(doc) ? (
-            <a
-              href={doc.trim()}
-              target="_blank"
-              rel="noopener noreferrer"
+            <SafeExternalLink
+              href={doc}
               className="ea-focus block max-w-40 truncate rounded-sm text-xs font-semibold text-brand hover:underline"
               title={doc}
             >
               Open document
-            </a>
+            </SafeExternalLink>
           ) : (
             <span className="block max-w-40 truncate text-xs text-muted-fg" title={doc}>{doc}</span>
           );
