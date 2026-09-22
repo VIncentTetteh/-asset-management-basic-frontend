@@ -17,9 +17,17 @@ import { Select } from "@/components/ui/select";
 import { CountrySelect } from "@/components/ui/country-select";
 import { countryName } from "@/lib/countries";
 import { buildPatchPayload } from "@/lib/patch";
+import { applyApiFieldErrors } from "@/lib/api-validation";
+import { usePermissions } from "@/contexts/PermissionContext";
+import { allowedParents, buildLocationPayload } from "@/features/locations/payload";
 import { useConfirm } from "@/hooks/useConfirm";
 
-const locations = makeCrudHooks<Location, LocationDto>("locations", locationService, { entity: "Location" });
+// Edits go through PUT (full replace) so cleared fields and parents are cleared.
+const locations = makeCrudHooks<Location, LocationDto>(
+  "locations",
+  { ...locationService, update: (id, data) => locationService.replace(id, data as LocationDto) },
+  { entity: "Location" },
+);
 
 export default function LocationsPage() {
   const { data: rows = [], isLoading } = locations.useList();
@@ -31,7 +39,11 @@ export default function LocationsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<Location | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<LocationDto>();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<LocationDto>();
+  const { hasPermission } = usePermissions();
+  // Mirrors the API: location writes take MANAGE_LOCATIONS or MANAGE_ORGANIZATION_SETTINGS.
+  const canManage = hasPermission("MANAGE_LOCATIONS") || hasPermission("MANAGE_ORGANIZATION_SETTINGS");
+  const parentOptions = useMemo(() => allowedParents(rows, editing?.id ?? undefined), [rows, editing]);
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -75,22 +87,23 @@ export default function LocationsPage() {
   };
 
   const onSubmit = async (data: LocationDto) => {
-    const payload: LocationDto = { ...data };
-    (Object.keys(payload) as (keyof LocationDto)[]).forEach((k) => {
-      if (payload[k] === "") delete (payload as unknown as Record<string, unknown>)[k];
-    });
-
-    if (editing) {
-      const patch = buildPatchPayload<LocationDto>(editing as unknown as Partial<LocationDto>, payload);
-      if (Object.keys(patch).length === 0) {
-        toast("No changes to update");
-        return;
+    const payload = buildLocationPayload(data, editing);
+    try {
+      if (editing) {
+        const before = buildLocationPayload(editing as unknown as LocationDto, editing);
+        if (Object.keys(buildPatchPayload<LocationDto>(before, payload)).length === 0) {
+          toast("No changes to update");
+          return;
+        }
+        await save.mutateAsync({ id: editing.id, data: payload });
+      } else {
+        await save.mutateAsync({ data: payload });
       }
-      await save.mutateAsync({ id: editing.id, data: patch as LocationDto });
-    } else {
-      await save.mutateAsync({ data: payload });
+      setIsModalOpen(false);
+    } catch (err) {
+      // Toasted by the save hook; keep the form open with fields marked.
+      applyApiFieldErrors(err, setError);
     }
-    setIsModalOpen(false);
   };
 
   const columns = useMemo<ColumnDef<Location, unknown>[]>(
@@ -127,7 +140,7 @@ export default function LocationsPage() {
         id: "actions",
         header: "",
         enableSorting: false,
-        cell: ({ row }) => (
+        cell: ({ row }) => !canManage ? null : (
           <div className="flex justify-end gap-0.5">
             <Button
               variant="ghost"
@@ -155,7 +168,7 @@ export default function LocationsPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [parentName],
+    [parentName, canManage],
   );
 
   return (
@@ -163,9 +176,11 @@ export default function LocationsPage() {
       title="Locations"
       subtitle={isLoading ? "Loading locations…" : `${rows.length} sites and rooms`}
       actions={
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> New location
-        </Button>
+        canManage ? (
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" /> New location
+          </Button>
+        ) : undefined
       }
       toolbar={
         <div className="relative w-full max-w-xs">
@@ -181,9 +196,11 @@ export default function LocationsPage() {
         emptyTitle="No locations yet"
         emptyDescription="Track sites, buildings, and rooms — nest them to mirror your physical footprint."
         emptyAction={
-          <Button size="sm" onClick={openCreate}>
-            <MapPin className="mr-1.5 h-4 w-4" /> New location
-          </Button>
+          canManage ? (
+            <Button size="sm" onClick={openCreate}>
+              <MapPin className="mr-1.5 h-4 w-4" /> New location
+            </Button>
+          ) : undefined
         }
       />
 
@@ -231,7 +248,8 @@ export default function LocationsPage() {
             <Label htmlFor="loc-parent">Parent location</Label>
             <Select id="loc-parent" {...register("parentLocationId")}>
               <option value="">None</option>
-              {rows.filter((l) => l.id !== editing?.id).map((l) => (
+              {/* Not itself or a descendant: that would make a cycle. */}
+              {rows.filter((l) => parentOptions.has(l.id!)).map((l) => (
                 <option key={l.id} value={l.id}>{l.name}</option>
               ))}
             </Select>
