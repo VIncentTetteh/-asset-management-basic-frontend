@@ -68,12 +68,12 @@ export default function RegisterTenantPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="phone">Phone</Label>
+                                    <Label htmlFor="adminPhone">Phone</Label>
                                     <Input
-                                        id="phone"
+                                        id="adminPhone"
                                         type="tel"
                                         placeholder="+233201234567"
-                                        {...register("phone")}
+                                        {...register("adminPhone")}
                                     />
                                 </div>
                             </div>

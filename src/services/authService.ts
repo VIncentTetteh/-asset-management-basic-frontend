@@ -8,7 +8,8 @@ export interface TenantRegistrationDto {
     adminFirstName: string;
     adminLastName: string;
     password: string;
-    phone?: string;
+    /** The administrator's phone (the API's `adminPhone`; a `phone` key was silently dropped). */
+    adminPhone?: string;
     country?: string;
 }
 
