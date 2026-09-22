@@ -28,9 +28,18 @@ import {
     buildCloudAssetPayload,
     buildCloudCostPayload,
     formatBillingMonth,
+    parseTags,
     resourceTypeLabel,
+    serializeTags,
+    tagRowsError,
     type CloudAssetForm,
+    type TagRow,
 } from "@/features/cloud/options";
+import { TagEditor } from "@/features/cloud/TagEditor";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+
+const CL = FIELD_LIMITS.cloudAsset;
 import { CloudCostHistoryModal } from "@/features/cloud/CloudCostHistoryModal";
 
 const PROVIDER_COLORS: Record<string, string> = {
@@ -72,6 +81,8 @@ export default function CloudAssetsPage() {
     const [costAssetId, setCostAssetId] = useState("");
     const [isSyncing, setIsSyncing] = useState(false);
     const [historyAsset, setHistoryAsset] = useState<CloudAsset | null>(null);
+    const [tagRows, setTagRows] = useState<TagRow[]>([]);
+    const [tagError, setTagError] = useState<string | null>(null);
 
     const assetForm = useForm<CloudAssetForm>();
     const { format, baseCurrency } = useCurrency();
@@ -113,6 +124,8 @@ export default function CloudAssetsPage() {
     const handleOpenCreate = () => {
         setEditingAsset(null);
         assetForm.reset({ name: "", provider: "AWS", region: "", resourceId: "", resourceType: "VIRTUAL_MACHINE", status: "RUNNING", environment: "", currency: baseCurrency });
+        setTagRows([]);
+        setTagError(null);
         setIsModalOpen(true);
     };
 
@@ -126,6 +139,8 @@ export default function CloudAssetsPage() {
             currency: asset.currency || baseCurrency, environment: asset.environment ?? "",
             tags: asset.tags || "", description: asset.description || "",
         });
+        setTagRows(parseTags(asset.tags));
+        setTagError(null);
         setIsModalOpen(true);
     };
 
@@ -150,7 +165,10 @@ export default function CloudAssetsPage() {
     };
 
     const onSubmitAsset = async (form: CloudAssetForm) => {
-        const data: CloudAssetDto = buildCloudAssetPayload(form);
+        const problem = tagRowsError(tagRows);
+        setTagError(problem);
+        if (problem) return;
+        const data: CloudAssetDto = buildCloudAssetPayload({ ...form, tags: serializeTags(tagRows) });
         try {
             if (editingAsset) {
                 await cloudAssetService.update(editingAsset.id, data);
@@ -216,7 +234,7 @@ export default function CloudAssetsPage() {
             )}
 
             {costSummary && (
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <Card className="md:col-span-1">
                         <CardContent className="flex items-center gap-3 p-4">
                             <div className="rounded-control bg-brand-soft p-2"><DollarSign className="h-5 w-5 text-brand" /></div>
@@ -253,6 +271,21 @@ export default function CloudAssetsPage() {
                                     <span className="data-mono font-medium text-muted-fg">{format(v, costSummary.currency)}</span>
                                 </div>
                             ))}
+                        </CardContent>
+                    </Card>
+                    <Card className="md:col-span-1">
+                        <CardHeader className="px-4 pb-1 pt-3"><p className="text-xs font-semibold uppercase tracking-wide text-faint-fg">Top Assets</p></CardHeader>
+                        <CardContent className="space-y-1 px-4 pb-3">
+                            {(costSummary.topAssets ?? []).length === 0 ? (
+                                <p className="text-xs text-faint-fg">No costs yet.</p>
+                            ) : (
+                                (costSummary.topAssets ?? []).map((a, i) => (
+                                    <div key={`${a.assetName}-${i}`} className="flex justify-between gap-2 text-sm">
+                                        <span className="min-w-0 truncate text-muted-fg" title={resourceTypeLabel(a.resourceType)}>{a.assetName}</span>
+                                        <span className="data-mono shrink-0 font-medium text-muted-fg">{format(a.monthlyCost, costSummary.currency)}</span>
+                                    </div>
+                                ))
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -295,10 +328,11 @@ export default function CloudAssetsPage() {
                                             <th className="px-4 py-3 text-left font-medium text-muted-fg">Name</th>
                                             <th className="px-4 py-3 text-left font-medium text-muted-fg">Provider</th>
                                             <th className="px-4 py-3 text-left font-medium text-muted-fg">Type</th>
-                                            <th className="px-4 py-3 text-left font-medium text-muted-fg">Region</th>
+                                            <th className="px-4 py-3 text-left font-medium text-muted-fg">Region / account</th>
                                             <th className="px-4 py-3 text-left font-medium text-muted-fg">Environment</th>
                                             <th className="px-4 py-3 text-left font-medium text-muted-fg">Monthly Cost</th>
                                             <th className="px-4 py-3 text-left font-medium text-muted-fg">Status</th>
+                                            <th className="px-4 py-3 text-left font-medium text-muted-fg">Last sync</th>
                                             <th className="px-4 py-3 text-right font-medium text-muted-fg">Actions</th>
                                         </tr>
                                     </thead>
@@ -308,6 +342,21 @@ export default function CloudAssetsPage() {
                                                 <td className="px-4 py-3">
                                                     <div className="font-medium text-foreground">{asset.name}</div>
                                                     <div className="data-mono max-w-[180px] truncate text-xs text-faint-fg">{asset.resourceId}</div>
+                                                    {asset.description ? (
+                                                        <div className="max-w-[220px] truncate text-xs text-muted-fg" title={asset.description}>{asset.description}</div>
+                                                    ) : null}
+                                                    {parseTags(asset.tags).length > 0 ? (
+                                                        <div className="mt-1 flex max-w-[260px] flex-wrap gap-1">
+                                                            {parseTags(asset.tags).slice(0, 3).map((t) => (
+                                                                <span key={t.key} className="rounded bg-surface-muted px-1.5 py-0.5 text-[10px] text-muted-fg" title={`${t.key}: ${t.value}`}>
+                                                                    {t.key}: {t.value}
+                                                                </span>
+                                                            ))}
+                                                            {parseTags(asset.tags).length > 3 ? (
+                                                                <span className="text-[10px] text-faint-fg">+{parseTags(asset.tags).length - 3}</span>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : null}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <span className={cn("rounded px-2 py-0.5 text-xs font-medium", PROVIDER_COLORS[asset.provider] || "bg-surface-muted text-faint-fg")}>
@@ -315,7 +364,10 @@ export default function CloudAssetsPage() {
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-xs text-muted-fg">{resourceTypeLabel(asset.resourceType)}</td>
-                                                <td className="px-4 py-3 text-muted-fg">{asset.region}</td>
+                                                <td className="px-4 py-3 text-muted-fg">
+                                                    {asset.region}
+                                                    {asset.accountId ? <div className="data-mono text-xs text-faint-fg">{asset.accountId}</div> : null}
+                                                </td>
                                                 <td className="px-4 py-3">
                                                     {asset.environment ? (
                                                         <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", ENV_STYLES[asset.environment] || "bg-info-soft text-info")}>
@@ -330,6 +382,9 @@ export default function CloudAssetsPage() {
                                                     <span className={cn("rounded-full border px-2 py-0.5 text-xs font-bold", STATUS_STYLES[asset.status] || STATUS_STYLES.UNKNOWN)}>
                                                         {asset.status}
                                                     </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-xs text-muted-fg">
+                                                    {asset.lastSyncAt ? new Date(asset.lastSyncAt).toLocaleString() : <span className="text-faint-fg">Never synced</span>}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex justify-end gap-1">
@@ -397,7 +452,8 @@ export default function CloudAssetsPage() {
                 <form onSubmit={assetForm.handleSubmit(onSubmitAsset)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
                     <div className="space-y-2">
                         <Label htmlFor="assetName">Name <span className="text-danger">*</span></Label>
-                        <Input id="assetName" placeholder="prod-web-server-01" {...assetForm.register("name", { required: true })} />
+                        <Input id="assetName" placeholder="prod-web-server-01" {...limitInputProps(CL.name)} {...assetForm.register("name", limitRules<CloudAssetForm, "name">(CL.name, "Name"))} />
+                        <FieldError error={assetForm.formState.errors.name} />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -431,21 +487,29 @@ export default function CloudAssetsPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label>Region <span className="text-danger">*</span></Label>
-                            <Input placeholder="us-east-1" {...assetForm.register("region", { required: true })} />
+                            <Input placeholder="us-east-1" {...limitInputProps(CL.region)} {...assetForm.register("region", limitRules<CloudAssetForm, "region">(CL.region, "Region"))} />
+                            <FieldError error={assetForm.formState.errors.region} />
                         </div>
                         <div className="space-y-2">
                             <Label>Account ID</Label>
-                            <Input placeholder="123456789012" {...assetForm.register("accountId")} />
+                            <Input placeholder="123456789012" {...limitInputProps(CL.accountId)} {...assetForm.register("accountId", limitRules<CloudAssetForm, "accountId">(CL.accountId, "Account ID"))} />
+                            <FieldError error={assetForm.formState.errors.accountId} />
                         </div>
                     </div>
                     <div className="space-y-2">
                         <Label>Resource ID <span className="text-danger">*</span></Label>
-                        <Input placeholder="arn:aws:ec2:..." {...assetForm.register("resourceId", { required: true })} />
+                        <Input placeholder="arn:aws:ec2:..." {...limitInputProps(CL.resourceId)} {...assetForm.register("resourceId", limitRules<CloudAssetForm, "resourceId">(CL.resourceId, "Resource ID"))} />
+                        <FieldError error={assetForm.formState.errors.resourceId} />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label>Monthly Cost Estimate</Label>
-                            <Input type="number" min="0" step="0.0001" {...assetForm.register("monthlyCostEstimate")} />
+                            <Input
+                                type="number"
+                                {...limitInputProps(CL.monthlyCostEstimate)}
+                                {...assetForm.register("monthlyCostEstimate", limitRules<CloudAssetForm, "monthlyCostEstimate">(CL.monthlyCostEstimate, "Monthly cost estimate"))}
+                            />
+                            <FieldError error={assetForm.formState.errors.monthlyCostEstimate} />
                         </div>
                         <div className="space-y-2">
                             <Label>Currency</Label>
@@ -457,6 +521,11 @@ export default function CloudAssetsPage() {
                     <div className="space-y-2">
                         <Label>Description</Label>
                         <Textarea placeholder="Optional description" {...assetForm.register("description")} />
+                        <FieldError error={assetForm.formState.errors.description} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Tags</Label>
+                        <TagEditor rows={tagRows} onChange={setTagRows} error={tagError ?? (assetForm.formState.errors.tags?.message as string | undefined)} />
                     </div>
                     <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
                         <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>

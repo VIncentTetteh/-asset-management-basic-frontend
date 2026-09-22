@@ -51,3 +51,22 @@ describe("cloud cost records", () => {
         expect(formatBillingMonth(null)).toBe("—");
     });
 });
+
+describe("cloud asset tags", () => {
+    it("round-trips a JSON object through the editor rows", async () => {
+        const { parseTags, serializeTags } = await import("@/features/cloud/options");
+        const rows = parseTags('{"team":"payments","cost-centre":"CC1"}');
+        expect(rows).toEqual([{ key: "team", value: "payments" }, { key: "cost-centre", value: "CC1" }]);
+        expect(serializeTags([...rows, { key: " ", value: "" }])).toBe('{"team":"payments","cost-centre":"CC1"}');
+        expect(serializeTags([])).toBeNull();
+    });
+
+    it("keeps legacy non-JSON tags visible and flags blank or repeated names", async () => {
+        const { parseTags, tagRowsError } = await import("@/features/cloud/options");
+        expect(parseTags("env=prod")).toEqual([{ key: "tags", value: "env=prod" }]);
+        expect(parseTags(null)).toEqual([]);
+        expect(tagRowsError([{ key: "", value: "x" }])).toBe("Every tag needs a name");
+        expect(tagRowsError([{ key: "a", value: "1" }, { key: "a", value: "2" }])).toMatch(/twice/);
+        expect(tagRowsError([{ key: "", value: "" }, { key: "a", value: "1" }])).toBeNull();
+    });
+});
