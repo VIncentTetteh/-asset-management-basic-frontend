@@ -170,6 +170,9 @@ export function AssetFormModal({
             <div className="space-y-2">
               <Label htmlFor="assetTag">Asset tag</Label>
               <Input id="assetTag" placeholder="AST-2025-001" className="data-mono" {...register("assetTag")} />
+              {!editingAsset ? (
+                <p className="text-xs text-muted-fg">Leave blank to use the category&apos;s next prefix tag, if it has one.</p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="serialNumber">Serial number</Label>
@@ -279,6 +282,9 @@ export function AssetFormModal({
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="warrantyExpiryDate">Warranty expiry</Label>
               <Input id="warrantyExpiryDate" type="date" {...register("warrantyExpiryDate")} />
+              {!editingAsset ? (
+                <p className="text-xs text-muted-fg">Leave blank to use the category&apos;s default warranty from the purchase date.</p>
+              ) : null}
             </div>
           </div>
         </div>

@@ -230,7 +230,7 @@ export default function CategoriesPage() {
         data={filtered}
         isLoading={isLoading}
         emptyTitle="No categories yet"
-        emptyDescription="Organise assets into categories with prefix codes and default warranty periods."
+        emptyDescription="Organise assets into categories. A prefix code numbers new asset tags and a default warranty fills in warranty expiry."
         emptyAction={
           <Button size="sm" onClick={openCreate}>
             <Tags className="mr-1.5 h-4 w-4" /> New category
@@ -254,10 +254,12 @@ export default function CategoriesPage() {
             <div className="space-y-2">
               <Label htmlFor="cat-prefix">Asset prefix code</Label>
               <Input id="cat-prefix" className="data-mono" placeholder="LT" {...register("assetPrefixCode")} />
+              <p className="text-xs text-muted-fg">New assets without a tag get the next one, e.g. LT-0001.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="cat-warranty">Default warranty (months)</Label>
               <Input id="cat-warranty" type="number" min="0" {...register("defaultWarrantyPeriodMonths")} />
+              <p className="text-xs text-muted-fg">Sets a new asset&apos;s warranty expiry from its purchase date when none is given.</p>
             </div>
           </div>
           <div className="space-y-2">
