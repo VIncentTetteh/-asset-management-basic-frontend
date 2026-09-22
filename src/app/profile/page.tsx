@@ -173,13 +173,14 @@ export default function ProfilePage() {
             const patchPayload = {
                 firstName: data.firstName,
                 lastName: data.lastName,
-                phone: data.phone || undefined,
-                jobTitle: data.jobTitle || undefined,
+                // "" clears the field on the API (undefined would leave it unchanged).
+                phone: data.phone?.trim() ?? "",
+                jobTitle: data.jobTitle?.trim() ?? "",
             };
 
             // Only send if something actually changed
             const patch = buildPatchPayload<typeof patchPayload>(
-                { firstName: user?.firstName, lastName: user?.lastName, phone: user?.phone, jobTitle: user?.jobTitle },
+                { firstName: user?.firstName, lastName: user?.lastName, phone: user?.phone ?? "", jobTitle: user?.jobTitle ?? "" },
                 patchPayload
             );
             if (Object.keys(patch).length === 0) {
