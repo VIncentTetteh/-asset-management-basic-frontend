@@ -182,6 +182,7 @@ function EmployeesPageInner() {
         editingEmployee={null}
         departments={master.departments}
         users={master.users}
+        employees={master.employees}
       />
     </ListPageTemplate>
   );

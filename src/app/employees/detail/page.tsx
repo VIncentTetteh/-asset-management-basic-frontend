@@ -299,6 +299,7 @@ function EmployeeDetailContent() {
         editingEmployee={employee}
         departments={master.departments}
         users={master.users}
+        employees={master.employees}
       />
       <OnboardModal employee={onboardTarget} onClose={() => setOnboardTarget(null)} assets={master.assets} />
       <OffboardModal employee={offboardTarget} onClose={() => setOffboardTarget(null)} />

@@ -20,15 +20,19 @@ export function EmployeeFormModal({
   editingEmployee,
   departments,
   users,
+  employees = [],
 }: {
   isOpen: boolean;
   onClose: () => void;
   editingEmployee: EmployeeDto | null;
   departments: Department[];
   users: User[];
+  /** Manager candidates (active employees). */
+  employees?: EmployeeDto[];
 }) {
   const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<EmployeeDto>();
   const save = useSaveEmployee();
+  const managerOptions = managerChoices(employees, editingEmployee);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -147,6 +151,17 @@ export function EmployeeFormModal({
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="emp-manager">Manager</Label>
+          <Select id="emp-manager" {...register("managerId")}>
+            <option value="">None</option>
+            {managerOptions.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </Select>
+          {errors.managerId && <p className="text-sm text-danger">{errors.managerId.message}</p>}
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="emp-user">Linked system user (optional)</Label>
           <Select id="emp-user" {...register("userId")}>
             <option value="">No login — asset custodian only</option>
@@ -170,4 +185,22 @@ export function EmployeeFormModal({
       </form>
     </Modal>
   );
+}
+
+/**
+ * Employees who can be picked as this employee's manager: never the employee
+ * themself, and always the current manager (even when not in the loaded page,
+ * e.g. a terminated manager) so an edit does not silently drop them.
+ */
+export function managerChoices(
+  employees: EmployeeDto[],
+  editing: EmployeeDto | null,
+): { id: string; label: string }[] {
+  const options = employees
+    .filter((e) => e.id && e.id !== editing?.id)
+    .map((e) => ({ id: e.id as string, label: `${e.firstName} ${e.lastName}` }));
+  if (editing?.managerId && !options.some((o) => o.id === editing.managerId)) {
+    options.unshift({ id: editing.managerId, label: editing.managerName || "Current manager" });
+  }
+  return options;
 }

@@ -62,10 +62,18 @@ export function useEmployeeMasterData() {
     queryFn: () => assetService.getAll(),
     staleTime: 300_000,
   });
+  // Manager candidates. The API caps a page at 100; the current manager is kept
+  // as an option by the form even when outside this page.
+  const employees = useQuery({
+    queryKey: qk.employees.list({ status: "ACTIVE", size: 100 }),
+    queryFn: () => employeeService.getPaged({ status: "ACTIVE", size: 100 }),
+    staleTime: 300_000,
+  });
   return {
     departments: departments.data ?? [],
     users: users.data ?? [],
     assets: assets.data ?? [],
+    employees: employees.data?.content ?? [],
   };
 }
 
