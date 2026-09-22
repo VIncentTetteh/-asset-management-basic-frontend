@@ -1,4 +1,5 @@
 import api from "@/lib/axios";
+import { extractList } from "@/services/responseUtils";
 
 export type ConsentPurpose =
   | "MARKETING"
@@ -9,56 +10,49 @@ export type ConsentPurpose =
   | "COMMUNICATIONS"
   | "OTHER";
 
+/**
+ * ConsentRecordDto on the API. Consent is recorded by the signed-in user for
+ * themselves (the API takes the subject from the session); administrators see
+ * the organisation's ledger.
+ */
 export interface ConsentRecordDto {
   id?: string;
-  subjectId?: string;
-  subjectEmail?: string;
-  subjectName?: string;
+  userId?: string;
   purpose?: ConsentPurpose | string;
   granted?: boolean;
-  ipAddress?: string;
-  userAgent?: string;
-  consentText?: string;
-  expiresAt?: string;
+  grantedAt?: string;
   revokedAt?: string;
-  organisationId?: string;
   createdAt?: string;
 }
 
-export interface ConsentCheckResult {
-  purpose: string;
-  granted: boolean;
-  subjectId: string;
-  expiresAt?: string;
-}
+const PAGE_SIZE = 500;
 
 export const dpaConsentService = {
-  /** POST /dpa/consent — Record a data processing consent */
-  record: async (dto: Partial<ConsentRecordDto>): Promise<ConsentRecordDto> => {
-    const response = await api.post<ConsentRecordDto>("/dpa/consent", dto);
-    return response.data;
-  },
-
-  /** GET /dpa/consent — List all consent records for the organisation */
-  listAll: async (): Promise<ConsentRecordDto[]> => {
-    const response = await api.get<ConsentRecordDto[]>("/dpa/consent");
-    return Array.isArray(response.data) ? response.data : [];
-  },
-
-  /**
-   * GET /dpa/consent/check — Check consent for a specific purpose
-   * @param subjectId   The data subject's ID
-   * @param purpose     The processing purpose to check
-   */
-  check: async (subjectId: string, purpose: string): Promise<ConsentCheckResult> => {
-    const response = await api.get<ConsentCheckResult>("/dpa/consent/check", {
-      params: { subjectId, purpose },
+  /** POST /dpa/consent — grant (or decline) consent for a purpose, as the current user. */
+  record: async (purpose: string, granted: boolean): Promise<ConsentRecordDto> => {
+    const response = await api.post<ConsentRecordDto>("/dpa/consent", {
+      purpose,
+      granted,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 255) : undefined,
     });
     return response.data;
   },
 
-  /** DELETE /dpa/consent/{purpose}?subjectId=... — Revoke consent for a purpose */
-  revoke: async (purpose: string, subjectId: string): Promise<void> => {
-    await api.delete(`/dpa/consent/${purpose}`, { params: { subjectId } });
+  /** GET /dpa/consent — the organisation's consent ledger (a Spring page). */
+  listAll: async (): Promise<ConsentRecordDto[]> => {
+    const response = await api.get("/dpa/consent", { params: { size: PAGE_SIZE } });
+    return extractList<ConsentRecordDto>(response.data);
+  },
+
+  /** GET /dpa/consent/check?purpose= — whether the current user has active consent. */
+  check: async (purpose: string): Promise<boolean> => {
+    const response = await api.get<boolean>("/dpa/consent/check", { params: { purpose } });
+    return response.data === true;
+  },
+
+  /** DELETE /dpa/consent/{purpose} — withdraw the current user's consent. */
+  revoke: async (purpose: string): Promise<ConsentRecordDto> => {
+    const response = await api.delete<ConsentRecordDto>(`/dpa/consent/${encodeURIComponent(purpose)}`);
+    return response.data;
   },
 };
