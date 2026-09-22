@@ -5,13 +5,16 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { AssetStats } from "@/services/assetService";
-import type { Department, Location } from "@/types";
+import { AssetCondition, AssetType, type Category, type Department, type Location } from "@/types";
+import type { AssetFilters } from "@/features/assets/assetFilters";
 
 const STATUS_TABS = (stats?: AssetStats) => [
   { key: "ALL", label: "All", count: stats?.total },
+  { key: "PENDING_PROCUREMENT", label: "Pending procurement", count: stats?.pendingProcurement },
   { key: "IN_USE", label: "In use", count: stats?.inUse },
   { key: "IN_STOCK", label: "In stock", count: stats?.inStock },
   { key: "MAINTENANCE", label: "Maintenance", count: stats?.maintenance },
+  { key: "UNDER_REPAIR", label: "Under repair", count: stats?.underRepair },
   { key: "RESERVED", label: "Reserved", count: stats?.reserved },
   { key: "RETIRED", label: "Retired", count: stats?.retired },
   { key: "DISPOSED", label: "Disposed", count: stats?.disposed },
@@ -26,21 +29,16 @@ export function AssetFilterBar({
   hasAdvancedFilters,
   departments,
   locations,
+  categories,
 }: {
   stats?: AssetStats;
-  filters: {
-    status: string;
-    departmentId: string;
-    locationId: string;
-    purchaseDateFrom: string;
-    purchaseDateTo: string;
-    assigned: string;
-  };
+  filters: AssetFilters;
   setParam: (key: string, value: string | null) => void;
   clearAdvanced: () => void;
   hasAdvancedFilters: boolean;
   departments: Department[];
   locations: Location[];
+  categories: Category[];
 }) {
   return (
     <div className="space-y-3">
@@ -68,7 +66,34 @@ export function AssetFilterBar({
       </div>
 
       {/* Advanced filters */}
-      <div className="grid grid-cols-2 gap-3 rounded-card border border-edge bg-surface p-3 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 rounded-card border border-edge bg-surface p-3 md:grid-cols-3 lg:grid-cols-5">
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Category</label>
+          <Select value={filters.categoryId} onChange={(e) => setParam("categoryId", e.target.value)} className="h-8 text-xs">
+            <option value="">All categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Type</label>
+          <Select value={filters.assetType} onChange={(e) => setParam("assetType", e.target.value)} className="h-8 text-xs">
+            <option value="">All types</option>
+            {Object.values(AssetType).map((t) => (
+              <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Condition</label>
+          <Select value={filters.condition} onChange={(e) => setParam("condition", e.target.value)} className="h-8 text-xs">
+            <option value="">All conditions</option>
+            {Object.values(AssetCondition).map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </Select>
+        </div>
         <div className="flex flex-col gap-1">
           <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Department</label>
           <Select value={filters.departmentId} onChange={(e) => setParam("departmentId", e.target.value)} className="h-8 text-xs">
@@ -94,6 +119,10 @@ export function AssetFilterBar({
         <div className="flex flex-col gap-1">
           <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Purchased to</label>
           <Input type="date" value={filters.purchaseDateTo} onChange={(e) => setParam("purchaseDateTo", e.target.value)} className="h-8 text-xs" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Warranty ends before</label>
+          <Input type="date" value={filters.warrantyExpiryBefore} onChange={(e) => setParam("warrantyExpiryBefore", e.target.value)} className="h-8 text-xs" />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg">Assignment</label>

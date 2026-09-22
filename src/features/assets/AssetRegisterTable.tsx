@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 import { assetBookValue } from "@/features/assets/assetPayload";
+import { ASSET_SORT_FIELDS, sortParamToState, sortStateToParam } from "@/features/assets/assetFilters";
 
 /**
  * The asset register — direction A's reference surface. A compact table
@@ -23,6 +24,8 @@ export function AssetRegisterTable({
   isLoading,
   page,
   onPageChange,
+  sort,
+  onSortChange,
   lookups,
   format,
   onView,
@@ -38,6 +41,9 @@ export function AssetRegisterTable({
   isLoading: boolean;
   page: number;
   onPageChange: (page: number) => void;
+  /** Server sort param ("field,dir"); headers change it for the whole register. */
+  sort: string;
+  onSortChange: (sort: string) => void;
   lookups: {
     deptName: (id?: string) => string;
     locName: (id?: string) => string;
@@ -155,12 +161,23 @@ export function AssetRegisterTable({
     [lookups, format, onAssign, onEdit, onDelete, baseCurrency],
   );
 
+  // Only columns the API can sort by are sortable.
+  const sortableColumns = useMemo(
+    () => columns.map((c) => {
+      const id = c.id ?? (c as { accessorKey?: string }).accessorKey;
+      return id && id in ASSET_SORT_FIELDS ? c : { ...c, enableSorting: false };
+    }),
+    [columns],
+  );
+
   const total = paged?.total ?? 0;
   const size = paged?.limit ?? 20;
 
   return (
     <DataTable
-      columns={columns}
+      columns={sortableColumns}
+      sorting={sortParamToState(sort)}
+      onSortingChange={(state) => onSortChange(sortStateToParam(state))}
       data={items}
       isLoading={isLoading}
       onRowClick={onView}

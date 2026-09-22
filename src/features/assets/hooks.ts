@@ -15,6 +15,9 @@ import { userService } from "@/services/userService";
 import { qk } from "@/lib/queryClient";
 import { reportApiError } from "@/lib/api-validation";
 import type { AssetDto } from "@/types";
+import {
+  ADVANCED_FILTER_KEYS, assetQueryParams, hasAdvancedAssetFilters, readAssetFilters,
+} from "@/features/assets/assetFilters";
 
 /** URL-driven filter state shared by the toolbar, table, and pagination. */
 export function useAssetFilters() {
@@ -29,16 +32,7 @@ export function useAssetFilters() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  const filters = {
-    status: searchParams.get("status") ?? "ALL",
-    departmentId: searchParams.get("departmentId") ?? "",
-    locationId: searchParams.get("locationId") ?? "",
-    purchaseDateFrom: searchParams.get("purchaseDateFrom") ?? "",
-    purchaseDateTo: searchParams.get("purchaseDateTo") ?? "",
-    assigned: searchParams.get("assigned") ?? "",
-    page: Number(searchParams.get("page") ?? "0"),
-    sort: searchParams.get("sort") ?? "name,asc",
-  };
+  const filters = readAssetFilters((key) => searchParams.get(key));
 
   const setParam = (key: string, value: string | null) => {
     const p = new URLSearchParams(searchParams.toString());
@@ -50,28 +44,12 @@ export function useAssetFilters() {
 
   const clearAdvanced = () => {
     const p = new URLSearchParams(searchParams.toString());
-    ["departmentId", "locationId", "purchaseDateFrom", "purchaseDateTo", "assigned", "page"].forEach((k) =>
-      p.delete(k),
-    );
+    [...ADVANCED_FILTER_KEYS, "page"].forEach((k) => p.delete(k));
     router.push(`?${p.toString()}`);
   };
 
-  const queryParams: AssetFilterParams = {
-    search: debouncedSearch || undefined,
-    status: filters.status !== "ALL" ? filters.status : undefined,
-    departmentId: filters.departmentId || undefined,
-    locationId: filters.locationId || undefined,
-    purchaseDateFrom: filters.purchaseDateFrom || undefined,
-    purchaseDateTo: filters.purchaseDateTo || undefined,
-    assigned: filters.assigned === "true" ? true : filters.assigned === "false" ? false : undefined,
-    page: filters.page,
-    size: 20,
-    sort: filters.sort,
-  };
-
-  const hasAdvancedFilters = Boolean(
-    filters.departmentId || filters.locationId || filters.purchaseDateFrom || filters.purchaseDateTo || filters.assigned,
-  );
+  const queryParams: AssetFilterParams = assetQueryParams(filters, debouncedSearch);
+  const hasAdvancedFilters = hasAdvancedAssetFilters(filters);
 
   return { filters, searchInput, setSearchInput, setParam, clearAdvanced, queryParams, hasAdvancedFilters };
 }

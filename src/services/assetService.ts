@@ -28,6 +28,8 @@ export interface AssetStats {
     disposed: number;
     reserved: number;
     missing: number;
+    pendingProcurement?: number;
+    underRepair?: number;
     assigned: number;
     unassigned: number;
     /** Register value: purchase cost of every non-disposed asset, in `currency`. */

@@ -36,6 +36,12 @@ interface DataTableProps<TData> {
   emptyTitle?: string;
   emptyDescription?: string;
   emptyAction?: React.ReactNode;
+  /**
+   * Server-side sorting: when given, header clicks report the new state here
+   * (the parent refetches) instead of sorting the loaded page in the browser.
+   */
+  sorting?: SortingState;
+  onSortingChange?: (sorting: SortingState) => void;
   /** Right-hand slot of the footer, e.g. a page money total. */
   footerSummary?: React.ReactNode;
   className?: string;
@@ -59,8 +65,12 @@ export function DataTable<TData>({
   emptyAction,
   footerSummary,
   className,
+  sorting: serverSorting,
+  onSortingChange: onServerSortingChange,
 }: DataTableProps<TData>) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [localSorting, setLocalSorting] = React.useState<SortingState>([]);
+  const manualSorting = serverSorting !== undefined && onServerSortingChange !== undefined;
+  const sorting = manualSorting ? serverSorting : localSorting;
 
   // React Compiler intentionally skips TanStack's function-returning table API.
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -68,9 +78,14 @@ export function DataTable<TData>({
     data,
     columns,
     state: { sorting },
-    onSortingChange: setSorting,
+    onSortingChange: (updater) => {
+      const next = typeof updater === "function" ? updater(sorting) : updater;
+      if (manualSorting) onServerSortingChange(next);
+      else setLocalSorting(next);
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    manualSorting,
     manualPagination: true,
   });
 

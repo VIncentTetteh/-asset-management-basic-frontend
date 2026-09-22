@@ -130,6 +130,7 @@ function AssetsPageInner() {
           hasAdvancedFilters={hasAdvancedFilters}
           departments={master.departments}
           locations={master.locations}
+          categories={master.categories}
         />
 
         <AssetRegisterTable
@@ -137,6 +138,8 @@ function AssetsPageInner() {
           isLoading={isLoading}
           page={filters.page}
           onPageChange={(p) => setParam("page", String(p))}
+          sort={filters.sort}
+          onSortChange={(sort) => setParam("sort", sort)}
           lookups={lookups}
           format={format}
           onView={setDetailAsset}
@@ -184,6 +187,8 @@ function AssetsPageInner() {
         categories={master.categories}
         users={master.users}
         organisations={master.organisations}
+        suppliers={master.suppliers}
+        purchaseOrders={master.purchaseOrders}
       />
       {ConfirmDialog}
     </ListPageTemplate>
