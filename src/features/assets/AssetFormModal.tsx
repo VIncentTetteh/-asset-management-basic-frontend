@@ -12,11 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { buildAssetUpdate, normaliseAssetForm } from "@/features/assets/assetPayload";
+import { buildAssetUpdate, editableAssetStatuses, normaliseAssetForm } from "@/features/assets/assetPayload";
 import { useSaveAsset } from "@/features/assets/hooks";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { todayLocal } from "@/lib/local-date";
+import { FIELD_LIMITS, limitInputProps } from "@/lib/field-limits";
 
 function emptyForm(baseCurrency: string): AssetDto {
   return {
@@ -37,6 +38,9 @@ function emptyForm(baseCurrency: string): AssetDto {
     usefulLifeMonths: "",
     residualValue: "",
     warrantyExpiryDate: "",
+    insurancePremiumPerYear: "",
+    downtimeCostPerDay: "",
+    insurancePolicyExpiry: "",
     status: AssetStatus.IN_STOCK,
     condition: AssetCondition.NEW,
     locationId: "",
@@ -66,6 +70,9 @@ function formFromAsset(asset: Asset, baseCurrency: string): AssetDto {
     usefulLifeMonths: asset.usefulLifeMonths ?? "",
     residualValue: asset.residualValue ?? "",
     warrantyExpiryDate: asset.warrantyExpiryDate ? asset.warrantyExpiryDate.split("T")[0] : "",
+    insurancePremiumPerYear: asset.insurancePremiumPerYear ?? "",
+    downtimeCostPerDay: asset.downtimeCostPerDay ?? "",
+    insurancePolicyExpiry: asset.insurancePolicyExpiry ? asset.insurancePolicyExpiry.split("T")[0] : "",
     status: asset.status as AssetStatus,
     condition: asset.condition,
     locationId: asset.locationId || "",
@@ -258,6 +265,33 @@ export function AssetFormModal({
             Leave depreciation blank to use the category&apos;s depreciation policy. Assets with no useful life
             anywhere are carried at cost.
           </p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="insurancePremiumPerYear">Insurance premium / year</Label>
+              <Input
+                id="insurancePremiumPerYear"
+                type="number"
+                {...limitInputProps(FIELD_LIMITS.asset.insurancePremiumPerYear)}
+                {...register("insurancePremiumPerYear")}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="downtimeCostPerDay">Downtime cost / day</Label>
+              <Input
+                id="downtimeCostPerDay"
+                type="number"
+                {...limitInputProps(FIELD_LIMITS.asset.downtimeCostPerDay)}
+                {...register("downtimeCostPerDay")}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="insurancePolicyExpiry">Insurance policy expiry</Label>
+              <Input id="insurancePolicyExpiry" type="date" {...register("insurancePolicyExpiry")} />
+            </div>
+          </div>
+          <p className="text-xs text-muted-fg">
+            Insurance and downtime costs feed the asset&apos;s total cost of ownership, in the asset&apos;s currency.
+          </p>
         </div>
 
         <div className="space-y-4">
@@ -265,11 +299,16 @@ export function AssetFormModal({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="status">Current status</Label>
-              <Select id="status" {...register("status")}>
-                {Object.values(AssetStatus).map((s) => (
+              <Select id="status" disabled={editingAsset?.status === AssetStatus.DISPOSED} {...register("status")}>
+                {editableAssetStatuses(editingAsset?.status).map((s) => (
                   <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
                 ))}
               </Select>
+              <p className="text-xs text-muted-fg">
+                {editingAsset?.status === AssetStatus.DISPOSED
+                  ? "A disposed asset's status is final."
+                  : "To dispose of an asset, raise a disposal request; it needs approval."}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="condition">Physical condition</Label>

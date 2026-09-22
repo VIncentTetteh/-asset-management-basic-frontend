@@ -48,6 +48,8 @@ export const FIELD_LIMITS = {
         currency: CURRENCY,
         purchaseCost: MONEY,
         residualValue: MONEY,
+        insurancePremiumPerYear: MONEY,
+        downtimeCostPerDay: MONEY,
         usefulLifeMonths: { min: 1, step: 1 },
     },
     assetAudit: { auditDate: REQUIRED, remarks: text(5000) },

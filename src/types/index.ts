@@ -170,6 +170,12 @@ export interface Asset extends BaseEntity {
     insurancePolicyId?: string;
     departmentId?: string;
     purchaseOrderId?: string;
+    /** TCO inputs, in the asset's currency. */
+    insurancePremiumPerYear?: number | null;
+    downtimeCostPerDay?: number | null;
+    insurancePolicyExpiry?: string | null;
+    /** The asset this one is a component of. */
+    parentAssetId?: string | null;
     organisationId?: string;
     /** Net book value as of today, computed server-side by the depreciation engine. */
     currentBookValue?: number;
@@ -189,6 +195,7 @@ export interface Asset extends BaseEntity {
 /** Optional relations an asset update can clear (a missing/null field means "unchanged"). */
 export const CLEARABLE_ASSET_FIELDS = [
     "departmentId", "locationId", "supplierId", "purchaseOrderId", "assignedUserId",
+    "parentAssetId", "insurancePremiumPerYear", "downtimeCostPerDay", "insurancePolicyExpiry",
 ] as const;
 export type ClearableAssetField = (typeof CLEARABLE_ASSET_FIELDS)[number];
 
@@ -221,6 +228,12 @@ export interface AssetDto {
     insurancePolicyId?: string;
     departmentId?: string;
     purchaseOrderId?: string;
+    /** TCO inputs, in the asset's currency. */
+    insurancePremiumPerYear?: number | null;
+    downtimeCostPerDay?: number | null;
+    insurancePolicyExpiry?: string | null;
+    /** The asset this one is a component of. */
+    parentAssetId?: string | null;
     currentBookValue?: number;
     /** Update only: relations to clear explicitly. */
     clearFields?: ClearableAssetField[];

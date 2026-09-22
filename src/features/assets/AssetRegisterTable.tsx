@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
+import { assetBookValue } from "@/features/assets/assetPayload";
 
 /**
  * The asset register — direction A's reference surface. A compact table
@@ -109,11 +110,15 @@ export function AssetRegisterTable({
         ),
       },
       {
-        accessorKey: "purchaseCost",
+        id: "bookValue",
+        accessorFn: (a) => assetBookValue(a),
         header: () => <span className="block text-right">Book value</span>,
         cell: ({ row }) => (
-          <span className="data-mono block text-right">
-            {format(row.original.purchaseCost, row.original.currency || baseCurrency)}
+          <span
+            className="data-mono block text-right"
+            title={`Cost ${format(row.original.purchaseCost, row.original.currency || baseCurrency)}`}
+          >
+            {format(assetBookValue(row.original), row.original.currency || baseCurrency)}
           </span>
         ),
       },

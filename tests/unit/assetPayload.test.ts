@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAssetUpdate, normaliseAssetForm } from "@/features/assets/assetPayload";
+import { assetBookValue, buildAssetUpdate, editableAssetStatuses, normaliseAssetForm } from "@/features/assets/assetPayload";
 import type { Asset, AssetDto } from "@/types";
 
 const original: Asset = {
@@ -73,5 +73,42 @@ describe("normaliseAssetForm", () => {
             departmentId: "",
         });
         expect(out).toEqual({ name: "Desk", purchaseCost: 250.5 });
+    });
+});
+
+describe("asset TCO inputs", () => {
+    it("sends the premium and downtime cost as numbers", () => {
+        const out = normaliseAssetForm({
+            name: "Server", insurancePremiumPerYear: "1200.50", downtimeCostPerDay: "300",
+        } as unknown as AssetDto);
+        expect(out.insurancePremiumPerYear).toBe(1200.5);
+        expect(out.downtimeCostPerDay).toBe(300);
+    });
+
+    it("clears an emptied premium, even a stored 0", () => {
+        const withTco: Asset = { ...original, insurancePremiumPerYear: 0, insurancePolicyExpiry: "2027-01-01" };
+        const patch = buildAssetUpdate(withTco, {
+            ...untouchedForm(), insurancePremiumPerYear: "" as unknown as number, insurancePolicyExpiry: "",
+        });
+        expect(patch.clearFields).toEqual(expect.arrayContaining(["insurancePremiumPerYear", "insurancePolicyExpiry"]));
+    });
+});
+
+describe("editableAssetStatuses", () => {
+    it("never offers DISPOSED: disposal goes through an approved request", () => {
+        expect(editableAssetStatuses("IN_USE")).not.toContain("DISPOSED");
+        expect(editableAssetStatuses("IN_USE")).toContain("RETIRED");
+    });
+
+    it("keeps a disposed asset's status final", () => {
+        expect(editableAssetStatuses("DISPOSED")).toEqual(["DISPOSED"]);
+    });
+});
+
+describe("assetBookValue", () => {
+    it("shows the net book value, not the cost", () => {
+        expect(assetBookValue({ purchaseCost: 1200, currentBookValue: 900 })).toBe(900);
+        expect(assetBookValue({ purchaseCost: 1200, currentBookValue: 0 })).toBe(0);
+        expect(assetBookValue({ purchaseCost: 1200 })).toBe(1200);
     });
 });
