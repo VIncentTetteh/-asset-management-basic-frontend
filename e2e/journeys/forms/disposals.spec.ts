@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { approverCredentials, expect, test, uniq } from "../../fixtures/auth";
+import { opsApproverCredentials, expect, test, uniq } from "../../fixtures/auth";
 import type { ApiClient } from "../../fixtures/api";
 import { acceptConfirm, fieldControl, formModal, overLength, rowWith, submitAndClose, type FieldSpec } from "../../fixtures/forms";
 import { createAsset, dropAsset, isoDate, type Created } from "../../fixtures/prereqs";
@@ -82,7 +82,7 @@ describeRoundTrip({
 
 test.describe("Disposals: maker-checker", () => {
     test("a second user rejects the request with a reason, then the requester deletes it", async ({ page, api, browser }) => {
-        const approver = approverCredentials();
+        const approver = opsApproverCredentials();
         test.skip(!approver, NO_APPROVER);
         const name = uniq("DispApprovalAsset");
         const reason = uniq("disposal for review");

@@ -274,8 +274,12 @@ export async function acceptConfirm(page: Page, name: RegExp = /^(Delete|Confirm
  * what the user sees. Mirrors a paste or autofill that bypasses the attributes.
  */
 export async function bypassNativeValidation(scope: Locator, control?: Locator): Promise<void> {
-    await scope.locator("form").first().evaluate((form) => {
-        (form as HTMLFormElement).noValidate = true;
+    // The scope may be the form itself (e.g. one of several forms on a page) or a
+    // container around it.
+    const isForm = await scope.evaluate((el) => el.tagName === "FORM");
+    const form = isForm ? scope : scope.locator("form").first();
+    await form.evaluate((el) => {
+        (el as HTMLFormElement).noValidate = true;
     });
     if (control) {
         await control.evaluate((el) => {

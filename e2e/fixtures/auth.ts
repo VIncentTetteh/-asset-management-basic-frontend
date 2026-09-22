@@ -39,6 +39,18 @@ export function approverCredentials(): Credentials | null {
     return { email, password, totpSecret: process.env.E2E_APPROVER_TOTP?.trim() || undefined };
 }
 
+/**
+ * Second user for asset workflows (transfers, disposals). Those approvals need
+ * TRANSFER_ASSET / DISPOSE_ASSET, which a finance approver usually lacks, so they
+ * take their own account; falls back to the generic approver.
+ */
+export function opsApproverCredentials(): Credentials | null {
+    const email = process.env.E2E_OPS_APPROVER_EMAIL?.trim();
+    const password = process.env.E2E_OPS_APPROVER_PASSWORD;
+    if (!email || !password) return approverCredentials();
+    return { email, password, totpSecret: process.env.E2E_OPS_APPROVER_TOTP?.trim() || undefined };
+}
+
 const MFA_INPUT_PLACEHOLDER = "000000";
 
 /** Signs in through the real login page, answering the MFA challenge when shown. */
@@ -154,18 +166,28 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
             const baseURL = workerInfo.project.use.baseURL;
             if (!baseURL) throw new Error("baseURL is not configured");
             const file = path.resolve(workerInfo.project.outputDir, `.auth/admin-${workerInfo.parallelIndex}.json`);
-            if (!fs.existsSync(file)) {
-                await saveStorageState(browser, baseURL, adminCredentials(), file);
-            }
+            // Always sign in fresh: a file left by an earlier run may hold a refresh
+            // token the server has since rotated or revoked.
+            await saveStorageState(browser, baseURL, adminCredentials(), file);
             await use(file);
         },
         { scope: "worker" },
     ],
     storageState: ({ workerStorageState }, use) => use(workerStorageState),
     creds: async ({}, use) => use(adminCredentials()),
-    page: async ({ page, creds }, use) => {
+    page: async ({ page, creds, workerStorageState }, use) => {
         await installStepUpHandler(page, creds);
         await use(page);
+        // The API rotates the refresh token on every silent refresh and treats a replayed
+        // old token as theft (the whole session family is revoked). A browser always keeps
+        // the newest cookie; tests start fresh contexts from this file, so write the
+        // rotated cookies back after each test or the next test replays a dead token.
+        try {
+            await page.context().storageState({ path: workerStorageState });
+        } catch {
+            // The context may already be closed if the test failed hard; the next test
+            // simply reuses the last good state.
+        }
     },
     api: async ({ page }, use) => {
         await use(new ApiClient(page));

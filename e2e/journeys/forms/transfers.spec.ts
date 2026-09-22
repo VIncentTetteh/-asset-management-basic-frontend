@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { approverCredentials, expect, test, uniq } from "../../fixtures/auth";
+import { opsApproverCredentials, expect, test, uniq } from "../../fixtures/auth";
 import type { ApiClient } from "../../fixtures/api";
 import {
     acceptConfirm,
@@ -170,7 +170,7 @@ test.describe("Transfers", () => {
     });
 
     test("approval by a second user, then reject and delete", async ({ page, api, browser }) => {
-        const approver = approverCredentials();
+        const approver = opsApproverCredentials();
         test.skip(!approver, NO_APPROVER);
         const p = await ensurePrereqs(api);
         const reason = uniq("transfer for approval");
