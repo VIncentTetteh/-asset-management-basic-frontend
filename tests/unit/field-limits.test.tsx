@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { FIELD_LIMITS, fieldLimit, isAcceptableUrl, limitInputProps, limitRules } from "@/lib/field-limits";
+import { FIELD_LIMITS, fieldLimit, isAcceptableUrl, limitInputProps, limitRules, matchesFormat } from "@/lib/field-limits";
 import { FieldError } from "@/components/ui/field-error";
 
 describe("FIELD_LIMITS mirrors the backend DTOs", () => {
@@ -93,5 +93,47 @@ describe("URL fields mirror @HttpUrl", () => {
         expect(validate("https://x.example/y")).toBe(true);
         expect(FIELD_LIMITS.disposal.complianceDocumentUrl.url).toBe("httpOrText");
         expect(FIELD_LIMITS.expense.receiptUrl.url).toBe("http");
+    });
+});
+
+describe("shared format rules", () => {
+    it("accepts the phone shapes the product uses, and rejects prose", () => {
+        for (const ok of ["+233 20 123 4567", "+233200000123", "020-123-4567", "(030) 276 1000", "0201234567"]) {
+            expect(matchesFormat(ok, "phone"), ok).toBe(true);
+        }
+        for (const bad of ["n/a", "call me", "12345", "+", "0800 CALL NOW"]) {
+            expect(matchesFormat(bad, "phone"), bad).toBe(false);
+        }
+    });
+
+    it("treats a blank value as no value for every format", () => {
+        for (const format of ["phone", "email", "ipv4", "ipv4Cidr"] as const) {
+            expect(matchesFormat("", format)).toBe(true);
+            expect(matchesFormat("   ", format)).toBe(true);
+            expect(matchesFormat(undefined, format)).toBe(true);
+        }
+    });
+
+    it("uses one email rule: a domain with a dot", () => {
+        expect(matchesFormat("ama@example.com", "email")).toBe(true);
+        // The auth pages used /\S+@\S+\.\S+/ and the organisation form
+        // /^[^\s@]+@[^\s@]+$/, so this was valid on one screen and not the next.
+        expect(matchesFormat("ama@localhost", "email")).toBe(false);
+        expect(matchesFormat("ama example@x.com", "email")).toBe(false);
+    });
+
+    it("checks IPv4 octet ranges, and a /0-32 prefix for a range", () => {
+        expect(matchesFormat("192.168.1.10", "ipv4")).toBe(true);
+        expect(matchesFormat("256.1.1.1", "ipv4")).toBe(false);
+        expect(matchesFormat("192.168.1.0/24", "ipv4Cidr")).toBe(true);
+        expect(matchesFormat("192.168.1.0/33", "ipv4Cidr")).toBe(false);
+        expect(matchesFormat("example.com", "ipv4Cidr")).toBe(false);
+    });
+
+    it("limitRules turns a format into an inline message", () => {
+        const rules = limitRules({ maxLength: 100, format: "phone" }, "Phone");
+        const validate = rules.validate as (v: unknown) => true | string;
+        expect(validate("+233 20 123 4567")).toBe(true);
+        expect(validate("n/a")).toMatch(/Phone must be a phone number/);
     });
 });

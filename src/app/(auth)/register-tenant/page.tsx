@@ -1,5 +1,6 @@
 "use client";
 
+import { FORMATS } from "@/lib/field-limits";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -114,7 +115,7 @@ export default function RegisterTenantPage() {
                                     placeholder="alice@acme.com"
                                     {...register("adminEmail", {
                                         required: "Email is required",
-                                        pattern: { value: /\S+@\S+\.\S+/, message: "Invalid email address" }
+                                        pattern: { value: FORMATS.email.pattern, message: FORMATS.email.message("Email") }
                                     })}
                                     className={errors.adminEmail ? "border-red-500" : ""}
                                 />

@@ -1,5 +1,6 @@
 "use client";
 
+import { FORMATS } from "@/lib/field-limits";
 import { useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -55,7 +56,7 @@ export default function ForgotPasswordPage() {
                                     placeholder="name@company.com"
                                     {...register("email", {
                                     required: "Email is required",
-                                    pattern: { value: /\S+@\S+\.\S+/, message: "Invalid email address" }
+                                    pattern: { value: FORMATS.email.pattern, message: FORMATS.email.message("Email") }
                                 })}
                                     className={errors.email ? "border-red-500" : ""}
                                 />

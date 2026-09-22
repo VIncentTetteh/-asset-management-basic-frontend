@@ -25,7 +25,8 @@ import { reportApiError } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
 import {
     buildScanPayload, canPromoteDevice, DEVICE_STATUS_FILTERS, deviceStatusCount, deviceTypeKey, promotedAssetHref,
-    validatePortsInput, MAX_SCAN_PORTS, type DeviceStatusFilter, type ScanForm,
+    validateCidrInput, validateIpListInput, validatePortsInput, MAX_SCAN_PORTS,
+    type DeviceStatusFilter, type ScanForm,
 } from "@/features/discovery/lib";
 import { PromoteDeviceModal } from "@/features/discovery/PromoteDeviceModal";
 import { FieldError } from "@/components/ui/field-error";
@@ -503,7 +504,13 @@ export default function DiscoveryPage() {
                 <form onSubmit={handleSubmit(onScan)} className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="cidrRange">CIDR Range</Label>
-                        <Input id="cidrRange" placeholder="192.168.1.0/24" {...register("cidrRange")} />
+                        <Input
+                            id="cidrRange"
+                            placeholder="192.168.1.0/24"
+                            aria-invalid={scanErrors.cidrRange ? true : undefined}
+                            {...register("cidrRange", { validate: validateCidrInput })}
+                        />
+                        <FieldError error={scanErrors.cidrRange} />
                         <p className="text-xs text-faint-fg">Up to a /24 (256 addresses), e.g. 10.0.0.0/24 or 192.168.1.0/24. Individual IPs below take precedence.</p>
                     </div>
 
@@ -512,7 +519,9 @@ export default function DiscoveryPage() {
                         <textarea id="ipAddressesInput" rows={3}
                             placeholder={"192.168.1.10\n192.168.1.11\n10.0.0.5"}
                             className="ea-focus data-mono w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm text-foreground placeholder:text-faint-fg"
-                            {...register("ipAddressesInput")} />
+                            aria-invalid={scanErrors.ipAddressesInput ? true : undefined}
+                            {...register("ipAddressesInput", { validate: validateIpListInput })} />
+                        <FieldError error={scanErrors.ipAddressesInput} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

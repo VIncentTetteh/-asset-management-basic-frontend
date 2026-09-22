@@ -28,6 +28,50 @@ export interface FieldLimit {
      * also plain text with no URL scheme (a reference such as a certificate number).
      */
     url?: "http" | "httpOrText";
+    /**
+     * A shared format rule. "phone" mirrors the backend's `@ValidPhone`, "email"
+     * its `@Email`, "ipv4" / "ipv4Cidr" the network-scan request. Blank passes —
+     * `required` is what makes a field mandatory.
+     */
+    format?: FormatRule;
+}
+
+export type FormatRule = "phone" | "email" | "ipv4" | "ipv4Cidr";
+
+/**
+ * One rule per format, for the whole app. Each mirrors the backend exactly:
+ * `ValidPhone.PATTERN`, Hibernate's `@Email` (an address with a dot in the
+ * domain), and NetworkScanRequestDto's IPV4 / IPV4_CIDR.
+ *
+ * The auth pages each carried their own email regex and phone inputs had no
+ * format rule at all, so the same value was accepted on one screen and rejected
+ * on the next.
+ */
+export const FORMATS: Readonly<Record<FormatRule, { pattern: RegExp; message: (label: string) => string }>> = {
+    phone: {
+        pattern: /^\+?[0-9(][0-9 ()./-]{5,23}$/,
+        message: (label) => `${label} must be a phone number, e.g. +233 20 123 4567`,
+    },
+    email: {
+        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        message: (label) => `${label} must be a valid email address`,
+    },
+    ipv4: {
+        pattern: /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/,
+        message: (label) => `${label} must be an IPv4 address such as 192.168.1.10`,
+    },
+    ipv4Cidr: {
+        pattern: /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}(\/(3[0-2]|[12]?\d))?$/,
+        message: (label) => `${label} must be an IPv4 range such as 192.168.1.0/24`,
+    },
+};
+
+/** True when `value` is blank or matches the format. */
+export function matchesFormat(value: unknown, format: FormatRule): boolean {
+    if (value === undefined || value === null) return true;
+    const text = String(value).trim();
+    if (text === "") return true;
+    return FORMATS[format].pattern.test(text);
 }
 
 export type EntityLimits = Readonly<Record<string, FieldLimit>>;
@@ -126,8 +170,8 @@ export const FIELD_LIMITS = {
         firstName: text(255, true),
         lastName: text(255, true),
         employeeNumber: text(100),
-        email: text(255),
-        phone: text(100),
+        email: { ...text(255), format: "email" },
+        phone: { ...text(100), format: "phone" },
         jobTitle: text(255),
     },
     exchangeRate: {
@@ -167,12 +211,12 @@ export const FIELD_LIMITS = {
         taxId: text(255),
         industry: text(255),
         country: text(255),
-        contactEmail: text(255),
-        contactPhone: text(255),
+        contactEmail: { ...text(255), format: "email" },
+        contactPhone: { ...text(255), format: "phone" },
         timezone: text(255),
         billingCurrency: CURRENCY,
         dpoName: text(255),
-        dpoEmail: text(255),
+        dpoEmail: { ...text(255), format: "email" },
     },
     purchaseOrder: {
         poNumber: text(255, true),
@@ -215,15 +259,15 @@ export const FIELD_LIMITS = {
         name: text(255, true),
         registrationNumber: text(255),
         contactPerson: text(255),
-        email: text(255),
-        phone: text(255),
+        email: { ...text(255), format: "email" },
+        phone: { ...text(255), format: "phone" },
         taxId: text(255),
     },
     user: {
         firstName: text(255, true),
         lastName: text(255, true),
-        email: text(255, true),
-        phone: text(255),
+        email: { ...text(255, true), format: "email" },
+        phone: { ...text(255), format: "phone" },
         employeeId: text(255),
         jobTitle: text(255),
         password: { minLength: PASSWORD_MIN_LENGTH, maxLength: PASSWORD_MAX_BYTES },
@@ -237,7 +281,7 @@ export const FIELD_LIMITS = {
         periodEnd: REQUIRED,
     },
     webhook: { name: text(200, true), url: text(2048, true), secret: text(512) },
-    dsar: { requestType: REQUIRED, requesterEmail: text(255, true) },
+    dsar: { requestType: REQUIRED, requesterEmail: { ...text(255, true), format: "email" } },
     consent: { purpose: text(100, true) },
 
     // ── Compliance ───────────────────────────────────────────────────────────
@@ -351,6 +395,10 @@ export function limitRules<T extends FieldValues, N extends FieldPath<T> = Field
     if (limit.url) {
         const allowText = limit.url === "httpOrText";
         checks.push((value) => isAcceptableUrl(value, allowText) || `${label} must be an http:// or https:// link`);
+    }
+    if (limit.format) {
+        const format = limit.format;
+        checks.push((value) => matchesFormat(value, format) || FORMATS[format].message(label));
     }
     if (checks.length > 0) {
         rules.validate = (value: unknown) => {

@@ -19,13 +19,6 @@ import { buildPatchPayload } from "@/lib/patch";
 import { timeZoneOptions } from "@/lib/time-zones";
 
 const L = FIELD_LIMITS.organisation;
-/** Optional email: blank, or something@something (the API's @Email decides the rest). */
-function emailRules(maxLength: number, label: string) {
-    return {
-        maxLength: { value: maxLength, message: `${label} must be at most ${maxLength} characters` },
-        pattern: { value: /^[^\s@]+@[^\s@]+$/, message: `${label} must be a valid email address` },
-    };
-}
 
 /** Editable organisation fields; blanks are "" in the form and clear the value on save. */
 export type OrganisationFormValues = Required<
@@ -142,7 +135,7 @@ export function OrganisationFormModal({
                         <div className="space-y-2">
                             <Label htmlFor="org-email">Contact email</Label>
                             <Input id="org-email" type="email" {...limitInputProps(L.contactEmail)}
-                                {...register("contactEmail", emailRules(L.contactEmail.maxLength ?? 255, "Contact email"))} />
+                                {...register("contactEmail", limitRules<OrganisationFormValues, "contactEmail">(L.contactEmail, "Contact email"))} />
                             <FieldError error={errors.contactEmail} />
                         </div>
                         <div className="space-y-2">
@@ -194,7 +187,7 @@ export function OrganisationFormModal({
                         <div className="space-y-2">
                             <Label htmlFor="org-dpo-email">DPO email</Label>
                             <Input id="org-dpo-email" type="email" {...limitInputProps(L.dpoEmail)}
-                                {...register("dpoEmail", emailRules(L.dpoEmail.maxLength ?? 255, "DPO email"))} />
+                                {...register("dpoEmail", limitRules<OrganisationFormValues, "dpoEmail">(L.dpoEmail, "DPO email"))} />
                             <FieldError error={errors.dpoEmail} />
                         </div>
                         <div className="space-y-2">

@@ -1,4 +1,5 @@
 import type { DiscoveryScanDto } from "@/types";
+import { matchesFormat } from "@/lib/field-limits";
 
 /**
  * The API reports free-text device types ("Linux Server", "Windows
@@ -55,6 +56,26 @@ export function parsePorts(input: string | undefined): { ports: number[] } | { e
   if (ports.length > MAX_SCAN_PORTS) return { error: `At most ${MAX_SCAN_PORTS} ports per scan (${ports.length} given)` };
   return { ports };
 }
+
+/** The API scans at most this many hosts per request (a /24). */
+export const MAX_SCAN_HOSTS = 256;
+
+/**
+ * react-hook-form rule for the CIDR input. The same shape the API enforces
+ * (NetworkScanRequestDto.IPV4_CIDR): the range used to be checked server-side
+ * only, so a typo came back as a bare 400 with nothing marked.
+ */
+export const validateCidrInput = (input: string | null | undefined): true | string =>
+  matchesFormat(input, "ipv4Cidr") || "Enter an IPv4 range such as 192.168.1.0/24";
+
+/** react-hook-form rule for the IP list: every line must be an IPv4 address. */
+export const validateIpListInput = (input: string | undefined): true | string => {
+  const ips = (input ?? "").split(/[\n,]/).map((ip) => ip.trim()).filter(Boolean);
+  const bad = ips.find((ip) => !matchesFormat(ip, "ipv4"));
+  if (bad) return `"${bad}" is not an IPv4 address`;
+  if (ips.length > MAX_SCAN_HOSTS) return `At most ${MAX_SCAN_HOSTS} addresses per scan (${ips.length} given)`;
+  return true;
+};
 
 /** react-hook-form rule for the ports input: true, or the first problem. */
 export const validatePortsInput = (input: string | undefined): true | string => {
