@@ -1934,6 +1934,22 @@ export interface SsoDiscoverResponse {
     provider?: string | null;
 }
 
+/**
+ * GET /organisations/{id}/sso/domain — an email domain claim and its proof.
+ * Discovery routes on the domain only once `verified` is true, so one tenant
+ * cannot claim another's domain (or a public provider's) and capture its users.
+ */
+export interface SsoDomainStatus {
+    emailDomain?: string | null;
+    verified: boolean;
+    /** A shared mailbox provider (gmail.com, outlook.com, …): never routable. */
+    publicProvider: boolean;
+    /** The DNS name to publish the record on. */
+    txtRecordName?: string | null;
+    /** The exact TXT value to publish, e.g. "assetiq-verify=<token>". */
+    txtRecordValue?: string | null;
+}
+
 // ─── Dashboard Additions ──────────────────────────────────────────────────────
 
 export interface AssetsByDepartment extends MoneyAggregateMeta {

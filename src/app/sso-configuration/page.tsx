@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, useEffect } from "react";
-import { OrgSsoConfig, SsoOAuth2Dto, SsoSamlDto } from "@/types";
+import { OrgSsoConfig, SsoDomainStatus, SsoOAuth2Dto, SsoSamlDto } from "@/types";
 import { orgSsoService } from "@/services/orgSsoService";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
 import { useForm } from "react-hook-form";
-import { KeyRound, Shield, ToggleLeft, ToggleRight } from "lucide-react";
+import { BadgeCheck, Globe, KeyRound, Shield, ToggleLeft, ToggleRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toastActionError } from "@/lib/step-up";
 import { reportApiError } from "@/lib/api-validation";
@@ -33,6 +33,8 @@ export default function SsoConfigurationPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>("oauth2");
     const [isToggling, setIsToggling] = useState(false);
+    const [domain, setDomain] = useState<SsoDomainStatus | null>(null);
+    const [isVerifying, setIsVerifying] = useState(false);
     // A save that would replace the other SSO type, held until the admin confirms.
     const [pendingReplace, setPendingReplace] = useState<
         { type: "oauth2"; data: SsoOAuth2Dto } | { type: "saml"; data: SsoSamlDto } | null
@@ -49,6 +51,8 @@ export default function SsoConfigurationPage() {
         try {
             setIsLoading(true);
             const data = await orgSsoService.get(orgId);
+            // Best effort: an admin without the settings permission still sees the page.
+            setDomain(await orgSsoService.domainStatus(orgId).catch(() => null));
             setConfig(data);
             setActiveTab(activeSsoType(data) ?? "oauth2");
             if (data) {
@@ -93,6 +97,22 @@ export default function SsoConfigurationPage() {
                 : "Failed to toggle SSO");
         } finally {
             setIsToggling(false);
+        }
+    };
+
+    const verifyDomain = async () => {
+        if (!orgId) return;
+        setIsVerifying(true);
+        try {
+            const status = await orgSsoService.verifyDomain(orgId);
+            setDomain(status);
+            toast.success(`${status.emailDomain} verified — SSO discovery now routes it here`);
+        } catch (error) {
+            // The API says exactly what is missing (no record yet, DNS not propagated,
+            // or a public provider that nobody may claim).
+            reportApiError(error, { fallback: "Could not verify the domain" });
+        } finally {
+            setIsVerifying(false);
         }
     };
 
@@ -203,6 +223,42 @@ export default function SsoConfigurationPage() {
                 </CardContent>
             </Card>
 
+            {domain?.emailDomain ? (
+                <Card className={cn("border-2", domain.verified ? "border-ok/40" : "border-warn/40")}>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            {domain.verified
+                                ? <BadgeCheck className="h-4 w-4 text-ok" />
+                                : <Globe className="h-4 w-4 text-faint-fg" />}
+                            Email domain: {domain.emailDomain}
+                        </CardTitle>
+                        <CardDescription>
+                            {domain.publicProvider
+                                ? "This is a public email provider. It is shared by everyone, so no organisation can claim it and sign-in will never be routed here."
+                                : domain.verified
+                                    ? "Verified. People who sign in with an address at this domain are sent to your identity provider."
+                                    : "Not verified yet. Until you prove you own this domain, sign-in is not routed to your identity provider."}
+                        </CardDescription>
+                    </CardHeader>
+                    {!domain.verified && !domain.publicProvider && domain.txtRecordValue ? (
+                        <CardContent className="space-y-3">
+                            <p className="text-sm text-muted-fg">
+                                Add this TXT record to <span className="font-semibold">{domain.txtRecordName}</span>, then verify.
+                                DNS changes can take a few minutes to appear.
+                            </p>
+                            <code className="data-mono block overflow-x-auto rounded-card border border-edge-subtle bg-surface-muted px-3 py-2 text-xs">
+                                {domain.txtRecordValue}
+                            </code>
+                            <div className="flex justify-end">
+                                <Button onClick={verifyDomain} isLoading={isVerifying}>
+                                    <BadgeCheck className="mr-2 h-4 w-4" /> Verify domain
+                                </Button>
+                            </div>
+                        </CardContent>
+                    ) : null}
+                </Card>
+            ) : null}
+
             <p className="text-sm text-muted-fg">
                 An organisation uses one SSO type at a time.
                 {activeType ? ` Currently configured: ${activeType === "saml" ? "SAML 2.0" : "OAuth2 / OIDC"}.` : ""}
@@ -269,6 +325,7 @@ export default function SsoConfigurationPage() {
                                 <Label htmlFor="oauth2-emailDomain">Email Domain</Label>
                                 <Input id="oauth2-emailDomain" placeholder="company.com" {...limitInputProps(L.emailDomain)} {...oauth2Form.register("emailDomain", { ...limitRules<SsoOAuth2Dto, "emailDomain">(L.emailDomain, "Email domain"), validate: emailDomainRule })} />
                                 <FieldError error={o2e.emailDomain} />
+                                <p className="text-xs text-faint-fg">A domain your organisation owns. It has to be verified (a DNS TXT record) before sign-in is routed here; public providers such as gmail.com can never be claimed.</p>
                                 <p className="text-xs text-faint-fg">
                                     Users with this email domain will be automatically routed to your SSO provider at login.
                                 </p>
@@ -319,6 +376,7 @@ export default function SsoConfigurationPage() {
                                 <Label htmlFor="saml-emailDomain">Email Domain</Label>
                                 <Input id="saml-emailDomain" placeholder="company.com" {...limitInputProps(L.emailDomain)} {...samlForm.register("emailDomain", { ...limitRules<SsoSamlDto, "emailDomain">(L.emailDomain, "Email domain"), validate: emailDomainRule })} />
                                 <FieldError error={se.emailDomain} />
+                                <p className="text-xs text-faint-fg">A domain your organisation owns. It has to be verified (a DNS TXT record) before sign-in is routed here; public providers such as gmail.com can never be claimed.</p>
                                 <p className="text-xs text-faint-fg">
                                     Users with this email domain will be automatically routed to your SSO provider at login.
                                 </p>

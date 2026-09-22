@@ -1,6 +1,6 @@
 import api from "@/lib/axios";
 import { isAxiosError } from "axios";
-import { OrgSsoConfig, SsoDiscoverResponse, SsoOAuth2Dto, SsoSamlDto, SsoToggleDto } from "@/types";
+import { OrgSsoConfig, SsoDiscoverResponse, SsoDomainStatus, SsoOAuth2Dto, SsoSamlDto, SsoToggleDto } from "@/types";
 import { invalidateRequestCache, withRequestCache } from "@/services/requestCache";
 
 export const orgSsoService = {
@@ -47,6 +47,22 @@ export const orgSsoService = {
         const response = await api.put<OrgSsoConfig>(`/organisations/${orgId}/sso/saml`, data, {
             params: options?.replaceExisting ? { replaceExisting: true } : undefined,
         });
+        invalidateRequestCache(`sso:${orgId}`);
+        return response.data;
+    },
+
+    /**
+     * GET /organisations/{orgId}/sso/domain — the email domain claim and whether
+     * it has been verified. SSO discovery routes on the domain only once it is.
+     */
+    domainStatus: async (orgId: string): Promise<SsoDomainStatus> => {
+        const response = await api.get<SsoDomainStatus>(`/organisations/${orgId}/sso/domain`);
+        return response.data;
+    },
+
+    /** POST /organisations/{orgId}/sso/domain/verify — looks for the TXT record. */
+    verifyDomain: async (orgId: string): Promise<SsoDomainStatus> => {
+        const response = await api.post<SsoDomainStatus>(`/organisations/${orgId}/sso/domain/verify`);
         invalidateRequestCache(`sso:${orgId}`);
         return response.data;
     },
