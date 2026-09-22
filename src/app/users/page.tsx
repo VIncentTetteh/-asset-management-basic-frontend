@@ -16,6 +16,7 @@ import { usePermissions } from "@/contexts/PermissionContext";
 import { applyApiFieldErrors } from "@/lib/api-validation";
 import { useConfirm } from "@/hooks/useConfirm";
 import { PASSWORD_INPUT_PROPS, passwordRules } from "@/lib/password-policy";
+import { MfaStatus } from "@/features/users/MfaStatus";
 import {
   useUsers,
   useUserMasterData,
@@ -159,7 +160,9 @@ export default function UsersPage() {
               <p className="truncate font-semibold text-foreground">
                 {row.original.firstName} {row.original.lastName}
               </p>
-              <p className="truncate text-xs text-faint-fg">{row.original.jobTitle || "—"}</p>
+              <p className="truncate text-xs text-faint-fg">
+                {[row.original.jobTitle, row.original.employeeId].filter(Boolean).join(" · ") || "—"}
+              </p>
             </div>
           </div>
         ),
@@ -180,6 +183,11 @@ export default function UsersPage() {
         header: "Department",
         enableSorting: false,
         cell: ({ row }) => <span className="text-muted-fg">{lookups.deptName(row.original.departmentId)}</span>,
+      },
+      {
+        accessorKey: "mfaEnabled",
+        header: "MFA",
+        cell: ({ row }) => <MfaStatus enabled={row.original.mfaEnabled} />,
       },
       {
         accessorKey: "status",
@@ -205,16 +213,18 @@ export default function UsersPage() {
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-warn"
-              aria-label="Reset MFA"
-              title="Reset MFA"
-              onClick={() => handleResetMfa(row.original)}
-            >
-              <ShieldOff className="h-3.5 w-3.5" />
-            </Button>
+            {row.original.mfaEnabled && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-warn"
+                aria-label="Reset MFA"
+                title="Reset MFA"
+                onClick={() => handleResetMfa(row.original)}
+              >
+                <ShieldOff className="h-3.5 w-3.5" />
+              </Button>
+            )}
             {row.original.status === "INACTIVE" ? (
               <Button
                 variant="ghost"
