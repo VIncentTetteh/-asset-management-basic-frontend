@@ -1,4 +1,4 @@
-import type { CloudAssetDto, CloudEnvironment, CloudResourceType } from "@/types";
+import type { CloudAssetDto, CloudEnvironment, CloudMonthlyCostDto, CloudResourceType } from "@/types";
 
 /** The API's `CloudEnvironment` values. Blank means "not set", never a silent PROD. */
 export const CLOUD_ENVIRONMENTS: readonly CloudEnvironment[] = ["PROD", "STAGING", "DEV", "TEST", "OTHER"];
@@ -43,4 +43,24 @@ export function buildCloudAssetPayload(form: CloudAssetForm): CloudAssetDto {
         tags: optionalString(form.tags),
         description: optionalString(form.description),
     };
+}
+
+/**
+ * Body of POST /cloud-assets/{id}/cost. A blank service name is null (the asset
+ * as a whole); recording the same month and service again replaces the amount.
+ */
+export function buildCloudCostPayload(form: { billingMonth?: string; amount?: number | string; serviceName?: string | null }): CloudMonthlyCostDto {
+    return {
+        billingMonth: String(form.billingMonth ?? ""),
+        amount: Number(form.amount),
+        serviceName: optionalString(form.serviceName),
+    };
+}
+
+/** "2026-09" as "Sep 2026" (no Date parsing, so no time-zone shift). */
+export function formatBillingMonth(month: string | null | undefined): string {
+    const m = /^(\d{4})-(\d{2})$/.exec(month ?? "");
+    if (!m) return month || "—";
+    const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${names[Number(m[2]) - 1] ?? m[2]} ${m[1]}`;
 }

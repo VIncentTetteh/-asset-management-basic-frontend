@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { CloudAsset, CloudAssetDto, CloudCostSummary, CloudMonthlyCostDto, PaginatedResponse } from "@/types";
+import { CloudAsset, CloudAssetDto, CloudCostRecord, CloudCostSummary, CloudMonthlyCostDto, PaginatedResponse } from "@/types";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
 
 const getOrgId = (): string | undefined => getOrganisationIdFromStorage();
@@ -60,7 +60,15 @@ export const cloudAssetService = {
         return response.data;
     },
 
-    /** POST /cloud-assets/{id}/cost */
+    /** GET /cloud-assets/{id}/costs — recorded monthly costs, newest month first. */
+    getCosts: async (id: string, params?: { limit?: number; offset?: number }): Promise<PaginatedResponse<CloudCostRecord>> => {
+        const response = await api.get<PaginatedResponse<CloudCostRecord>>(`/cloud-assets/${id}/costs`, {
+            params: withOrgParams({ limit: params?.limit ?? 24, offset: params?.offset ?? 0 }),
+        });
+        return response.data;
+    },
+
+    /** POST /cloud-assets/{id}/cost — upsert on (asset, month, service). */
     recordMonthlyCost: async (id: string, data: CloudMonthlyCostDto): Promise<void> => {
         await api.post(`/cloud-assets/${id}/cost`, data, { params: withOrgParams() });
     },

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { CLOUD_ENVIRONMENTS, CLOUD_RESOURCE_TYPES, buildCloudAssetPayload } from "@/features/cloud/options";
+import {
+    CLOUD_ENVIRONMENTS,
+    CLOUD_RESOURCE_TYPES,
+    buildCloudAssetPayload,
+    buildCloudCostPayload,
+    formatBillingMonth,
+} from "@/features/cloud/options";
 
 const base = {
     name: " web-01 ", provider: "AWS" as const, region: "eu-west-1", resourceId: "i-1",
@@ -30,5 +36,18 @@ describe("cloud options mirror the API enums", () => {
     it("offers all fourteen resource types, including the five that were missing", () => {
         expect(CLOUD_RESOURCE_TYPES).toHaveLength(14);
         expect(CLOUD_RESOURCE_TYPES).toEqual(expect.arrayContaining(["CDN", "DNS", "VPN_GATEWAY", "CACHE", "MESSAGE_QUEUE"]));
+    });
+});
+
+describe("cloud cost records", () => {
+    it("a blank service name is null (the whole asset)", () => {
+        expect(buildCloudCostPayload({ billingMonth: "2026-09", amount: "12.5", serviceName: "  " }))
+            .toEqual({ billingMonth: "2026-09", amount: 12.5, serviceName: null });
+        expect(buildCloudCostPayload({ billingMonth: "2026-09", amount: 3, serviceName: " EC2 " }).serviceName).toBe("EC2");
+    });
+
+    it("formats a billing month without a time-zone shift", () => {
+        expect(formatBillingMonth("2026-01")).toBe("Jan 2026");
+        expect(formatBillingMonth(null)).toBe("—");
     });
 });

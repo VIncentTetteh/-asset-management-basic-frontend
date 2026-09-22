@@ -26,9 +26,12 @@ import {
     CLOUD_ENVIRONMENTS,
     CLOUD_RESOURCE_TYPES,
     buildCloudAssetPayload,
+    buildCloudCostPayload,
+    formatBillingMonth,
     resourceTypeLabel,
     type CloudAssetForm,
 } from "@/features/cloud/options";
+import { CloudCostHistoryModal } from "@/features/cloud/CloudCostHistoryModal";
 
 const PROVIDER_COLORS: Record<string, string> = {
     AWS: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
@@ -68,6 +71,7 @@ export default function CloudAssetsPage() {
     const [editingAsset, setEditingAsset] = useState<CloudAsset | null>(null);
     const [costAssetId, setCostAssetId] = useState("");
     const [isSyncing, setIsSyncing] = useState(false);
+    const [historyAsset, setHistoryAsset] = useState<CloudAsset | null>(null);
 
     const assetForm = useForm<CloudAssetForm>();
     const { format, baseCurrency } = useCurrency();
@@ -164,7 +168,7 @@ export default function CloudAssetsPage() {
 
     const onSubmitCost = async (data: CloudMonthlyCostDto) => {
         try {
-            await cloudAssetService.recordMonthlyCost(costAssetId, { ...data, amount: Number(data.amount) });
+            await cloudAssetService.recordMonthlyCost(costAssetId, buildCloudCostPayload(data));
             toast.success("Cost recorded");
             setIsCostModalOpen(false);
             fetchAll(page);
@@ -219,6 +223,13 @@ export default function CloudAssetsPage() {
                             <div>
                                 <p className="text-xs text-faint-fg">Total Monthly Cost</p>
                                 <p className="data-mono text-xl font-bold text-foreground">{format(costSummary.totalMonthlyCost, costSummary.currency)}</p>
+                                {costSummary.actualsMonth ? (
+                                    <p className="text-[11px] text-faint-fg">
+                                        {costSummary.assetsWithActuals
+                                            ? `${costSummary.assetsWithActuals} asset${costSummary.assetsWithActuals === 1 ? "" : "s"} at recorded ${formatBillingMonth(costSummary.actualsMonth)} cost; the rest at estimate`
+                                            : `Estimates (no costs recorded for ${formatBillingMonth(costSummary.actualsMonth)})`}
+                                    </p>
+                                ) : null}
                             </div>
                         </CardContent>
                     </Card>
@@ -322,6 +333,9 @@ export default function CloudAssetsPage() {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex justify-end gap-1">
+                                                        <Button variant="outline" size="sm" onClick={() => setHistoryAsset(asset)} className="h-7 px-2 text-xs">
+                                                            History
+                                                        </Button>
                                                         {canManage && (
                                                             <Button variant="outline" size="sm" onClick={() => handleOpenCost(asset.id)} className="h-7 border-ok/30 px-2 text-xs text-ok hover:bg-ok-soft">
                                                                 Cost
@@ -356,7 +370,7 @@ export default function CloudAssetsPage() {
                 </CardContent>
             </Card>
 
-            <Modal isOpen={isCostModalOpen} onClose={() => setIsCostModalOpen(false)} title="Record Monthly Cost" description="Log a cost entry for this cloud asset.">
+            <Modal isOpen={isCostModalOpen} onClose={() => setIsCostModalOpen(false)} title="Record Monthly Cost" description="Log a month's cost for this asset. Recording the same month and service again replaces it.">
                 <form onSubmit={costForm.handleSubmit(onSubmitCost)} className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="billingMonth">Billing Month <span className="text-danger">*</span></Label>
@@ -369,7 +383,7 @@ export default function CloudAssetsPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="serviceName">Service Name</Label>
-                            <Input id="serviceName" placeholder="e.g. EC2 Compute" {...costForm.register("serviceName")} />
+                            <Input id="serviceName" placeholder="e.g. EC2 Compute" maxLength={200} {...costForm.register("serviceName")} />
                         </div>
                     </div>
                     <div className="flex justify-end gap-2 border-t border-edge-subtle pt-4">
@@ -452,6 +466,7 @@ export default function CloudAssetsPage() {
                     </div>
                 </form>
             </Modal>
+            <CloudCostHistoryModal asset={historyAsset} onClose={() => setHistoryAsset(null)} />
             {ConfirmDialog}
         </div>
     );

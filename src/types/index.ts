@@ -2011,12 +2011,28 @@ export interface CloudCostSummary extends MoneyAggregateMeta {
     costByProvider: Record<string, number>;
     costByEnvironment: Record<string, number>;
     topAssets?: { assetName: string; resourceType: string; monthlyCost: number }[];
+    /** Month (YYYY-MM) whose recorded actuals replace estimates in the totals. */
+    actualsMonth?: string | null;
+    /** Assets counted at recorded actuals rather than their estimate. */
+    assetsWithActuals?: number;
 }
 
 export interface CloudMonthlyCostDto {
     billingMonth: string;
     amount: number;
     serviceName?: string | null;
+}
+
+/** GET /cloud-assets/{id}/costs item: one recorded month (and sub-service) of cost. */
+export interface CloudCostRecord {
+    id: string;
+    /** YYYY-MM */
+    billingMonth: string;
+    amount: number;
+    currency?: string | null;
+    serviceName?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
 }
 
 // ─── Document Attachments ─────────────────────────────────────────────────────
