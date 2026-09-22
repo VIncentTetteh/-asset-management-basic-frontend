@@ -19,6 +19,8 @@ import { buildPatchPayload } from "@/lib/patch";
 import { reportApiError } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { useConfirm } from "@/hooks/useConfirm";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 
 
 // Permission groups matching the backend Permission enum categories
@@ -302,10 +304,11 @@ export default function RolesPage() {
                         <Input
                             id="name"
                             placeholder="e.g. Finance Auditor"
-                            {...register("name", { required: "Name is required" })}
+                            {...limitInputProps(FIELD_LIMITS.role.name)}
+                            {...register("name", limitRules<RoleDto, "name">(FIELD_LIMITS.role.name, "Name"))}
                             disabled={readOnly}
                         />
-                        {errors.name && <p className="text-sm text-danger">{errors.name.message as string}</p>}
+                        <FieldError error={errors.name} />
                     </div>
 
 

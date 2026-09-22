@@ -17,6 +17,10 @@ import { applyApiFieldErrors } from "@/lib/api-validation";
 import { useConfirm } from "@/hooks/useConfirm";
 import { PASSWORD_INPUT_PROPS, passwordRules } from "@/lib/password-policy";
 import { MfaStatus } from "@/features/users/MfaStatus";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+
+const L = FIELD_LIMITS.user;
 import {
   useUsers,
   useUserMasterData,
@@ -304,20 +308,20 @@ export default function UsersPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="us-first">First name <span className="text-danger">*</span></Label>
-              <Input id="us-first" {...register("firstName", { required: "First name is required" })} />
-              {errors.firstName && <p className="text-sm text-danger">{errors.firstName.message}</p>}
+              <Input id="us-first" {...limitInputProps(L.firstName)} {...register("firstName", limitRules<UserDto, "firstName">(L.firstName, "First name"))} />
+              <FieldError error={errors.firstName} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="us-last">Last name <span className="text-danger">*</span></Label>
-              <Input id="us-last" {...register("lastName", { required: "Last name is required" })} />
-              {errors.lastName && <p className="text-sm text-danger">{errors.lastName.message}</p>}
+              <Input id="us-last" {...limitInputProps(L.lastName)} {...register("lastName", limitRules<UserDto, "lastName">(L.lastName, "Last name"))} />
+              <FieldError error={errors.lastName} />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="us-email">Email <span className="text-danger">*</span></Label>
-            <Input id="us-email" type="email" disabled={!!editingUser} {...register("email", { required: "Email is required" })} />
-            {errors.email && <p className="text-sm text-danger">{errors.email.message}</p>}
+            <Input id="us-email" type="email" disabled={!!editingUser} {...limitInputProps(L.email)} {...register("email", limitRules<UserDto, "email">(L.email, "Email"))} />
+            <FieldError error={errors.email} />
           </div>
 
           {!editingUser && (
@@ -325,18 +329,20 @@ export default function UsersPage() {
               <Label htmlFor="us-password">Temporary password <span className="text-danger">*</span></Label>
               <Input id="us-password" type="password" autoComplete="new-password" {...PASSWORD_INPUT_PROPS}
                 {...register("password", passwordRules(editingUser ? false : "Password is required"))} />
-              {errors.password && <p className="text-sm text-danger">{errors.password.message}</p>}
+              <FieldError error={errors.password} />
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="us-phone">Phone</Label>
-              <Input id="us-phone" {...register("phone")} />
+              <Input id="us-phone" type="tel" {...limitInputProps(L.phone)} {...register("phone", limitRules<UserDto, "phone">(L.phone, "Phone"))} />
+              <FieldError error={errors.phone} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="us-title">Job title</Label>
-              <Input id="us-title" {...register("jobTitle")} />
+              <Input id="us-title" {...limitInputProps(L.jobTitle)} {...register("jobTitle", limitRules<UserDto, "jobTitle">(L.jobTitle, "Job title"))} />
+              <FieldError error={errors.jobTitle} />
             </div>
           </div>
 

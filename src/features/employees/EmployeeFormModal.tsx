@@ -13,6 +13,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSaveEmployee } from "@/features/employees/hooks";
 import { applyApiFieldErrors } from "@/lib/api-validation";
 import { todayLocal } from "@/lib/local-date";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+
+const L = FIELD_LIMITS.employee;
 
 export function EmployeeFormModal({
   isOpen,
@@ -100,37 +104,39 @@ export function EmployeeFormModal({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="emp-first">First name <span className="text-danger">*</span></Label>
-            <Input id="emp-first" placeholder="Ama" {...register("firstName", { required: "First name is required" })} />
-            {errors.firstName && <p className="text-sm text-danger">{errors.firstName.message}</p>}
+            <Input id="emp-first" placeholder="Ama" {...limitInputProps(L.firstName)} {...register("firstName", limitRules<EmployeeDto, "firstName">(L.firstName, "First name"))} />
+            <FieldError error={errors.firstName} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="emp-last">Last name <span className="text-danger">*</span></Label>
-            <Input id="emp-last" placeholder="Mensah" {...register("lastName", { required: "Last name is required" })} />
-            {errors.lastName && <p className="text-sm text-danger">{errors.lastName.message}</p>}
+            <Input id="emp-last" placeholder="Mensah" {...limitInputProps(L.lastName)} {...register("lastName", limitRules<EmployeeDto, "lastName">(L.lastName, "Last name"))} />
+            <FieldError error={errors.lastName} />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="emp-number">Employee number</Label>
-            <Input id="emp-number" placeholder="EMP-0001" className="data-mono" maxLength={100} {...register("employeeNumber")} />
-            {errors.employeeNumber && <p className="text-sm text-danger">{errors.employeeNumber.message}</p>}
+            <Input id="emp-number" placeholder="EMP-0001" className="data-mono" {...limitInputProps(L.employeeNumber)} {...register("employeeNumber", limitRules<EmployeeDto, "employeeNumber">(L.employeeNumber, "Employee number"))} />
+            <FieldError error={errors.employeeNumber} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="emp-title">Job title</Label>
-            <Input id="emp-title" placeholder="Field Engineer" {...register("jobTitle")} />
+            <Input id="emp-title" placeholder="Field Engineer" {...limitInputProps(L.jobTitle)} {...register("jobTitle", limitRules<EmployeeDto, "jobTitle">(L.jobTitle, "Job title"))} />
+            <FieldError error={errors.jobTitle} />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="emp-email">Email</Label>
-            <Input id="emp-email" type="email" placeholder="ama.mensah@example.com" {...register("email")} />
-            {errors.email && <p className="text-sm text-danger">{errors.email.message}</p>}
+            <Input id="emp-email" type="email" placeholder="ama.mensah@example.com" {...limitInputProps(L.email)} {...register("email", limitRules<EmployeeDto, "email">(L.email, "Email"))} />
+            <FieldError error={errors.email} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="emp-phone">Phone</Label>
-            <Input id="emp-phone" placeholder="+233 …" {...register("phone")} />
+            <Input id="emp-phone" type="tel" placeholder="+233 …" {...limitInputProps(L.phone)} {...register("phone", limitRules<EmployeeDto, "phone">(L.phone, "Phone"))} />
+            <FieldError error={errors.phone} />
           </div>
         </div>
 
@@ -158,7 +164,7 @@ export function EmployeeFormModal({
               <option key={m.id} value={m.id}>{m.label}</option>
             ))}
           </Select>
-          {errors.managerId && <p className="text-sm text-danger">{errors.managerId.message}</p>}
+          <FieldError error={errors.managerId} />
         </div>
 
         <div className="space-y-2">
