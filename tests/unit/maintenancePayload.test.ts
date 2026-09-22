@@ -54,3 +54,22 @@ describe("maintenance payload", () => {
         expect(canCompleteMaintenance("CANCELLED")).toBe(false);
     });
 });
+
+describe("maintenance defaults", () => {
+    it("fills today's completion date when saved as completed without one", async () => {
+        const { todayLocal } = await import("@/lib/local-date");
+        const body = buildMaintenancePayload({ assetId: "a1", maintenanceType: "ROUTINE", status: "COMPLETED", scheduledDate: "2026-09-01" });
+        expect(body.performedDate).toBe(todayLocal());
+        const open = buildMaintenancePayload({ assetId: "a1", maintenanceType: "ROUTINE", status: "SCHEDULED", scheduledDate: "2026-09-01" });
+        expect(open.performedDate).toBeNull();
+    });
+
+    it("offers only assets that can still take maintenance, keeping the record's own asset", async () => {
+        const { maintainableAssets } = await import("@/features/maintenance/payload");
+        const assets = [
+            { id: "a", status: "IN_USE" }, { id: "b", status: "DISPOSED" }, { id: "c", status: "RETIRED" },
+        ];
+        expect(maintainableAssets(assets).map((a) => a.id)).toEqual(["a"]);
+        expect(maintainableAssets(assets, "c").map((a) => a.id)).toEqual(["a", "c"]);
+    });
+});

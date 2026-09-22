@@ -37,11 +37,13 @@ export default function MaintenancePage() {
 
   const lookups = useMemo(() => {
     const byId = new Map(master.assets.map((a) => [a.id, a]));
+    const vendorById = new Map(master.suppliers.map((s) => [s.id, s.name]));
     return {
       assetName: (id?: string) => byId.get(id ?? "")?.name ?? "Unknown asset",
       assetTag: (id?: string) => byId.get(id ?? "")?.assetTag,
+      vendorName: (id?: string | null) => (id ? vendorById.get(id) ?? "Unknown vendor" : "—"),
     };
-  }, [master.assets]);
+  }, [master.assets, master.suppliers]);
 
   const openCreate = () => {
     setEditingRecord(null);
@@ -94,6 +96,22 @@ export default function MaintenancePage() {
             {formatLocalDate(row.original.scheduledDate)}
           </span>
         ),
+      },
+      {
+        accessorKey: "performedDate",
+        header: "Completed",
+        cell: ({ row }) => <span className="text-muted-fg">{formatLocalDate(row.original.performedDate)}</span>,
+      },
+      {
+        accessorKey: "nextDueDate",
+        header: "Next due",
+        cell: ({ row }) => <span className="text-muted-fg">{formatLocalDate(row.original.nextDueDate)}</span>,
+      },
+      {
+        id: "vendor",
+        header: "Vendor",
+        enableSorting: false,
+        cell: ({ row }) => <span className="text-muted-fg">{lookups.vendorName(row.original.vendorId)}</span>,
       },
       {
         accessorKey: "cost",

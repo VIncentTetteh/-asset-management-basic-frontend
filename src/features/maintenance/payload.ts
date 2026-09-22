@@ -1,5 +1,6 @@
 import type { Asset, MaintenanceDto } from "@/types";
 import { optionalNumber, optionalString } from "@/features/finance/payloads";
+import { todayLocal } from "@/lib/local-date";
 
 /** Form values as react-hook-form holds them (inputs give strings). */
 export interface MaintenanceForm {
@@ -21,13 +22,16 @@ export interface MaintenanceForm {
  * dropped blanks, so a vendor or completion date could never be removed).
  */
 export function buildMaintenancePayload(form: MaintenanceForm): MaintenanceDto {
+  const status = optionalString(form.status) ?? undefined;
+  // Work recorded as done was performed today unless the form says when.
+  const performedDate = optionalString(form.performedDate) ?? (status === "COMPLETED" ? todayLocal() : null);
   return {
     assetId: form.assetId,
     maintenanceType: form.maintenanceType,
-    status: optionalString(form.status) ?? undefined,
+    status,
     description: optionalString(form.description),
     scheduledDate: optionalString(form.scheduledDate),
-    performedDate: optionalString(form.performedDate),
+    performedDate,
     nextDueDate: optionalString(form.nextDueDate),
     cost: optionalNumber(form.cost),
     currency: optionalString(form.currency),
@@ -43,3 +47,10 @@ export function defaultMaintenanceCurrency(asset: Pick<Asset, "currency"> | unde
 /** Only open work can be marked done (the API rejects COMPLETED/CANCELLED). */
 export const canCompleteMaintenance = (status?: string): boolean =>
   !status || status === "SCHEDULED" || status === "IN_PROGRESS";
+
+/** Assets that can take new maintenance: not disposed or retired (the API refuses those). */
+export function maintainableAssets<T extends Pick<Asset, "id" | "status">>(assets: T[], currentAssetId?: string): T[] {
+  return assets.filter(
+    (a) => a.id === currentAssetId || (a.status !== "DISPOSED" && a.status !== "RETIRED"),
+  );
+}

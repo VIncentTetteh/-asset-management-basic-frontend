@@ -16,8 +16,11 @@ import { applyApiFieldErrors } from "@/lib/api-validation";
 import {
   buildMaintenancePayload,
   defaultMaintenanceCurrency,
+  maintainableAssets,
   type MaintenanceForm,
 } from "@/features/maintenance/payload";
+import { FieldError } from "@/components/ui/field-error";
+import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { todayLocal } from "@/lib/local-date";
 
 export function MaintenanceFormModal({
@@ -103,11 +106,11 @@ export function MaintenanceFormModal({
           <Label htmlFor="mt-assetId">Target asset <span className="text-danger">*</span></Label>
           <Select id="mt-assetId" {...register("assetId", { required: "Asset is required" })} disabled={!!editingRecord}>
             <option value="">Select asset</option>
-            {assets.map((a) => (
+            {maintainableAssets(assets, editingRecord?.assetId).map((a) => (
               <option key={a.id} value={a.id}>{a.name} ({a.assetTag || "no tag"})</option>
             ))}
           </Select>
-          {errors.assetId && <p className="text-sm text-danger">{errors.assetId.message as string}</p>}
+          <FieldError error={errors.assetId} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -118,6 +121,7 @@ export function MaintenanceFormModal({
                 <option key={t} value={t}>{t.replace("_", " ")}</option>
               ))}
             </Select>
+            <FieldError error={errors.maintenanceType} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="mt-status">Status</Label>
@@ -127,32 +131,40 @@ export function MaintenanceFormModal({
               <option value="COMPLETED">Completed</option>
               <option value="CANCELLED">Cancelled</option>
             </Select>
+            <FieldError error={errors.status} />
           </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="mt-description">Task description / issue</Label>
           <Textarea id="mt-description" placeholder="Replace battery and clean fans…" {...register("description")} />
+          <FieldError error={errors.description} />
         </div>
 
         <div className="grid grid-cols-2 gap-4 border-t border-edge-subtle pt-4">
           <div className="space-y-2">
             <Label htmlFor="mt-scheduled">Scheduled date <span className="text-danger">*</span></Label>
             <Input id="mt-scheduled" type="date" {...register("scheduledDate", { required: "Scheduled date is required" })} />
-            {errors.scheduledDate && <p className="text-sm text-danger">{errors.scheduledDate.message as string}</p>}
+            <FieldError error={errors.scheduledDate} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="mt-currency">Currency</Label>
             <Select id="mt-currency" {...register("currency")}>
               <CurrencyOptions current={editingRecord?.currency} />
             </Select>
+            <FieldError error={errors.currency} />
           </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="mt-cost">Estimated / actual cost</Label>
-          <Input id="mt-cost" type="number" step="0.01" min="0" {...register("cost")} />
-          {errors.cost && <p className="text-sm text-danger">{errors.cost.message as string}</p>}
+          <Input
+            id="mt-cost"
+            type="number"
+            {...limitInputProps(FIELD_LIMITS.maintenance.cost)}
+            {...register("cost", limitRules<MaintenanceForm, "cost">(FIELD_LIMITS.maintenance.cost, "Cost"))}
+          />
+          <FieldError error={errors.cost} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -164,16 +176,20 @@ export function MaintenanceFormModal({
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </Select>
+            <FieldError error={errors.vendorId} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="mt-performed">Completion date</Label>
             <Input id="mt-performed" type="date" {...register("performedDate")} />
+            <p className="text-xs text-muted-fg">Defaults to today when saved as completed.</p>
+            <FieldError error={errors.performedDate} />
           </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="mt-next-due">Next due date</Label>
           <Input id="mt-next-due" type="date" {...register("nextDueDate")} />
+          <FieldError error={errors.nextDueDate} />
           <p className="text-xs text-muted-fg">For recurring work; drives the &ldquo;due soon&rdquo; reminders.</p>
         </div>
 
