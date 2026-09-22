@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCompliancePayload, dateToInstant } from "@/features/compliance/payload";
+import { buildBogControlPayload, buildCompliancePayload, dateToInstant } from "@/features/compliance/payload";
 
 const fields = [
     { name: "filingType", type: "text" as const },
@@ -26,5 +26,17 @@ describe("compliance payload", () => {
     it("clears a text field that had a value when editing, but not selects or dates", () => {
         const editing = { notes: "old", status: "PENDING", dueDate: "2026-09-30T12:00:00Z" };
         expect(buildCompliancePayload(fields, { notes: "", status: "", dueDate: "" }, editing)).toEqual({ notes: "" });
+    });
+});
+
+describe("buildBogControlPayload", () => {
+    it("sends the target date as an instant the API can parse", () => {
+        expect(buildBogControlPayload({ directiveRef: "BoG/ICT/1.2", requirement: "x", targetDate: "2026-12-31" }).targetDate)
+            .toBe("2026-12-31T12:00:00Z");
+    });
+
+    it("sends blank optional fields as null so an edit clears them", () => {
+        const p = buildBogControlPayload({ directiveRef: " A ", requirement: "r", targetDate: "", gapDescription: " ", evidenceUrl: "" });
+        expect(p).toMatchObject({ directiveRef: "A", targetDate: null, gapDescription: null, evidenceUrl: null });
     });
 });

@@ -56,3 +56,29 @@ export function buildCompliancePayload(
   }
   return out;
 }
+
+/**
+ * Body of POST /compliance/bog/controls (an upsert by directive ref). The target
+ * date goes as an instant (a bare date used to be dropped silently by the API),
+ * and blank optional text or date is sent as null so an edit can clear it.
+ */
+export function buildBogControlPayload(form: {
+  directiveRef?: string;
+  requirement?: string;
+  status?: string;
+  gapDescription?: string | null;
+  remediationPlan?: string | null;
+  targetDate?: string | null;
+  evidenceUrl?: string | null;
+}) {
+  const text = (v: unknown): string | null => (isBlank(v) ? null : String(v).trim());
+  return {
+    directiveRef: String(form.directiveRef ?? "").trim(),
+    requirement: String(form.requirement ?? "").trim(),
+    status: form.status || undefined,
+    gapDescription: text(form.gapDescription),
+    remediationPlan: text(form.remediationPlan),
+    evidenceUrl: text(form.evidenceUrl),
+    targetDate: isBlank(form.targetDate) ? null : dateToInstant(String(form.targetDate)),
+  };
+}

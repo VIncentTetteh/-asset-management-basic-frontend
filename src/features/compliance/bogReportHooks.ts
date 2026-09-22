@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
+import { reportApiError } from "@/lib/api-validation";
 import { bogReportService, bogControlService } from "@/services/complianceService";
 import { qk } from "@/lib/queryClient";
 import type { BOGControlDto } from "@/types";
@@ -39,7 +40,7 @@ export function useUpsertBogControl() {
       toast.success(`Control ${vars.directiveRef} saved`);
       invalidate();
     },
-    onError: () => toast.error("Failed to save control"),
+    onError: (err) => reportApiError(err, { fallback: "Failed to save control" }),
   });
 }
 

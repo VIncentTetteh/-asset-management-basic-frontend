@@ -22,6 +22,7 @@ import { AssetTag } from "@/components/ui/asset-tag";
 import DocumentAttachments from "@/components/DocumentAttachments";
 import { useBogReport, useBogControlsList, useUpsertBogControl, useUpdateBogControlStatus } from "@/features/compliance/bogReportHooks";
 import { todayLocal } from "@/lib/local-date";
+import { buildBogControlPayload } from "@/features/compliance/payload";
 
 const STATUSES: ControlStatus[] = ["IMPLEMENTED", "PARTIAL", "NOT_IMPLEMENTED", "NOT_APPLICABLE"];
 
@@ -129,7 +130,7 @@ export default function BogReportPage() {
   };
 
   const onUpsert = async (data: BOGControlDto) => {
-    await upsertControl.mutateAsync(data);
+    await upsertControl.mutateAsync(buildBogControlPayload(data) as BOGControlDto);
     setIsUpsertOpen(false);
   };
 
