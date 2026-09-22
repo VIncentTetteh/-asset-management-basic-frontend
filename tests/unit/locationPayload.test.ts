@@ -22,3 +22,19 @@ describe("location payload", () => {
         expect([...allowedParents(all, "c")].sort()).toEqual(["a", "b", "d"]);
     });
 });
+
+describe("location country", () => {
+    it("maps stored names and lower-case codes to ISO codes, keeping legacy text visible", async () => {
+        const { toCountryCode, isCountryCode } = await import("@/lib/countries");
+        expect(toCountryCode("gh")).toBe("GH");
+        expect(toCountryCode("Ghana")).toBe("GH");
+        expect(toCountryCode("Head office region")).toBe("Head office region");
+        expect(toCountryCode(null)).toBe("");
+        expect(isCountryCode("GH")).toBe(true);
+        expect(isCountryCode("Ghana")).toBe(false);
+    });
+
+    it("clears the country when the blank option is chosen", () => {
+        expect(buildLocationPayload({ name: "HQ", country: "" }).country).toBeUndefined();
+    });
+});

@@ -178,3 +178,23 @@ export function countryName(code: string | null | undefined): string {
   if (!code) return "";
   return NAME_BY_CODE.get(code.toUpperCase()) ?? code;
 }
+
+const CODE_BY_NAME = new Map(COUNTRIES.map((c) => [c.name.toLowerCase(), c.code]));
+
+/**
+ * Best ISO alpha-2 code for a stored country value: a code in any case, or a
+ * country's English name. Anything else (legacy free text) is returned as-is so
+ * the form can still show it.
+ */
+export function toCountryCode(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return "";
+  const upper = raw.toUpperCase();
+  if (NAME_BY_CODE.has(upper)) return upper;
+  return CODE_BY_NAME.get(raw.toLowerCase()) ?? raw;
+}
+
+/** True when `value` is a known ISO alpha-2 code (the only form the API accepts). */
+export function isCountryCode(value: string | null | undefined): boolean {
+  return Boolean(value) && NAME_BY_CODE.has(value as string);
+}

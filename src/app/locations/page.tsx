@@ -15,9 +15,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { CountrySelect } from "@/components/ui/country-select";
-import { countryName } from "@/lib/countries";
+import { countryName, toCountryCode } from "@/lib/countries";
 import { buildPatchPayload } from "@/lib/patch";
 import { applyApiFieldErrors } from "@/lib/api-validation";
+import { FieldError } from "@/components/ui/field-error";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { allowedParents, buildLocationPayload } from "@/features/locations/payload";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -55,7 +56,7 @@ export default function LocationsPage() {
             floor: editing.floor || "",
             room: editing.room || "",
             city: editing.city || "",
-            country: editing.country || "",
+            country: toCountryCode(editing.country),
             address: editing.address || "",
             parentLocationId: editing.parentLocationId || "",
           }
@@ -237,7 +238,14 @@ export default function LocationsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="loc-country">Country</Label>
-              <CountrySelect id="loc-country" {...register("country")} />
+              <CountrySelect
+                id="loc-country"
+                placeholder="No country"
+                allowEmpty
+                legacyValue={editing ? toCountryCode(editing.country) : undefined}
+                {...register("country")}
+              />
+              <FieldError error={errors.country} />
             </div>
           </div>
           <div className="space-y-2">
