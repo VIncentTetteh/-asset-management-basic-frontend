@@ -19,10 +19,16 @@ describe("user edit payload", () => {
         });
     });
 
-    it("only asks for a role change when a different role was picked", () => {
+    it("only asks for a role change when the picker differs from the current role", () => {
         expect(roleChangeFor("r1", "r1")).toBeNull();
-        expect(roleChangeFor("r1", "")).toBeNull();
         expect(roleChangeFor("r1", "r2")).toBe("r2");
         expect(roleChangeFor(undefined, "r2")).toBe("r2");
+    });
+
+    it("asks to remove the role when the picker is cleared", () => {
+        expect(roleChangeFor("r1", "")).toBe("clear");
+        expect(roleChangeFor("r1", undefined)).toBe("clear");
+        // Nothing to remove when there was no role to begin with.
+        expect(roleChangeFor(undefined, "")).toBeNull();
     });
 });

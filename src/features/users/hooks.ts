@@ -57,9 +57,11 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: async ({ existing, data }: { existing: User; data: UserDto }) => {
       await userService.replaceProfile(existing.id!, buildUserProfileUpdate(existing, data));
-      const roleId = roleChangeFor(existing.roleId, data.roleId);
-      if (roleId) {
-        await userService.assignRole(existing.id!, roleId);
+      const roleChange = roleChangeFor(existing.roleId, data.roleId);
+      if (roleChange === "clear") {
+        await userService.removeRole(existing.id!);
+      } else if (roleChange) {
+        await userService.assignRole(existing.id!, roleChange);
       }
     },
     onSuccess: () => {

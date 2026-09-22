@@ -15,10 +15,9 @@ describeRoundTrip({
         { label: "Name", type: "text", value: uniq("Department"), edit: uniq("Department-edited") },
         { label: "Department code", type: "text", value: uniq("DC"), optional: true },
         { label: "Cost center", type: "text", value: uniq("CC"), optional: true },
-        // The label carries the base currency ("Planning cap (GHS)"). A cleared cap is
-        // sent as 0 ("no cap") and the form reopens with 0, so the edit sets 0
-        // explicitly instead of expecting an empty input.
-        { label: /^\s*Planning cap \([A-Z]{3}\)\s*$/i, type: "number", value: 50000, edit: 0 },
+        // The label carries the base currency ("Planning cap (GHS)"). An emptied cap
+        // means "no cap": it is stored as null and the form reopens empty.
+        { label: /^\s*Planning cap \([A-Z]{3}\)\s*$/i, type: "number", value: 50000, optional: true },
         // No empty option: change it instead of clearing.
         { label: "Status", type: "select", value: "Active", edit: "Inactive" },
         { label: "Description", type: "textarea", value: uniq("department description"), optional: true },

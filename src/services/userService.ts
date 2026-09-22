@@ -97,6 +97,12 @@ export const userService = {
         invalidateRequestCache("users:");
     },
 
+    /** DELETE /users/{id}/role — the user keeps their login but has no permissions. */
+    removeRole: async (id: string): Promise<User> => {
+        const response = await api.delete<User>(`/users/${id}/role`);
+        return response.data;
+    },
+
     /** PUT /users/{id}/role?roleId={uuid} */
     assignRole: async (id: string, roleId: string): Promise<User> => {
         const response = await api.put<User>(`/users/${id}/role`, null, {

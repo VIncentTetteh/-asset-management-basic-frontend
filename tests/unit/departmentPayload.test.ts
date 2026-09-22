@@ -25,6 +25,15 @@ describe("department payload", () => {
         expect(DEPARTMENT_STATUSES.map((s) => s.value)).toContain("ARCHIVED");
     });
 
+    it("clears the planning cap on edit instead of storing zero", () => {
+        expect(buildDepartmentPayload(form({ budgetLimit: "" }), existing)).toEqual({ clearBudgetLimit: true });
+    });
+
+    it("does not ask to clear a cap that was never set", () => {
+        const capless = { ...existing, budgetLimit: undefined } as Department;
+        expect(buildDepartmentPayload(form({ budgetLimit: "" }), capless)).toEqual({});
+    });
+
     it("omits blanks on create but keeps the description", () => {
         expect(buildDepartmentPayload(form({ description: "New team", departmentCode: "", costCenterCode: "", budgetLimit: "" })))
             .toEqual({ name: "Finance", description: "New team", status: "ACTIVE" });

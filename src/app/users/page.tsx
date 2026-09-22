@@ -359,8 +359,8 @@ export default function UsersPage() {
             <div className="space-y-2">
               <Label htmlFor="us-role">Role</Label>
               <Select id="us-role" {...register("roleId")}>
-                {/* A role can be changed but not removed once assigned. */}
-                <option value="" disabled={!!editingUser?.roleId}>None</option>
+                {/* "None" removes the role: the login stays, the permissions go. */}
+                <option value="">None</option>
                 {master.roles.map((r) => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}

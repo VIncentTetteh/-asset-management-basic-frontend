@@ -6,7 +6,8 @@ import { createRole } from "./_admin-helpers";
 
 // Users are provisioned (not invited): the create form sets a temporary password.
 // The API has no user delete, so cleanup deactivates the user (it stays, prefixed
-// and inactive). The role picker cannot be cleared once set, so it is changed.
+// and inactive). The role picker can now be cleared ("None" removes the role);
+// this journey changes it instead, so the role edit stays covered.
 const email = `e2e-${RUN_ID.toLowerCase()}-user@example.com`;
 const department = uniq("UserDept");
 const roleA = uniq("UserRoleA");
@@ -41,7 +42,7 @@ describeRoundTrip({
         { label: "Phone", type: "text", value: "+233200000123", optional: true },
         { label: "Job title", type: "text", value: uniq("Job title"), optional: true },
         { label: "Department", type: "select", value: department, optional: true },
-        // "None" is disabled once a role is assigned (no remove-role API): change it instead.
+        // "None" removes the role (DELETE /users/{id}/role); this step changes it instead.
         { label: "Role", type: "select", value: roleA, edit: roleB },
     ],
     negative: [

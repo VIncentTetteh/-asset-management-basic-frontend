@@ -54,6 +54,7 @@ export function EmployeeFormModal({
             userId: editingEmployee.userId || "",
             status: editingEmployee.status,
             hireDate: editingEmployee.hireDate || "",
+            terminationDate: editingEmployee.terminationDate || "",
             notes: editingEmployee.notes || "",
           }
         : {
@@ -77,6 +78,8 @@ export function EmployeeFormModal({
     (Object.keys(payload) as (keyof EmployeeDto)[]).forEach((k) => {
       if (payload[k] === "") delete (payload as unknown as Record<string, unknown>)[k];
     });
+    // PUT replaces the record, so an omitted termination date clears it — which
+    // is what an emptied field means here.
     // Status transitions happen through onboarding/offboarding, not the form.
     if (!editingEmployee) delete payload.status;
 
@@ -155,6 +158,16 @@ export function EmployeeFormModal({
             <Input id="emp-hire" type="date" {...register("hireDate")} />
           </div>
         </div>
+
+        {editingEmployee ? (
+          <div className="space-y-2">
+            <Label htmlFor="emp-termination">Termination date</Label>
+            <Input id="emp-termination" type="date" {...register("terminationDate")} />
+            <p className="text-xs text-faint-fg">
+              Set automatically when someone is terminated. Clear it to undo that.
+            </p>
+          </div>
+        ) : null}
 
         <div className="space-y-2">
           <Label htmlFor="emp-manager">Manager</Label>

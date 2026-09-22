@@ -72,6 +72,8 @@ export interface DepartmentDto {
     managerId?: string | null;
     costCenterCode?: string;
     budgetLimit?: number;
+    /** PATCH only: true removes the planning cap (an omitted cap means "unchanged"). */
+    clearBudgetLimit?: boolean;
     status?: DepartmentStatus | string;
 }
 

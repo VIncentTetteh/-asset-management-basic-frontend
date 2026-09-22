@@ -19,6 +19,16 @@ export function buildUserProfileUpdate(existing: Pick<User, "email" | "employeeI
   };
 }
 
-/** The API has no "remove role" operation: a role can be changed, not cleared. */
-export const roleChangeFor = (existingRoleId: string | undefined, formRoleId: string | undefined): string | null =>
-  formRoleId && formRoleId !== existingRoleId ? formRoleId : null;
+/**
+ * What the role picker asks for, relative to the role the user has now:
+ * a role id to assign, "clear" to remove the role they have, or null when
+ * nothing changed. A user with no role keeps their login and has no
+ * permissions — the state a user provisioned without a role is already in.
+ */
+export const roleChangeFor = (
+  existingRoleId: string | undefined,
+  formRoleId: string | undefined,
+): string | "clear" | null => {
+  if (formRoleId) return formRoleId === existingRoleId ? null : formRoleId;
+  return existingRoleId ? "clear" : null;
+};
