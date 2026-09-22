@@ -45,6 +45,9 @@ export class ApiClient {
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
             "X-Requested-With": "XMLHttpRequest",
+            // The API refuses cookie-authenticated writes without the app's Origin
+            // (CSRF defence); a browser sends it, Playwright's request context doesn't.
+            Origin: new URL(this.root).origin,
         };
         const orgId = await this.organisationId();
         if (orgId) headers["X-Organisation-Id"] = orgId;
