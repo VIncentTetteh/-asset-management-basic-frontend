@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, AlertTriangle, XCircle, Loader2, Upload } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, Loader2, Upload, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AssetImportResult } from "@/types";
 import { importJobService } from "@/services/importJobService";
-import { importJobPhase, shouldPollImportJob } from "./importJob";
+import { importJobPhase, importResultLabels, shouldPollImportJob } from "./importJob";
 import { qk } from "@/lib/queryClient";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,9 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
   const [jobId, setJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  // Whether the running (or last) job is a preview: rows are validated, nothing is saved.
+  const [dryRun, setDryRun] = useState(false);
+  const labels = importResultLabels(dryRun);
 
   useEffect(() => {
     if (isOpen) {
@@ -36,6 +39,7 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
       setResult(null);
       setJobId(null);
       setStatus(null);
+      setDryRun(false);
     }
   }, [isOpen]);
 
@@ -63,7 +67,9 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
               errors: (details.result.errors || []).map((e) => ({ row: e.row || 0, message: e.message || "" })),
             });
           }
-          if (phase === "completed") {
+          if (phase === "completed" && dryRun) {
+            toast.success("Preview ready — nothing was saved");
+          } else if (phase === "completed") {
             toast.success("Bulk import completed");
             queryClient.invalidateQueries({ queryKey: qk.assets.all });
           } else {
@@ -79,21 +85,22 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [jobId, status, queryClient]);
+  }, [jobId, status, queryClient, dryRun]);
 
-  const handleImport = async () => {
+  const handleRun = async (preview: boolean) => {
     if (!file) return;
     setIsImporting(true);
+    setDryRun(preview);
     setResult(null);
     setJobId(null);
     setStatus("uploading");
 
     try {
-      const response = await importJobService.importAssets(file);
+      const response = await importJobService.importAssets(file, { dryRun: preview });
       if (response.jobId) {
         setJobId(response.jobId);
         setStatus(response.status || "QUEUED");
-        toast.success("File uploaded — processing in the background");
+        toast.success(preview ? "Checking your file — nothing will be saved" : "File uploaded — processing in the background");
       } else if (response.result) {
         setResult({
           totalRows: response.result.totalRows || 0,
@@ -101,8 +108,12 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
           skipped: response.result.skipped || 0,
           errors: (response.result.errors || []).map((e) => ({ row: e.row || 0, message: e.message || "" })),
         });
-        toast.success("Assets imported");
-        queryClient.invalidateQueries({ queryKey: qk.assets.all });
+        if (preview) {
+          toast.success("Preview ready — nothing was saved");
+        } else {
+          toast.success("Assets imported");
+          queryClient.invalidateQueries({ queryKey: qk.assets.all });
+        }
       }
     } catch (error) {
       const message =
@@ -120,7 +131,7 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
       isOpen={isOpen}
       onClose={onClose}
       title="Import assets from Excel"
-      description="Upload an .xlsx file to bulk-import assets. Bad rows are skipped and reported without aborting the batch."
+      description="Upload an .xlsx file to bulk-import assets. Preview first to check every row without saving; bad rows are skipped and reported without aborting the batch."
     >
       <div className="space-y-5">
         <details className="rounded-card border border-edge bg-surface-muted text-xs">
@@ -135,6 +146,8 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
               <p><span className="font-semibold text-muted-fg">categoryName / locationName / supplierName</span> — exact names as created in your org</p>
               <p><span className="font-semibold text-muted-fg">departmentName</span> — department name <em>or</em> department code</p>
               <p><span className="font-semibold text-muted-fg">assignedUserEmail</span> — user email <em>or</em> employee number</p>
+              <p><span className="font-semibold text-muted-fg">usefulLifeMonths</span> — a whole number of months</p>
+              <p><span className="font-semibold text-muted-fg">Extra columns</span> after column 23 become custom fields when custom fields are enabled for your organisation; otherwise a row with a value in one is rejected.</p>
             </div>
           </div>
         </details>
@@ -162,6 +175,11 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
         {result && !jobId && (
           <div className="space-y-3 rounded-card border border-edge bg-surface p-4 text-sm">
+            {dryRun ? (
+              <p role="status" className="text-xs font-semibold text-muted-fg">
+                Preview only — nothing was saved. Fix any row errors, then choose Import.
+              </p>
+            ) : null}
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="rounded-card border border-edge-subtle bg-surface-muted py-2">
                 <p className="text-xs uppercase tracking-wide text-faint-fg">Total rows</p>
@@ -169,13 +187,13 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
               </div>
               <div className="rounded-card border border-edge-subtle bg-ok-soft py-2">
                 <p className="flex items-center justify-center gap-1 text-xs uppercase tracking-wide text-ok">
-                  <CheckCircle2 className="h-3 w-3" />Imported
+                  <CheckCircle2 className="h-3 w-3" />{labels.imported}
                 </p>
                 <p className="data-mono text-xl font-bold text-ok">{result.imported}</p>
               </div>
               <div className="rounded-card border border-edge-subtle bg-warn-soft py-2">
                 <p className="flex items-center justify-center gap-1 text-xs uppercase tracking-wide text-warn">
-                  <AlertTriangle className="h-3 w-3" />Skipped
+                  <AlertTriangle className="h-3 w-3" />{labels.skipped}
                 </p>
                 <p className="data-mono text-xl font-bold text-warn">{result.skipped}</p>
               </div>
@@ -199,8 +217,11 @@ export function ImportAssetsModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
         <div className="flex justify-end gap-2 border-t border-edge-subtle pt-3">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={handleImport} disabled={!file || isImporting}>
-            {isImporting
+          <Button variant="outline" onClick={() => void handleRun(true)} disabled={!file || isImporting || Boolean(jobId)}>
+            <Eye className="mr-2 h-4 w-4" />Preview
+          </Button>
+          <Button onClick={() => void handleRun(false)} disabled={!file || isImporting || Boolean(jobId)}>
+            {isImporting && !dryRun
               ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Importing…</>
               : <><Upload className="mr-2 h-4 w-4" />Import</>}
           </Button>

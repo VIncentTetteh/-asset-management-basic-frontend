@@ -20,3 +20,8 @@ export function importJobPhase(status: string | null | undefined): ImportJobPhas
 export function shouldPollImportJob(jobId: string | null, status: string | null | undefined): boolean {
     return Boolean(jobId) && importJobPhase(status) === "running";
 }
+
+/** Result headings: a preview (dry run) reports what an import would do, since nothing is saved. */
+export function importResultLabels(dryRun: boolean): { imported: string; skipped: string } {
+    return dryRun ? { imported: "Would import", skipped: "Would skip" } : { imported: "Imported", skipped: "Skipped" };
+}

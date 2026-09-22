@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { importJobPhase, shouldPollImportJob } from "@/features/assets/importJob";
+import { importJobPhase, importResultLabels, shouldPollImportJob } from "@/features/assets/importJob";
 
 describe("importJobPhase", () => {
     it.each([
@@ -25,5 +25,12 @@ describe("shouldPollImportJob", () => {
     });
     it("does not poll without a job id", () => {
         expect(shouldPollImportJob(null, "QUEUED")).toBe(false);
+    });
+});
+
+describe("importResultLabels", () => {
+    it("says what a preview would do, since nothing is saved", () => {
+        expect(importResultLabels(true)).toEqual({ imported: "Would import", skipped: "Would skip" });
+        expect(importResultLabels(false)).toEqual({ imported: "Imported", skipped: "Skipped" });
     });
 });
