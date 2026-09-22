@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ClipboardCheck, Pencil, CheckSquare } from "lucide-react";
+import { ClipboardCheck, Pencil, CheckSquare, ListChecks } from "lucide-react";
 import { Audit, AuditStatus } from "@/types";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { AuditSeal } from "@/components/ui/audit-seal";
+import { AuditCountSheet } from "@/features/audits/AuditCountSheet";
 import {
   useAudits,
   useAuditMasterData,
@@ -25,6 +27,8 @@ import {
   auditQueryParams,
   auditScopeLabel,
   buildAuditPayload,
+  auditProgressLabel,
+  auditProgressOf,
   auditStatusOf,
   auditStatusOptions,
   EMPTY_AUDIT_FILTERS,
@@ -52,6 +56,7 @@ export default function AuditsPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAudit, setEditingAudit] = useState<Audit | null>(null);
+  const [countingAudit, setCountingAudit] = useState<Audit | null>(null);
 
   const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<AuditForm>();
 
@@ -151,16 +156,63 @@ export default function AuditsPage() {
         header: "Status",
         cell: ({ row }) => <StatusBadge status={auditStatusOf(row.original)} />,
       },
-      // No "Verified" seal: item-level verification (scan / verify / discrepancy per
-      // asset) does not exist yet, so a completed audit proves nothing was checked.
+      {
+        id: "progress",
+        header: "Count sheet",
+        enableSorting: false,
+        cell: ({ row }) => {
+          const progress = auditProgressOf(row.original);
+          return (
+            <div className="min-w-32">
+              <p className="text-xs text-muted-fg">{auditProgressLabel(progress)}</p>
+              {progress.total > 0 ? (
+                <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-surface-subtle">
+                  <div className="h-full rounded-full bg-ok" style={{ width: `${progress.percent}%` }} />
+                </div>
+              ) : null}
+            </div>
+          );
+        },
+      },
+      {
+        id: "verified",
+        header: "Verified",
+        enableSorting: false,
+        // Backed by the API's allItemsVerified: the seal appears only when every
+        // asset on the sheet has actually been sighted.
+        cell: ({ row }) => {
+          const progress = auditProgressOf(row.original);
+          return (
+            <AuditSeal
+              verified={progress.allVerified}
+              title={
+                progress.allVerified
+                  ? "Every asset on this audit was verified"
+                  : auditProgressLabel(progress)
+              }
+            />
+          );
+        },
+      },
       {
         id: "actions",
         header: "",
         enableSorting: false,
         // Audits are immutable compliance records: status changes only, never deletion.
-        cell: ({ row }) =>
-          !canConduct || isAuditFinal(row.original.status) ? null : (
-            <div className="flex justify-end gap-0.5">
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label="Open count sheet"
+              title="Count sheet"
+              onClick={() => setCountingAudit(row.original)}
+            >
+              <ListChecks className="h-3.5 w-3.5" />
+            </Button>
+            {!canConduct || isAuditFinal(row.original.status) ? null : (
+            <>
               {nextAuditStatuses(row.original.status).includes(AuditStatus.COMPLETED) && (
                 <Button
                   variant="ghost"
@@ -183,8 +235,10 @@ export default function AuditsPage() {
               >
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
-            </div>
-          ),
+            </>
+            )}
+          </div>
+        ),
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -268,6 +322,17 @@ export default function AuditsPage() {
           ) : undefined
         }
       />
+
+      <Modal
+        isOpen={!!countingAudit}
+        onClose={() => setCountingAudit(null)}
+        title={countingAudit ? `Count sheet · ${formatLocalDate(countingAudit.auditDate)}` : "Count sheet"}
+        description="Every asset in this audit's scope, and what was found. Scan or type a tag to verify one."
+      >
+        <div className="max-h-[70vh] overflow-y-auto px-1">
+          {countingAudit ? <AuditCountSheet audit={countingAudit} /> : null}
+        </div>
+      </Modal>
 
       <Modal
         isOpen={isModalOpen}
