@@ -24,12 +24,6 @@ export const organisationService = {
         return response.data;
     },
 
-    /** POST /organisations */
-    create: async (data: OrganisationDto): Promise<Organisation> => {
-        const response = await api.post<Organisation>("/organisations", data);
-        return response.data;
-    },
-
     /** PUT /organisations/{id} */
     replace: async (id: string, data: OrganisationDto): Promise<Organisation> => {
         const response = await api.put<Organisation>(`/organisations/${id}`, data);
