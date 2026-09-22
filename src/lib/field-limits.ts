@@ -194,10 +194,11 @@ export const FIELD_LIMITS = {
         emailDomain: text(255),
     },
     storageConfig: {
-        bucketName: text(255),
+        // S3 bucket names are 3 to 63 characters (the API checks the pattern too).
+        bucketName: text(63),
         reportPrefix: text(200),
         importPrefix: text(200),
-        presignMinutes: { min: 1, max: 10080, step: 1 },
+        presignMinutes: { min: 1, max: 720, step: 1 },
     },
     supplier: {
         name: text(255, true),

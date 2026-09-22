@@ -9,7 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { storageConfigService, OrgStorageConfig } from "@/services/storageConfigService";
+import {
+    MAX_PRESIGN_MINUTES,
+    buildStoragePayload,
+    presignMinutesError,
+    storageConfigService,
+    storageFormFromResponse,
+    OrgStorageConfig,
+} from "@/services/storageConfigService";
+import { FIELD_LIMITS } from "@/lib/field-limits";
 import { Database, HardDrive, Info } from "lucide-react";
 
 interface StorageSettingsProps {
@@ -29,6 +37,9 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving]   = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [defaultBucket, setDefaultBucket] = useState<string | null>(null);
+    const [effectiveBucket, setEffectiveBucket] = useState<string | null>(null);
+    const ttlError = presignMinutesError(config.presignMinutes);
 
     useEffect(() => {
         if (!orgId) {
@@ -39,16 +50,27 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
             .get(orgId)
             // The service maps 404 (no config yet) to null, so defaults stand;
             // anything else (403, 500) must not masquerade as "defaults".
-            .then((c) => { if (c) setConfig(c); })
+            .then((c) => {
+                if (!c) return;
+                setConfig(storageFormFromResponse(c));
+                setDefaultBucket(c.defaultBucket ?? null);
+                setEffectiveBucket(c.bucketName ?? null);
+            })
             .catch((err) => setLoadError(extractErrorMessage(err, "Could not load the storage settings")))
             .finally(() => setLoading(false));
     }, [orgId]);
 
     const handleSave = async () => {
+        if (config.s3Enabled && ttlError) {
+            toast.error(ttlError);
+            return;
+        }
         setSaving(true);
         try {
-            const saved = await storageConfigService.save(orgId, config);
-            setConfig(saved);
+            const saved = await storageConfigService.save(orgId, buildStoragePayload(config));
+            setConfig(storageFormFromResponse(saved));
+            setDefaultBucket(saved.defaultBucket ?? null);
+            setEffectiveBucket(saved.bucketName ?? null);
             toast.success("Storage settings saved");
         } catch (err) {
             reportApiError(err, { fallback: "Failed to save storage settings" });
@@ -101,7 +123,7 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
                         {config.s3Enabled ? (
                             <>
                                 <span className="font-semibold">S3 Storage: Enabled</span>
-                                {config.bucketName && <span className="data-mono ml-1 text-xs">(bucket: {config.bucketName})</span>}
+                                {effectiveBucket && <span className="data-mono ml-1 text-xs">(bucket: {effectiveBucket})</span>}
                             </>
                         ) : (
                             <span className="font-semibold">
@@ -127,13 +149,15 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
                 {config.s3Enabled && (
                     <div className="space-y-4 rounded-panel border border-edge-subtle bg-surface-muted p-4">
                         <div className="space-y-2">
-                            <Label htmlFor="bucketName">S3 Bucket Name</Label>
+                            <Label htmlFor="bucketName">S3 bucket override</Label>
                             <Input
                                 id="bucketName"
-                                placeholder="my-org-assets-bucket"
+                                placeholder={defaultBucket ? `Default: ${defaultBucket}` : "my-org-assets-bucket"}
+                                maxLength={FIELD_LIMITS.storageConfig.bucketName.maxLength}
                                 value={config.bucketName ?? ""}
                                 onChange={(e) => set("bucketName", e.target.value)}
                             />
+                            <p className="text-xs text-faint-fg">Leave blank to use the default bucket.</p>
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -166,13 +190,19 @@ export function StorageSettings({ orgId }: StorageSettingsProps) {
                                 id="presignMinutes"
                                 type="number"
                                 min={1}
-                                max={720}
+                                max={MAX_PRESIGN_MINUTES}
+                                step={1}
                                 placeholder="15"
                                 value={config.presignMinutes}
                                 onChange={(e) => set("presignMinutes", Number(e.target.value))}
                                 className="w-40"
+                                aria-invalid={ttlError ? true : undefined}
                             />
-                            <p className="text-xs text-faint-fg">How long a presigned download URL remains valid (1–720 min)</p>
+                            {ttlError ? (
+                                <p role="alert" className="text-sm text-danger">{ttlError}</p>
+                            ) : (
+                                <p className="text-xs text-faint-fg">How long a presigned download URL remains valid (1–{MAX_PRESIGN_MINUTES} min)</p>
+                            )}
                         </div>
                     </div>
                 )}
