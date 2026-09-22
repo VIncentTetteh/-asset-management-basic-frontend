@@ -74,11 +74,6 @@ export const cloudAssetService = {
     },
 
     /** POST /cloud-assets/sync */
-    syncProvider: async (provider: string, regions?: string[]): Promise<{ message: string; assetsUpserted: number }> => {
-        const response = await api.post("/cloud-assets/sync", { provider, regions }, { params: withOrgParams() });
-        return response.data;
-    },
-
     /** POST /cloud-assets/sync/all */
     syncAll: async (regions?: string[]): Promise<{ message: string; assetsUpserted: number }> => {
         const response = await api.post("/cloud-assets/sync/all", { regions }, { params: withOrgParams() });

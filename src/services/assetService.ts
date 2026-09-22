@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import { Asset, AssetDto, AssetImportResult, AssetHistory } from "@/types";
+import { Asset, AssetDto, AssetHistory } from "@/types";
 
 export interface AssetFilterParams {
     search?: string;
@@ -89,11 +89,6 @@ export const assetService = {
     },
 
     /** PUT /assets/{id} */
-    replace: async (id: string, data: AssetDto): Promise<Asset> => {
-        const response = await api.put<Asset>(`/assets/${id}`, data);
-        return response.data;
-    },
-
     /** GET /assets/{id}/history */
     getHistory: async (id: string): Promise<AssetHistory[]> => {
         const response = await api.get<AssetHistory[]>(`/assets/${id}/history`);
@@ -128,11 +123,6 @@ export const assetService = {
     },
 
     /** POST /assets/{id}/assign/{departmentId} */
-    assignToDepartment: async (id: string, departmentId: string): Promise<Asset> => {
-        const response = await api.post<Asset>(`/assets/${id}/assign/${departmentId}`);
-        return response.data;
-    },
-
     /** POST /assets/{assetId}/assign-user/{userId} */
     assignToUser: async (assetId: string, userId: string): Promise<Asset> => {
         const response = await api.post<Asset>(`/assets/${assetId}/assign-user/${userId}`, {});
@@ -151,15 +141,6 @@ export const assetService = {
     },
 
     /** POST /assets/import — multipart .xlsx bulk import */
-    importFromExcel: async (file: File): Promise<AssetImportResult> => {
-        const formData = new FormData();
-        formData.append("file", file);
-        const response = await api.post<AssetImportResult>("/assets/import", formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-        });
-        return response.data;
-    },
-
     /** GET /assets/stats — per-status counts + assigned/unassigned totals for current tenant */
     getStats: async (): Promise<AssetStats> => {
         const response = await api.get<AssetStats>("/assets/stats");

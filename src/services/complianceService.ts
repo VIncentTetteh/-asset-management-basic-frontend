@@ -223,9 +223,6 @@ export const pciSaqService = {
         const res = await api.put<PCISAQRecord>(`${BASE}/pci-saq/${id}`, data);
         return res.data;
     },
-    delete: async (id: string): Promise<void> => {
-        await api.delete(`${BASE}/pci-saq/${id}`);
-    },
 };
 
 // ─── 10) SLA Metrics ──────────────────────────────────────────────────────────

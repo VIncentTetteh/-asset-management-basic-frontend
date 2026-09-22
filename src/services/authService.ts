@@ -56,11 +56,6 @@ export const authService = {
     },
 
     /** POST /auth/refresh — refreshes the JWT expiry to 24 h */
-    refreshToken: async (): Promise<{ token: string; expiresIn: number }> => {
-        const response = await api.post<{ token: string; expiresIn: number }>("/auth/refresh");
-        return response.data;
-    },
-
     /** POST /auth/logout */
     logout: async (): Promise<{ message: string }> => {
         const response = await api.post("/auth/logout");

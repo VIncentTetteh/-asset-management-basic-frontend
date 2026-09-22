@@ -70,7 +70,4 @@ export const billingService = {
         return response.data;
     },
 
-    handlePaystackWebhook: async (payload: unknown): Promise<void> => {
-        await api.post("/billing/webhooks/paystack", payload);
-    },
 };

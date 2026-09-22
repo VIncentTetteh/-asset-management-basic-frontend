@@ -60,9 +60,10 @@ interface ComplianceCrudPageProps<T extends { id?: string }, TDto extends FieldV
     create: (data: TDto) => Promise<T>;
     /** Full replace (PUT): fields sent as null are cleared. */
     update: (id: string, data: Partial<TDto>) => Promise<T>;
-    delete: (id: string) => Promise<void>;
+    /** Absent for registers the API cannot delete; pass canDelete={false} with it. */
+    delete?: (id: string) => Promise<void>;
   };
-  /** False for entities the API cannot delete (PCI SAQ answers, SLA metrics). */
+  /** False for registers the API cannot delete (PCI SAQ answers). */
   canDelete?: boolean;
   moduleKey: string;
   columns: ColumnSpec<T>[];
@@ -143,6 +144,9 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
         moduleKey,
         {
           ...service,
+          delete: service.delete ?? (async () => {
+            throw new Error(`${entity} records cannot be deleted`);
+          }),
           // Some endpoints return a pagination envelope; normalize to a list.
           getAll: async () => {
             const result = await service.getAll();
@@ -247,7 +251,7 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
-            {canDelete && (
+            {canDelete && service.delete && (
               <Button
                 variant="ghost"
                 size="icon"
