@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSaveMaintenance } from "@/features/maintenance/hooks";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import {
   buildMaintenancePayload,
   defaultMaintenanceCurrency,
@@ -101,7 +101,7 @@ export function MaintenanceFormModal({
       title={editingRecord ? "Edit maintenance log" : "Schedule maintenance"}
       description={editingRecord ? "Update the maintenance details." : "Create a maintenance or repair ticket for an asset."}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+      <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
         <div className="space-y-2">
           <Label htmlFor="mt-assetId">Target asset <span className="text-danger">*</span></Label>
           <Select id="mt-assetId" {...register("assetId", { required: "Asset is required" })} disabled={!!editingRecord}>

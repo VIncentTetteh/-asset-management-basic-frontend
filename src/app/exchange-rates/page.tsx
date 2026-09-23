@@ -21,7 +21,7 @@ import { isoCurrencyCodes } from "@/lib/currency";
 import { formatLocalDate, todayLocal } from "@/lib/local-date";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
-import { applyApiFieldErrors, reportApiError } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportApiError, reportFormErrors } from "@/lib/api-validation";
 import { exchangeRateError, formatExchangeRate } from "@/features/finance/payloads";
 
 type FormData = Omit<ExchangeRateDto, "id" | "organisationId">;
@@ -300,7 +300,7 @@ export default function ExchangeRatesPage() {
         title="Add exchange rate"
         description="Rates are point-in-time entries; the newest effective date wins."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="rate-base">Base currency</Label>

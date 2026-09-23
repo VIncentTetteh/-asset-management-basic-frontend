@@ -14,7 +14,7 @@ import { CountrySelect } from "@/components/ui/country-select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { buildPatchPayload } from "@/lib/patch";
 import { timeZoneOptions } from "@/lib/time-zones";
 
@@ -94,7 +94,7 @@ export function OrganisationFormModal({
             title={`Edit ${organisation?.name ?? "organisation"}`}
             description="Organisation profile, contact, legal and data-protection information."
         >
-            <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-6 overflow-y-auto px-1">
+            <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-6 overflow-y-auto px-1">
                 <section className="space-y-4">
                     <h4 className="border-b border-edge-subtle pb-1 text-sm font-bold text-foreground">Profile</h4>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

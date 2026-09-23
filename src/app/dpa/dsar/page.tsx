@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, Plus, Search, CheckCircle2, AlertTriangle, User } from "lucide-react";
 import { dsarService, DSAR_PAGE_SIZE, type DsarDto, type DsarType, type DsarStatus, type DsarStatusUpdate, type DsarSubmission } from "@/services/dsarService";
-import { reportApiError, applyApiFieldErrors } from "@/lib/api-validation";
+import { reportApiError, applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { buildDsarStatusUpdate, dsarNextStatuses, isDsarClosed, type DsarUpdateForm } from "@/features/dpa/dsar";
 import { userService } from "@/services/userService";
@@ -308,7 +308,7 @@ export default function DsarPage() {
         title="Submit data subject access request"
         description="Record a request from a data subject. An acknowledgement is emailed to them when email is enabled."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="d-type">Request type <span className="text-danger">*</span></Label>
             <Select id="d-type" {...register("requestType", limitRules<SubmitForm, "requestType">(L.requestType, "Request type"))}>

@@ -21,7 +21,7 @@ import {
 import { useForm } from "react-hook-form";
 import { useConfirm } from "@/hooks/useConfirm";
 import { cn } from "@/lib/utils";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
 import {
     buildScanPayload, canPromoteDevice, DEVICE_STATUS_FILTERS, deviceStatusCount, deviceTypeKey, promotedAssetHref,
@@ -521,7 +521,7 @@ export default function DiscoveryPage() {
 
             <Modal isOpen={isScanModalOpen} onClose={() => setIsScanModalOpen(false)}
                 title="Scan Network" description="Configure and run a network discovery scan to find IT assets.">
-                <form onSubmit={handleSubmit(onScan)} className="space-y-4">
+                <form onSubmit={handleSubmit(onScan, reportFormErrors)} className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="cidrRange">CIDR Range</Label>
                         <Input

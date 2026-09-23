@@ -20,7 +20,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useConfirm } from "@/hooks/useConfirm";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { buildSupplierPayload, SUPPLIER_STATUSES } from "@/features/finance/payloads";
 
 // Edits are a full-replace PUT so a field the user empties is cleared (PATCH skips nulls).
@@ -229,7 +229,7 @@ export default function SuppliersPage() {
         title={editing ? "Edit supplier" : "New supplier"}
         description="Company identity, contacts, and statutory identifiers."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="sup-name">Company name <span className="text-danger">*</span></Label>
             <Input id="sup-name" placeholder="Acme Supplies Ltd" {...limitInputProps(L.name)}

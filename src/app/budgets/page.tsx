@@ -8,7 +8,7 @@ import { Plus, Pencil, Trash2, Wallet, Receipt, History, Search, ListTree } from
 import { BUDGET_STATUSES, type Budget, type BudgetLedgerKind, type Expense } from "@/types";
 import { budgetService } from "@/services/budgetService";
 import { departmentService } from "@/services/departmentService";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 import { buildBudgetPayload, budgetAvailable, budgetCurrencyLocked, ledgerSourceLink, type BudgetForm } from "@/features/finance/payloads";
 import { qk } from "@/lib/queryClient";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
@@ -458,7 +458,7 @@ export default function BudgetsPage() {
         title={editing ? "Edit budget" : "New budget"}
         description="A spending envelope. Approved purchase orders and submitted expenses commit against it; receipts, approvals and adjustments spend it."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="bd-name">Name <span className="text-danger">*</span></Label>
             <Input id="bd-name" placeholder="IT hardware FY2026" {...limitInputProps(L.name)}

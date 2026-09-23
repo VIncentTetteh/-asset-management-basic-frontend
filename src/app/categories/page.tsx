@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/ui/field-error";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { buildCategoryUpdate, normaliseCategoryForm } from "@/features/categories/categoryPayload";
 import { allowedTreeParents } from "@/lib/tree";
@@ -238,7 +238,7 @@ export default function CategoriesPage() {
         title={editing ? "Edit category" : "New category"}
         description="Categories group assets and can nest under a parent category."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="cat-name">Name <span className="text-danger">*</span></Label>
             <Input

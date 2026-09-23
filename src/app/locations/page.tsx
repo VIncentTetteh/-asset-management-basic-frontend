@@ -17,7 +17,7 @@ import { Select } from "@/components/ui/select";
 import { CountrySelect } from "@/components/ui/country-select";
 import { countryName, toCountryCode } from "@/lib/countries";
 import { buildPatchPayload } from "@/lib/patch";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { usePermissions } from "@/contexts/PermissionContext";
@@ -214,7 +214,7 @@ export default function LocationsPage() {
         title={editing ? "Edit location" : "New location"}
         description="Locations can nest — e.g. a floor under a building under a city."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="loc-name">Name <span className="text-danger">*</span></Label>
             <Input id="loc-name" placeholder="Head Office, Accra" {...limitInputProps(L.name)}

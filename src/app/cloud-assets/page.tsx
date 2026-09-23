@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
 import {
     CLOUD_ENVIRONMENTS,
@@ -426,7 +426,7 @@ export default function CloudAssetsPage() {
             </Card>
 
             <Modal isOpen={isCostModalOpen} onClose={() => setIsCostModalOpen(false)} title="Record Monthly Cost" description="Log a month's cost for this asset. Recording the same month and service again replaces it.">
-                <form onSubmit={costForm.handleSubmit(onSubmitCost)} className="space-y-4">
+                <form onSubmit={costForm.handleSubmit(onSubmitCost, reportFormErrors)} className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="billingMonth">Billing Month <span className="text-danger">*</span></Label>
                         <Input id="billingMonth" type="month" {...costForm.register("billingMonth", { required: true })} />
@@ -449,7 +449,7 @@ export default function CloudAssetsPage() {
             </Modal>
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingAsset ? "Edit Cloud Asset" : "Add Cloud Asset"} description="Register a cloud resource.">
-                <form onSubmit={assetForm.handleSubmit(onSubmitAsset)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+                <form onSubmit={assetForm.handleSubmit(onSubmitAsset, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
                     <div className="space-y-2">
                         <Label htmlFor="assetName">Name <span className="text-danger">*</span></Label>
                         <Input id="assetName" placeholder="prod-web-server-01" {...limitInputProps(CL.name)} {...assetForm.register("name", limitRules<CloudAssetForm, "name">(CL.name, "Name"))} />

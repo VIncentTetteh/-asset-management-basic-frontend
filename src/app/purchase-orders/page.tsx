@@ -25,7 +25,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { formatLocalDate } from "@/lib/local-date";
@@ -454,7 +454,7 @@ function PurchaseOrdersContent() {
         title={editing ? "Edit purchase order" : "New purchase order"}
         description="Orders start as drafts. Submit from the row actions; a different user approves, which commits the amount against the linked budget."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="po-number">PO number <span className="text-danger">*</span></Label>
@@ -514,17 +514,24 @@ function PurchaseOrdersContent() {
               <Input
                 id="po-amount"
                 type="number"
+                {...limitInputProps(L.totalAmount)}
                 // With lines the server derives the total from them; an editable
                 // field whose value is discarded is worse than a disabled one.
-                disabled={hasLines}
-                {...limitInputProps(L.totalAmount)}
-                {...register("totalAmount", hasLines ? {} : limitRules<PurchaseOrderForm, "totalAmount">(L.totalAmount, "Total amount"))}
+                // `disabled` goes through register, not as a JSX prop: that is
+                // what takes the field out of validation. Re-registering with
+                // `{}` does not — react-hook-form merges register options, so
+                // the "at least 0.01" rule survived and silently blocked every
+                // itemised save against the disabled field's 0.
+                {...register("totalAmount", {
+                  ...limitRules<PurchaseOrderForm, "totalAmount">(L.totalAmount, "Total amount"),
+                  disabled: hasLines,
+                })}
               />
               {hasLines ? (
                 <p className="text-xs text-muted-fg">Derived from the line items below.</p>
-              ) : (
-                <FieldError error={errors.totalAmount} />
-              )}
+              ) : null}
+              {/* Always rendered: an error the form refuses to submit on must never be hidden. */}
+              <FieldError error={errors.totalAmount} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="po-currency">Currency</Label>

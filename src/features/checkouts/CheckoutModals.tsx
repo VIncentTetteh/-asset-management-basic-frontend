@@ -13,7 +13,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/ui/field-error";
 import { useCheckIn, useCheckOut } from "@/features/checkouts/hooks";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { FIELD_LIMITS, limitRules } from "@/lib/field-limits";
 import type { EmployeeDto } from "@/services/employeeService";
 import {
@@ -80,7 +80,7 @@ export function CheckOutModal({
       title="Check out asset"
       description="Issue an asset to a user or an employee, with an optional expected return date."
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="co-asset">Asset <span className="text-danger">*</span></Label>
           <Select id="co-asset" {...register("assetId", { required: "Asset is required" })}>
@@ -201,7 +201,7 @@ export function CheckInModal({
       title="Check in asset"
       description={record ? `Return "${record.assetName ?? "asset"}" from ${record.employeeName || record.checkedOutByName || "holder"}.` : ""}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="ci-condition">Condition on return</Label>
           <Input id="ci-condition" maxLength={CONDITION_MAX_LENGTH} placeholder="e.g. Good, damaged screen…"

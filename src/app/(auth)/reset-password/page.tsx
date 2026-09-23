@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { authService } from "@/services/authService";
 import { extractErrorMessage } from "@/lib/error";
 import { PASSWORD_INPUT_PROPS, passwordRules } from "@/lib/password-policy";
+import { reportFormErrors } from "@/lib/api-validation";
 
 function ResetPasswordForm() {
     const router = useRouter();
@@ -58,7 +59,7 @@ function ResetPasswordForm() {
     }
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)}>
             <CardContent className="space-y-4">
                 <div className="space-y-2">
                     <Label htmlFor="newPassword">New Password</Label>

@@ -15,7 +15,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { buildPatchPayload } from "@/lib/patch";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { buildCompliancePayload, buildComplianceReplacePayload } from "@/features/compliance/payload";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -309,7 +309,7 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
         title={editing ? `Edit ${entity}` : `New ${entity}`}
         description={description}
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] overflow-y-auto px-1">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] overflow-y-auto px-1">
           <div className="grid grid-cols-2 gap-4">
             {fields.map((field) => {
               const id = `cc-${field.name}`;

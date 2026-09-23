@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { useDisposalDecision } from "@/features/disposals/hooks";
 
 interface RejectForm {
@@ -57,7 +57,7 @@ export function RejectDisposalModal({
       title={withdrawing ? "Withdraw disposal request" : "Reject disposal"}
       description={`The disposal of ${asset} will be closed; the asset stays in service.`}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="dp-reject-reason">Reason <span className="text-danger">*</span></Label>
           <Textarea

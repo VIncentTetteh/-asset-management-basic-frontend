@@ -26,7 +26,7 @@ import DocumentAttachments from "@/components/DocumentAttachments";
 import { useBogReport, useBogControlsList, useUpsertBogControl, useUpdateBogControlStatus } from "@/features/compliance/bogReportHooks";
 import { todayLocal } from "@/lib/local-date";
 import { buildBogControlPayload } from "@/features/compliance/payload";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 
 const STATUSES: ControlStatus[] = ["IMPLEMENTED", "PARTIAL", "NOT_IMPLEMENTED", "NOT_APPLICABLE"];
 
@@ -333,7 +333,7 @@ export default function BogReportPage() {
         title={editControl ? "Update BoG control" : "Add BoG control"}
         description="Upsert by directive reference — a control with the same reference is updated, not duplicated."
       >
-        <form onSubmit={handleSubmit(onUpsert)} className="space-y-4">
+        <form onSubmit={handleSubmit(onUpsert, reportFormErrors)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="b-ref">Directive reference <span className="text-danger">*</span></Label>
             <Input id="b-ref" className="data-mono" placeholder="BOG-ICT-2.1.3" {...limitInputProps(FIELD_LIMITS.bogControl.directiveRef)}

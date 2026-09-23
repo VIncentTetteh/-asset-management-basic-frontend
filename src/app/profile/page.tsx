@@ -27,6 +27,7 @@ import { clearAuthState } from "@/lib/axios";
 import { loginPathWithNext } from "@/lib/safe-next";
 import { MFA_SETUP_ANCHOR, isMfaCodeInvalidError } from "@/lib/step-up";
 import { ChangePasswordCard } from "@/features/users/ChangePasswordCard";
+import { reportFormErrors } from "@/lib/api-validation";
 
 /**
  * Enabling or disabling MFA revokes every session server-side (sessionVersion
@@ -272,7 +273,7 @@ export default function ProfilePage() {
                         <CardDescription>Update your contact details and job title.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-6">
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label htmlFor="firstName">First Name <span className="text-danger">*</span></Label>

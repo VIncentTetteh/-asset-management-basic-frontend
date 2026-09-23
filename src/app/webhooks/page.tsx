@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { formatRelativeTime } from "@/lib/time";
 import { useConfirm } from "@/hooks/useConfirm";
 import { cn } from "@/lib/utils";
+import { reportFormErrors } from "@/lib/api-validation";
 
 const AVAILABLE_EVENTS = [
     "asset.created", "asset.updated", "asset.deleted",
@@ -297,7 +298,7 @@ export default function WebhooksPage() {
                 title="Add Webhook"
                 description="Configure an endpoint to receive event notifications."
             >
-                <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+                <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
                     <div className="space-y-2">
                         <Label htmlFor="wh-name">Name <span className="text-danger">*</span></Label>
                         <Input

@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/local-date";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { FieldError } from "@/components/ui/field-error";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 import { buildVendorReviewPayload, vendorReviewRating, type VendorReviewForm } from "@/features/finance/payloads";
 
 const SCORE_FIELDS = ["qualityScore", "deliveryScore", "supportScore"] as const;
@@ -298,7 +298,7 @@ export default function VendorReviewsPage() {
         title={editingReview ? "Edit review" : "Add review"}
         description="The overall rating is the average of the three scores."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="vr-supplier">Supplier <span className="text-danger">*</span></Label>
             <Select id="vr-supplier" {...register("supplierId", { required: editingReview ? false : "Supplier is required" })} disabled={!!editingReview}>

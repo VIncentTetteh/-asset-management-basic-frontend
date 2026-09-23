@@ -16,7 +16,7 @@ import { useForm } from "react-hook-form";
 import { BadgeCheck, Globe, KeyRound, Shield, ToggleLeft, ToggleRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toastActionError } from "@/lib/step-up";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 import axios from "axios";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { FieldError } from "@/components/ui/field-error";
@@ -286,7 +286,7 @@ export default function SsoConfigurationPage() {
                         <CardDescription>Connect an identity provider using OpenID Connect (Google, Microsoft, Okta, etc.)</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={oauth2Form.handleSubmit(onSubmitOAuth2)} className="space-y-4">
+                        <form onSubmit={oauth2Form.handleSubmit(onSubmitOAuth2, reportFormErrors)} className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="oauth-provider">Provider</Label>
                                 <Select id="oauth-provider" {...oauth2Form.register("provider", { required: true })}>
@@ -348,7 +348,7 @@ export default function SsoConfigurationPage() {
                         <CardDescription>Connect an enterprise identity provider using SAML 2.0.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={samlForm.handleSubmit(onSubmitSaml)} className="space-y-4">
+                        <form onSubmit={samlForm.handleSubmit(onSubmitSaml, reportFormErrors)} className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="saml-provider">Provider</Label>
                                 <Input id="saml-provider" value="SAML 2.0" readOnly disabled />

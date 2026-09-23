@@ -40,7 +40,7 @@ import {
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { usePermissions } from "@/contexts/PermissionContext";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { formatLocalDate, toDateInputValue, todayLocal } from "@/lib/local-date";
 
 export default function AuditsPage() {
@@ -57,6 +57,18 @@ export default function AuditsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAudit, setEditingAudit] = useState<Audit | null>(null);
   const [countingAudit, setCountingAudit] = useState<Audit | null>(null);
+  /**
+   * The count sheet reads its progress off the audit record, which the server
+   * rewrites as items are generated and verified. The row object captured when
+   * the sheet was opened never changes, so the panel used to sit on "No count
+   * sheet yet" for the whole session; re-read it from the list every render
+   * (the sheet's mutations invalidate that query) and the sheet follows the
+   * server. The snapshot is only the fallback for an audit the current filters
+   * have since excluded.
+   */
+  const countingAuditLive = countingAudit
+    ? audits.find((audit) => audit.id === countingAudit.id) ?? countingAudit
+    : null;
 
   const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<AuditForm>();
 
@@ -326,11 +338,11 @@ export default function AuditsPage() {
       <Modal
         isOpen={!!countingAudit}
         onClose={() => setCountingAudit(null)}
-        title={countingAudit ? `Count sheet · ${formatLocalDate(countingAudit.auditDate)}` : "Count sheet"}
+        title={countingAuditLive ? `Count sheet · ${formatLocalDate(countingAuditLive.auditDate)}` : "Count sheet"}
         description="Every asset in this audit's scope, and what was found. Scan or type a tag to verify one."
       >
         <div className="max-h-[70vh] overflow-y-auto px-1">
-          {countingAudit ? <AuditCountSheet audit={countingAudit} canConduct={canConduct} /> : null}
+          {countingAuditLive ? <AuditCountSheet audit={countingAuditLive} canConduct={canConduct} /> : null}
         </div>
       </Modal>
 
@@ -344,7 +356,7 @@ export default function AuditsPage() {
             : "Plan a physical inventory verification."
         }
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="au-date">Audit date <span className="text-danger">*</span></Label>

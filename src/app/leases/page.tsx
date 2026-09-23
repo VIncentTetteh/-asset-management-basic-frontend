@@ -8,7 +8,7 @@ import { Plus, Pencil, Trash2, Home, AlertTriangle, Ban, Search } from "lucide-r
 import { leaseRecordService, type LeaseRecordDto, type LeaseStatus } from "@/services/leaseRecordService";
 import { assetService } from "@/services/assetService";
 import { supplierService } from "@/services/supplierService";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 import { buildLeasePayload, leaseNoticePrefill, type LeaseForm } from "@/features/finance/payloads";
 import { departmentService } from "@/services/departmentService";
 import { FieldError } from "@/components/ui/field-error";
@@ -395,7 +395,7 @@ export default function LeasesPage() {
         title={editing ? "Edit lease" : "New lease"}
         description="Lease agreements for assets you don't own outright."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="ls-asset">Asset <span className="text-danger">*</span></Label>
             <Select id="ls-asset" {...register("assetId", limitRules<LeaseForm, "assetId">(L.assetId, "Asset"))}>

@@ -23,7 +23,7 @@ import {
 } from "@/features/depreciation/payload";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { FieldError } from "@/components/ui/field-error";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 
 export default function DepreciationPoliciesPage() {
   const { data: policies = [], isLoading } = useDepreciationPolicies();
@@ -172,7 +172,7 @@ export default function DepreciationPoliciesPage() {
         title={editingPolicy ? "Edit depreciation policy" : "New depreciation policy"}
         description="Reusable rules assets reference for depreciation schedules."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="dpp-name">Policy name <span className="text-danger">*</span></Label>
             <Input

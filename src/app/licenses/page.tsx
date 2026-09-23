@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Key, AlertTriangle, Users } from "lucide-react";
 import { LICENSE_TYPES, type SoftwareLicense, type SoftwareLicenseDto, type LicenseStatus } from "@/types";
 import { licenseService } from "@/services/licenseService";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { buildLicensePayload, type LicenseForm } from "@/features/finance/payloads";
 import { makeCrudHooks } from "@/features/shared/crudHooks";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
@@ -356,7 +356,7 @@ export default function LicensesPage() {
         title={editing ? "Edit license" : "New license"}
         description="Seats, costs, and renewal tracking for software entitlements."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="space-y-2">
             <Label htmlFor="lic-name">License name <span className="text-danger">*</span></Label>
             <Input id="lic-name" placeholder="Microsoft 365 E3 — Finance" {...limitInputProps(L.name)}

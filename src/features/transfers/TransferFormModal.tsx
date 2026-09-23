@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateTransfer } from "@/features/transfers/hooks";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { buildTransferRequest } from "@/features/transfers/workflow";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
@@ -84,7 +84,7 @@ export function TransferFormModal({
       title="Request asset transfer"
       description="Move an asset to a new department or location, with an approval trail."
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+      <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
         <div className="space-y-2">
           <Label htmlFor="assetId">Asset <span className="text-danger">*</span></Label>
           <Select id="assetId" {...register("assetId", { required: "Asset is required" })}>

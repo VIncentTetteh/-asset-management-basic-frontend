@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { reportFormErrors } from "@/lib/api-validation";
 
 interface RejectForm {
   reason: string;
@@ -55,7 +56,7 @@ export function RejectPurchaseOrderModal({
       title="Reject purchase order"
       description={order ? `PO ${order.poNumber} will be closed as rejected; the requester sees your reason.` : undefined}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="po-reject-reason">Reason <span className="text-danger">*</span></Label>
           <Textarea

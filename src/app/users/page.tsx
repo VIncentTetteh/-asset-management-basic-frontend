@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { usePermissions } from "@/contexts/PermissionContext";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { useConfirm } from "@/hooks/useConfirm";
 import { PASSWORD_INPUT_PROPS, passwordRules } from "@/lib/password-policy";
 import { MfaStatus } from "@/features/users/MfaStatus";
@@ -304,7 +304,7 @@ export default function UsersPage() {
         title={editingUser ? "Edit user" : "Provision user"}
         description={editingUser ? "Update profile and role." : "Create a login for a teammate."}
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="us-first">First name <span className="text-danger">*</span></Label>

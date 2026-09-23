@@ -22,7 +22,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
 import { todayLocal } from "@/lib/local-date";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 
 const L = FIELD_LIMITS.asset;
 
@@ -178,7 +178,7 @@ export function AssetFormModal({
       title={editingAsset ? "Edit asset" : "Register new asset"}
       description={editingAsset ? "Update the master data for this asset." : "Enter the master data for the new asset."}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-6 overflow-y-auto p-1">
+      <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-6 overflow-y-auto p-1">
         <div className="space-y-4">
           <SectionHeading>Identification &amp; type</SectionHeading>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

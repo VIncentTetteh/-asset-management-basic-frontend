@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useSaveDisposal } from "@/features/disposals/hooks";
 import { CurrencyOptions } from "@/components/currency/CurrencyOptions";
-import { applyApiFieldErrors } from "@/lib/api-validation";
+import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import {
   buildDisposalPayload,
   DISPOSAL_DOC_MAX_LENGTH,
@@ -103,7 +103,7 @@ export function DisposalFormModal({
             : "Request an asset's disposal. A different user must approve it before the asset is marked disposed."
       }
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
+      <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
         <div className="space-y-2">
           <Label htmlFor="dp-assetId">Asset to dispose <span className="text-danger">*</span></Label>
           <input type="hidden" {...register("assetId", { required: "Asset is required" })} />

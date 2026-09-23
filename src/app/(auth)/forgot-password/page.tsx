@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { authService } from "@/services/authService";
 import { extractErrorMessage } from "@/lib/error";
+import { reportFormErrors } from "@/lib/api-validation";
 
 export default function ForgotPasswordPage() {
     const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +47,7 @@ export default function ForgotPasswordPage() {
                     </CardDescription>
                 </CardHeader>
                 {!isSubmitted ? (
-                    <form onSubmit={handleSubmit(onSubmit)}>
+                    <form onSubmit={handleSubmit(onSubmit, reportFormErrors)}>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email</Label>

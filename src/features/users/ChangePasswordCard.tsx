@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/ui/field-error";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 import { PASSWORD_INPUT_PROPS, passwordRules } from "@/lib/password-policy";
 
 export interface ChangePasswordForm {
@@ -48,7 +48,7 @@ export function ChangePasswordCard({ onChanged }: { onChanged: () => void }) {
                 <CardDescription>Changing your password signs you out everywhere, including here.</CardDescription>
             </CardHeader>
             <CardContent>
-                <form onSubmit={handleSubmit(onSubmit)} className="grid max-w-xl gap-4">
+                <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="grid max-w-xl gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="currentPassword">Current password</Label>
                         <Input

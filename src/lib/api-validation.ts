@@ -1,6 +1,6 @@
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
+import type { FieldErrors, FieldValues, Path, UseFormSetError } from "react-hook-form";
 import { extractErrorMessage } from "@/lib/error";
 import { isMfaEnrolmentRequiredError, isStepUpCancelledError, toastActionError } from "@/lib/step-up";
 
@@ -108,4 +108,70 @@ export function reportApiError<T extends FieldValues>(error: unknown, options: R
     const lines = describeFieldErrors(fieldErrors, options.labels);
     toast.error(`Please fix ${fields.length === 1 ? "this field" : "these fields"}:\n${lines.join("\n")}`);
     return true;
+}
+
+// ── Client-side rule failures ─────────────────────────────────────────────────
+
+/**
+ * Flattens react-hook-form's nested error tree to `{ "lineItems.0.quantity": message }`.
+ * Only leaves with a `message` (or a `type`) are fields; the rest are containers.
+ */
+function flattenFormErrors(errors: unknown, prefix = "", out: Record<string, string> = {}): Record<string, string> {
+    if (!errors || typeof errors !== "object") return out;
+    const node = errors as Record<string, unknown> & { message?: unknown; type?: unknown };
+    if (typeof node.message === "string" || typeof node.type === "string") {
+        const message = typeof node.message === "string" && node.message.trim() ? node.message : "is invalid";
+        if (prefix) out[prefix] = message;
+        return out;
+    }
+    for (const [key, value] of Object.entries(node)) {
+        if (key === "ref" || key === "root" || key === "types") continue;
+        flattenFormErrors(value, prefix ? `${prefix}.${key}` : key, out);
+    }
+    return out;
+}
+
+/**
+ * `handleSubmit`'s invalid handler, for every form in the app.
+ *
+ * Without one, react-hook-form silently refuses to submit: it fills `formState.errors`
+ * and returns. That is only visible if the failing field happens to render a
+ * {@link FieldError} right then — a field that is conditionally hidden, collapsed
+ * behind a tab, scrolled far off, or (as on the purchase-order form) replaced by a
+ * hint when another field is set, fails with no feedback at all and the user is left
+ * clicking Save. This toasts the same "Please fix these fields" summary a server-side
+ * `VALIDATION_FAILED` gets from {@link reportApiError}, so a refused save always says
+ * something, and focuses the first offending field.
+ *
+ * Usage: `onSubmit={handleSubmit(onSubmit, reportFormErrors)}`.
+ */
+export function reportFormErrors<T extends FieldValues>(errors: FieldErrors<T>): void {
+    const fieldErrors = flattenFormErrors(errors);
+    const fields = Object.keys(fieldErrors);
+    if (fields.length === 0) {
+        // Defensive: react-hook-form should never call this with an empty tree.
+        toast.error("Some fields need fixing before this can be saved");
+        return;
+    }
+    const lines = describeFieldErrors(fieldErrors);
+    toast.error(`Please fix ${fields.length === 1 ? "this field" : "these fields"}:\n${lines.join("\n")}`);
+    focusFirstError(errors);
+}
+
+/** Scrolls to and focuses the first field with an error, so the user can see it. */
+function focusFirstError(errors: unknown): void {
+    if (!errors || typeof errors !== "object") return;
+    const node = errors as { ref?: unknown };
+    const ref = node.ref as { focus?: () => void; scrollIntoView?: (options?: ScrollIntoViewOptions) => void } | undefined;
+    if (ref && typeof ref.focus === "function") {
+        ref.scrollIntoView?.({ block: "center" });
+        ref.focus();
+        return;
+    }
+    for (const value of Object.values(node as Record<string, unknown>)) {
+        if (value && typeof value === "object") {
+            focusFirstError(value);
+            return;
+        }
+    }
 }

@@ -16,7 +16,7 @@ import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, Shield, Lock, ShieldAlert } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { buildPatchPayload } from "@/lib/patch";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { useConfirm } from "@/hooks/useConfirm";
 import { FieldError } from "@/components/ui/field-error";
@@ -291,7 +291,7 @@ export default function RolesPage() {
                 title={editingRole ? (editingRole.systemRole ? "View System Role Policy" : "Edit Custom Role") : "Create Custom Role"}
                 description={editingRole?.systemRole ? "System roles are hardcoded by the application and cannot be structurally altered." : "Define an access control envelope to assign to users."}
             >
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+                <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
                     {editingRole?.systemRole && (
                         <div className="bg-info-soft text-foreground p-3 rounded-card text-sm mb-4 border border-edge flex items-start gap-2">
                             <Lock className="h-4 w-4 mt-0.5 shrink-0 text-info" />

@@ -16,6 +16,7 @@ import { authService, TenantRegistrationDto } from "@/services/authService";
 import { Eye, EyeOff } from "lucide-react";
 import { extractErrorMessage } from "@/lib/error";
 import { PASSWORD_INPUT_PROPS, passwordRules } from "@/lib/password-policy";
+import { reportFormErrors } from "@/lib/api-validation";
 
 export default function RegisterTenantPage() {
     const router = useRouter();
@@ -45,7 +46,7 @@ export default function RegisterTenantPage() {
                         Set up your Enterprise Asset Management organization
                     </CardDescription>
                 </CardHeader>
-                <form onSubmit={handleSubmit(onSubmit)}>
+                <form onSubmit={handleSubmit(onSubmit, reportFormErrors)}>
                     <CardContent className="space-y-6">
                         <div className="space-y-4">
                             <div className="space-y-2">

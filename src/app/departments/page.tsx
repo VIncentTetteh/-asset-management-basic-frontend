@@ -24,7 +24,7 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { usePermissions } from "@/contexts/PermissionContext";
 import Link from "next/link";
-import { reportApiError } from "@/lib/api-validation";
+import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 
 const L = FIELD_LIMITS.department;
 
@@ -263,7 +263,7 @@ export default function DepartmentsPage() {
         title={editingDept ? "Edit department" : "New department"}
         description="Departments group assets, people, and budgets."
       >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="dept-name">Name <span className="text-danger">*</span></Label>
             <Input

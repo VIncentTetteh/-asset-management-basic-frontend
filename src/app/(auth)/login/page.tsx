@@ -21,6 +21,7 @@ import { Eye, EyeOff, Smartphone } from "lucide-react";
 import { extractErrorMessage } from "@/lib/error";
 import { nextFromSearch } from "@/lib/safe-next";
 import { organisationChoicesFromError, type LoginOrganisationChoice } from "@/lib/login-organisations";
+import { reportFormErrors } from "@/lib/api-validation";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -230,7 +231,7 @@ export default function LoginPage() {
                         Sign in to your Enterprise Asset Management account
                     </CardDescription>
                 </CardHeader>
-                <form onSubmit={handleSubmit(onSubmit)}>
+                <form onSubmit={handleSubmit(onSubmit, reportFormErrors)}>
                     <CardContent className="space-y-4">
                         {/* Email field */}
                         <div className="space-y-2">

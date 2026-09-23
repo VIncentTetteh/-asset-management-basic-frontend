@@ -16,6 +16,7 @@ import { Select } from "@/components/ui/select";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { buildPromotePayload, promoteDefaults, type PromoteForm } from "@/features/discovery/lib";
+import { reportFormErrors } from "@/lib/api-validation";
 
 /**
  * Names the asset a discovered device becomes and places it in a category and
@@ -58,7 +59,7 @@ export function PromoteDeviceModal({
       description={device ? `Register ${device.ipAddress} in the asset register.` : ""}
     >
       <form
-        onSubmit={handleSubmit((form) => (device ? onSubmit(device, buildPromotePayload(form)) : Promise.resolve()))}
+        onSubmit={handleSubmit((form) => (device ? onSubmit(device, buildPromotePayload(form)) : Promise.resolve()), reportFormErrors)}
         className="space-y-4"
       >
         <div className="space-y-1.5">

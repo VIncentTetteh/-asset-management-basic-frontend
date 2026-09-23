@@ -12,6 +12,7 @@ import {
     getApiFieldErrors,
     humaniseField,
     reportApiError,
+    reportFormErrors,
 } from "@/lib/api-validation";
 import { StepUpCancelledError } from "@/lib/step-up";
 
@@ -157,5 +158,38 @@ describe("database integrity errors (GlobalExceptionHandler SQLState split)", ()
 
         expect(reportApiError(error, { fallback: "Failed" })).toBe(false);
         expect(toastMock.error).toHaveBeenCalledWith("A value is too long for its field");
+    });
+});
+
+describe("reportFormErrors", () => {
+    beforeEach(() => toastMock.error.mockClear());
+
+    it("names every field react-hook-form refused to submit on", () => {
+        reportFormErrors({
+            poNumber: { type: "required", message: "PO number is required" },
+            totalAmount: { type: "min", message: "Total amount must be at least 0.01" },
+        } as never);
+        expect(toastMock.error).toHaveBeenCalledTimes(1);
+        const message = String(toastMock.error.mock.calls[0][0]);
+        expect(message).toContain("Please fix these fields:");
+        expect(message).toContain("Po number: PO number is required");
+        expect(message).toContain("Total amount: Total amount must be at least 0.01");
+    });
+
+    it("reaches into field arrays, where the row that failed may be scrolled out of sight", () => {
+        reportFormErrors({
+            lineItems: [undefined, { quantity: { type: "min", message: "Quantity must be at least 0.0001" } }],
+        } as never);
+        expect(String(toastMock.error.mock.calls[0][0])).toContain("Quantity: Quantity must be at least 0.0001");
+    });
+
+    it("falls back to a message when a rule was registered without one", () => {
+        reportFormErrors({ name: { type: "required" } } as never);
+        expect(String(toastMock.error.mock.calls[0][0])).toContain("Name: is invalid");
+    });
+
+    it("still says something when the error tree is empty, so a refused save is never silent", () => {
+        reportFormErrors({} as never);
+        expect(toastMock.error).toHaveBeenCalledWith("Some fields need fixing before this can be saved");
     });
 });

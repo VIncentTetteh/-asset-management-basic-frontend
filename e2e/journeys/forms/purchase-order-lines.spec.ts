@@ -41,7 +41,13 @@ describeRoundTrip({
     editButton: /^Edit purchase order$/i,
     deleteButton: /^Delete purchase order$/i,
     setup: async ({ api }) => {
-        applyCurrencies(currency, await orgCurrencies(api));
+        // Deliberately NOT changed on edit. Every list and detail figure in the app
+        // is rendered in the viewer's display currency, converted from the record's
+        // own — so an order edited into another currency shows a converted amount
+        // (USD 4,500 came back as "GHS 74,025.00" on staging), and this file's
+        // afterEdit assertions are about the total derived from the lines, not about
+        // conversion. purchase-orders.spec.ts covers the currency change.
+        applyCurrencies(currency, await orgCurrencies(api), false);
         ids.supplier = (await createSupplier(api, supplier)).id;
         ids.department = (await createDepartment(api, department)).id;
         ids.category = (await createCategory(api, category)).id;
