@@ -51,12 +51,6 @@ export function missingRequiredFields(
     return fields.filter((field) => field.required && mapping[field.name] == null);
 }
 
-/** The user's columns that no field reads — "these will be ignored". */
-export function ignoredColumns(columns: DetectedColumn[], mapping: ColumnMapping): DetectedColumn[] {
-    const used = new Set(Object.values(mapping).filter((index): index is number => typeof index === "number"));
-    return columns.filter((column) => !used.has(column.index));
-}
-
 /**
  * Columns feeding more than one field. Legitimate occasionally (one column
  * used as both name and description), so it warns rather than blocks.

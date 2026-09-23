@@ -5,7 +5,6 @@ import {
     columnFor,
     describeColumn,
     duplicatedColumns,
-    ignoredColumns,
     initialMapping,
     mappingPayload,
     missingRequiredFields,
@@ -13,7 +12,7 @@ import {
     sampleValues,
 } from "@/features/imports/mapping";
 import { IMPORT_MAX_FILE_BYTES, formatBytes, rejectImportFile } from "@/features/imports/importFile";
-import { failedRowsCsv, failedRowsText, flattenPreviewRows, mergeFailedRows } from "@/features/imports/failedRows";
+import { failedRows, failedRowsCsv, failedRowsText, rowLabel } from "@/features/imports/failedRows";
 import { importEntityType, mergeImportType } from "@/features/imports/importTypes";
 import { importJobPollMs, importJobStatusLabel } from "@/features/imports/importJob";
 
@@ -60,12 +59,6 @@ describe("missingRequiredFields", () => {
     it("lists required fields with no column, and nothing else", () => {
         const missing = missingRequiredFields(fields, { name: 0, assetTag: null, serialNumber: null });
         expect(missing.map((f) => f.name)).toEqual(["assetTag"]);
-    });
-});
-
-describe("ignoredColumns", () => {
-    it("names the user's columns nothing reads", () => {
-        expect(ignoredColumns(columns, { name: 0, assetTag: null, serialNumber: null }).map((c) => c.index)).toEqual([1, 2]);
     });
 });
 
@@ -152,27 +145,22 @@ describe("rejectImportFile", () => {
 });
 
 describe("failed rows", () => {
-    const previewRows = [{ rowNumber: 4, errors: [{ column: "Cost (USD)", message: "must be a number" }] }];
-
-    it("gives job errors back the column the preview found for the same row", () => {
-        expect(mergeFailedRows([{ row: 4, message: "must be a number" }], previewRows)).toEqual([
+    it("keeps the row, the user's own heading and the reason the server gave", () => {
+        expect(failedRows([{ row: 4, message: "must be a number", field: "purchaseCost", column: "Cost (USD)" }])).toEqual([
             { rowNumber: 4, column: "Cost (USD)", message: "must be a number" },
         ]);
     });
 
     it("never renders a blank reason", () => {
-        expect(mergeFailedRows([{ row: 7 }], [])[0].message).toBe("Rejected without a reason given");
+        expect(failedRows([{ row: 7, message: "" }])[0].message).toBe("Rejected without a reason given");
     });
 
-    it("flattens a preview row with several problems into one line each", () => {
-        expect(
-            flattenPreviewRows([
-                { rowNumber: 2, errors: [{ column: "A", message: "x" }, { message: "y" }] },
-            ]),
-        ).toEqual([
-            { rowNumber: 2, column: "A", message: "x" },
-            { rowNumber: 2, column: undefined, message: "y" },
-        ]);
+    it("refuses to label a row 0, which is a row nobody can go and find", () => {
+        // The API guarantees it never sends one. If one ever arrives, the user
+        // gets the reason without being sent hunting for a row that is not there.
+        expect(rowLabel(0)).toBeNull();
+        expect(rowLabel(4)).toBe("Row 4");
+        expect(failedRowsCsv([{ rowNumber: 0, message: "no row" }]).split("\r\n")[1]).toBe(',"","no row"');
     });
 
     it("quotes a message containing a comma or a quote so the CSV stays readable", () => {
@@ -184,7 +172,7 @@ describe("failed rows", () => {
 
     it("writes one readable line per row as text", () => {
         expect(failedRowsText([{ rowNumber: 3, column: "Cost", message: "bad" }, { rowNumber: 4, message: "bad" }])).toBe(
-            "Row 3 · Cost: bad\nRow 4: bad",
+            "Row 3 · Cost · bad\nRow 4 · bad",
         );
     });
 });

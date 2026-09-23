@@ -1,53 +1,37 @@
-import type { ImportJobError } from "@/services/importJobService";
-import type { ImportPreviewRow } from "@/services/importService";
+import type { ImportRowIssue } from "@/services/importService";
 
 /**
  * Rows the import could not take, rendered as something the user can act on:
  * a CSV they open next to their own sheet, or text they paste into a ticket.
  *
- * A job's errors only carry a row number and a message; the preview knows
- * which of *their* columns each problem came from, so the two are merged when
- * both are available.
+ * Errors now arrive from the server already carrying the heading *as the user
+ * wrote it*, so nothing is merged or reconstructed here any more. The one
+ * defensive act left is row 0: the API guarantees it never sends one, and if
+ * one ever appears it is shown without a row number rather than as a row the
+ * user will go looking for and never find.
  */
 
 export interface FailedRow {
+    /** 1-based row in the user's file. 0 means "the server did not say which row". */
     rowNumber: number;
     column?: string;
     message: string;
 }
 
-/** Job errors, given back the column names the preview found for the same rows. */
-export function mergeFailedRows(
-    jobErrors: readonly ImportJobError[] | undefined,
-    previewRows: readonly ImportPreviewRow[] | undefined,
-): FailedRow[] {
-    const columnsByRow = new Map<number, string>();
-    for (const row of previewRows ?? []) {
-        const named = row.errors?.find((error) => error.column?.trim());
-        if (named?.column) columnsByRow.set(row.rowNumber, named.column);
-    }
-    return (jobErrors ?? [])
-        .filter((error) => error != null)
-        .map((error) => ({
-            rowNumber: error.row ?? 0,
-            column: columnsByRow.get(error.row ?? -1),
-            message: error.message?.trim() || "Rejected without a reason given",
-        }));
+/** A row's label, or null when there is no row number worth showing. */
+export function rowLabel(rowNumber: number): string | null {
+    return rowNumber > 0 ? `Row ${rowNumber}` : null;
 }
 
-/** Preview errors flattened one-per-problem, for the preview step's list. */
-export function flattenPreviewRows(rows: readonly ImportPreviewRow[] | undefined): FailedRow[] {
-    const out: FailedRow[] = [];
-    for (const row of rows ?? []) {
-        for (const error of row.errors ?? []) {
-            out.push({
-                rowNumber: row.rowNumber,
-                column: error.column?.trim() || undefined,
-                message: error.message?.trim() || "This value was rejected",
-            });
-        }
-    }
-    return out;
+/** Row issues as the failed-row list, copy and download all read. */
+export function failedRows(issues: readonly ImportRowIssue[] | undefined): FailedRow[] {
+    return (issues ?? [])
+        .filter((issue) => issue != null)
+        .map((issue) => ({
+            rowNumber: Number.isFinite(issue.row) ? Number(issue.row) : 0,
+            column: issue.column?.trim() || undefined,
+            message: issue.message?.trim() || "Rejected without a reason given",
+        }));
 }
 
 const escapeCsv = (value: string): string => `"${value.replace(/"/g, '""')}"`;
@@ -56,7 +40,7 @@ const escapeCsv = (value: string): string => `"${value.replace(/"/g, '""')}"`;
 export function failedRowsCsv(rows: readonly FailedRow[]): string {
     const lines = ["Row,Column,Problem"];
     for (const row of rows) {
-        lines.push([String(row.rowNumber), escapeCsv(row.column ?? ""), escapeCsv(row.message)].join(","));
+        lines.push([row.rowNumber > 0 ? String(row.rowNumber) : "", escapeCsv(row.column ?? ""), escapeCsv(row.message)].join(","));
     }
     return lines.join("\r\n");
 }
@@ -64,7 +48,7 @@ export function failedRowsCsv(rows: readonly FailedRow[]): string {
 /** The same list as plain text, for pasting into an email or a ticket. */
 export function failedRowsText(rows: readonly FailedRow[]): string {
     return rows
-        .map((row) => (row.column ? `Row ${row.rowNumber} · ${row.column}: ${row.message}` : `Row ${row.rowNumber}: ${row.message}`))
+        .map((row) => [rowLabel(row.rowNumber), row.column, row.message].filter(Boolean).join(" · "))
         .join("\n");
 }
 
