@@ -30,9 +30,6 @@ interface Register {
 }
 
 const OWNER = ADMIN_EMAIL;
-const JS_URL = "javascript:alert(1)";
-const url = (name: string) => `https://example.com/e2e/${RUN_ID.toLowerCase()}/${name}`;
-const linkError = (label: string) => new RegExp(`${label} must be an http:// or https:// link`);
 
 // ── Prerequisites for the asset-bound registers ───────────────────────────────
 const icsAssetName = uniq("IcsAsset");
@@ -58,11 +55,9 @@ const REGISTERS: Register[] = [
             { label: "Justification", type: "textarea", value: uniq("justification"), optional: true },
             { label: "Gap description", type: "textarea", value: uniq("gap"), optional: true },
             { label: "Remediation plan", type: "textarea", value: uniq("remediation"), optional: true },
-            { label: "Evidence URL", type: "text", value: url("control-evidence"), optional: true },
         ],
         negative: [
             { field: "Control reference", value: overLength(64), error: /Control reference must be at most 64 characters/ },
-            { field: "Evidence URL", value: JS_URL, error: linkError("Evidence URL") },
         ],
     },
     {
@@ -128,11 +123,9 @@ const REGISTERS: Register[] = [
             { label: "Review due", type: "date", value: isoDate(355), optional: true },
             { label: "Owner", type: "select", value: OWNER, optional: true },
             { label: "Approved by", type: "select", value: OWNER, optional: true },
-            { label: "Document URL", type: "text", value: url("policy.pdf"), optional: true },
         ],
         negative: [
             { field: "Version", value: overLength(16), error: /Version must be at most 16 characters/ },
-            { field: "Document URL", value: JS_URL, error: linkError("Document URL") },
         ],
     },
     {
@@ -171,13 +164,11 @@ const REGISTERS: Register[] = [
             { label: "Medium", type: "number", value: 3, edit: 0, optional: true },
             { label: "Low", type: "number", value: 4, edit: 0, optional: true },
             { label: "Next scan due", type: "date", value: isoDate(90), optional: true },
-            { label: "Report URL", type: "text", value: url("scan-report"), optional: true },
             { label: "Notes", type: "textarea", value: uniq("scan notes"), optional: true },
         ],
         negative: [
             { field: "Critical", value: -1, error: /Critical must be at least 0/ },
             { field: "Scanner tool", value: overLength(128), error: /Scanner tool must be at most 128 characters/ },
-            { field: "Report URL", value: JS_URL, error: linkError("Report URL") },
         ],
     },
     {
@@ -266,12 +257,10 @@ const REGISTERS: Register[] = [
             { label: "Requirement text", type: "textarea", value: uniq("requirement text"), optional: true },
             { label: "Compensating control", type: "textarea", value: uniq("compensating"), optional: true },
             { label: "Target date", type: "date", value: isoDate(30), optional: true },
-            { label: "Evidence URL", type: "text", value: url("saq-evidence"), optional: true },
             { label: "Notes", type: "textarea", value: uniq("saq notes"), optional: true },
         ],
         negative: [
             { field: "Requirement", value: overLength(16), error: /Requirement must be at most 16 characters/ },
-            { field: "Evidence URL", value: JS_URL, error: linkError("Evidence URL") },
         ],
     },
 ];

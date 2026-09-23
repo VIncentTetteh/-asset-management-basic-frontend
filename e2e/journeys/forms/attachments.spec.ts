@@ -1,5 +1,6 @@
 import { expect, test, uniq } from "../../fixtures/auth";
-import { formModal, searchList, visibleFeedback } from "../../fixtures/forms";
+import { formModal, searchList, submitAndClose, visibleFeedback } from "../../fixtures/forms";
+import { isoDate } from "../../fixtures/prereqs";
 import { createContract, dropContract } from "./_finance-helpers";
 
 /**
@@ -88,6 +89,52 @@ test.describe("Contract document attachments", () => {
         await form.getByRole("button", { name: /^Remove$/ }).click();
         await expect(form.getByText(FILE_NAME)).toBeHidden({ timeout: 30_000 });
         await expect(form.getByText(/No files attached yet/i)).toBeVisible();
+    });
+
+    /**
+     * The create path, which no round-trip spec reaches: on a form for a record
+     * that does not exist yet the file has nowhere to go, so it is held and
+     * uploaded once the POST returns an id. That ordering is the one thing in
+     * this feature that can silently attach to the wrong record — or to nothing
+     * at all — so it is checked against a contract created through the form.
+     */
+    test("holds a file chosen before the contract exists, then attaches it to the new record", async ({ page, api }) => {
+        const title = `${CONTRACT}-created`;
+        await page.goto("/contracts");
+        await page.getByRole("button", { name: /New contract/i }).first().click();
+
+        const form = formModal(page);
+        await expect(form).toBeVisible();
+        const picker = form.locator('input[type="file"]');
+        test.skip((await picker.count()) === 0, "document attachments are off for this tenant");
+
+        await form.getByLabel(/^Title\s*\*?$/).fill(title);
+        await form.getByLabel(/^Start date\s*\*?$/).fill(isoDate(0));
+        await form.getByLabel(/^End date\s*\*?$/).fill(isoDate(365));
+        await picker.setInputFiles({
+            name: FILE_NAME,
+            mimeType: "text/plain",
+            buffer: Buffer.from(FILE_BODY, "utf8"),
+        });
+        // Nothing is uploaded yet: the contract it would hang off does not exist.
+        await expect(form.getByText(/will be attached when this is saved/i)).toBeVisible();
+
+        await submitAndClose(page, form);
+
+        // Find what the form created, so the cleanup can remove it and the
+        // assertion below is about that record rather than any other.
+        const created = (await api.list<{ id: string; title: string }>("/contracts"))
+            .find((row) => row.title === title);
+        expect(created, `contract "${title}" via the API`).toBeTruthy();
+        contractId = created!.id;
+
+        // Reopening the record is the only proof the upload used the id the
+        // create returned: the list is read back from the server by entityId.
+        await searchList(page, title);
+        await page.locator("tr").filter({ hasText: title }).first()
+            .getByRole("button", { name: /^Edit contract$/i }).first().click();
+        const reopened = formModal(page);
+        await expect(reopened.getByTestId("attachment-list")).toContainText(FILE_NAME, { timeout: 30_000 });
     });
 
     test("refuses a file type the API would reject, before sending it", async ({ page, api }) => {

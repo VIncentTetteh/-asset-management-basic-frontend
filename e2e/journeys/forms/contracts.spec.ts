@@ -45,7 +45,6 @@ describeRoundTrip({
         { label: "Value", type: "number", value: 12_345.67, optional: true },
         currency,
         { label: "Auto-renews at end date", type: "checkbox", value: true, optional: true },
-        { label: "Document URL", type: "text", value: "https://example.com/e2e/contract.pdf", optional: true },
         { label: "Key terms", type: "textarea", value: uniq("contract key terms"), optional: true },
     ],
     negative: [
@@ -53,6 +52,5 @@ describeRoundTrip({
         { field: "Contract number", value: overLength(100), error: /Contract number must be at most 100 characters/ },
         // The rule's label is "Alert days" (not the visible "Alert days before end").
         { field: "Alert days before end", value: -1, error: /Alert days must be at least 0/ },
-        { field: "Document URL", value: "ftp://example.com/contract.pdf", error: /Document URL must be an http:\/\/ or https:\/\/ link/ },
     ],
 });

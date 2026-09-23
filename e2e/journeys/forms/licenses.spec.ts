@@ -1,4 +1,4 @@
-import { PREFIX, uniq } from "../../fixtures/auth";
+import { uniq } from "../../fixtures/auth";
 import { overLength } from "../../fixtures/forms";
 import { createAsset, dropAsset, isoDate } from "../../fixtures/prereqs";
 import { describeRoundTrip } from "../../fixtures/roundtrip";
@@ -54,18 +54,11 @@ describeRoundTrip({
         currency,
         { label: "Auto-renews", type: "checkbox", value: true, edit: false },
         { label: "Linked asset", type: "select", value: assetName, optional: true },
-        {
-            label: "Document URL",
-            type: "text",
-            value: `https://example.com/e2e/${PREFIX.toLowerCase()}license.pdf`,
-            optional: true,
-        },
         { label: "Notes", type: "textarea", value: uniq("license notes"), optional: true },
     ],
     negative: [
         { field: "License name", value: overLength(255), error: /License name must be at most 255 characters/ },
         { field: "Version", value: overLength(255), error: /Version must be at most 255 characters/ },
-        { field: "Document URL", value: "ftp://example.com/license.pdf", error: /Document URL must be an http:\/\/ or https:\/\/ link/ },
         { field: "Total seats", value: -1, error: /Total seats must be at least 0/ },
     ],
 });

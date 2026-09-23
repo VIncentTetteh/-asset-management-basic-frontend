@@ -32,7 +32,6 @@ const title = uniq("Expense");
 const budget = uniq("EX-Budget");
 const asset = uniq("EX-Asset");
 const department = uniq("EX-Dept");
-const receiptUrl = "https://example.com/e2e/receipt.pdf";
 const description = uniq("expense description");
 const expenseDate = isoDate(-2);
 const amount = 123.45;
@@ -51,7 +50,6 @@ const fields: readonly FieldSpec[] = [
     { label: "Linked budget", type: "select", value: budget },
     { label: "Linked asset", type: "select", value: asset },
     { label: "Department", type: "select", value: department },
-    { label: "Receipt URL", type: "text", value: receiptUrl },
     { label: "Description", type: "textarea", value: description },
 ];
 
@@ -86,7 +84,6 @@ interface StoredExpense {
     linkedBudgetId?: string;
     linkedAssetId?: string;
     departmentId?: string;
-    receiptUrl?: string;
 }
 
 async function findStored(api: ApiClient, text: string): Promise<StoredExpense | undefined> {
@@ -97,7 +94,6 @@ async function findStored(api: ApiClient, text: string): Promise<StoredExpense |
 const NEGATIVE: readonly { field: string; value: string | number; error: RegExp }[] = [
     { field: "Title", value: overLength(255), error: /Title must be at most 255 characters/ },
     { field: "Amount", value: 0, error: /Amount must be at least 0\.01/ },
-    { field: "Receipt URL", value: "ftp://example.com/receipt.pdf", error: /Receipt URL must be an http:\/\/ or https:\/\/ link/ },
 ];
 
 test.describe("Expenses", () => {
@@ -156,7 +152,6 @@ test.describe("Expenses", () => {
                     linkedBudgetId: ids.budget,
                     linkedAssetId: ids.asset,
                     departmentId: ids.department,
-                    receiptUrl,
                 });
                 expect(Number(stored!.amount)).toBe(amount);
                 expect(String(stored!.expenseDate).slice(0, 10)).toBe(expenseDate);
