@@ -1,7 +1,7 @@
 "use client";
 
 import { safeInternalPath } from "@/lib/safe-url";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notificationService, resolveNotifId } from "@/services/notificationService";
@@ -14,7 +14,8 @@ import { Loader2, Bell, CheckCircle2, Trash2, Settings } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
-import { toast } from "react-hot-toast";
+import { notify } from "@/lib/notify";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 import { cn } from "@/lib/utils";
 
 const TYPE_COLORS: Record<string, string> = {
@@ -80,9 +81,11 @@ export default function NotificationsPage() {
     const summary = summaryQuery.data ?? null;
     const loading = listQuery.isLoading || prefsQuery.isLoading;
 
-    useEffect(() => {
-        if (listQuery.isError) toast.error("Failed to load notifications");
-    }, [listQuery.isError]);
+    // A failed load used to be a toast. Four seconds later it was gone and the
+    // page said "No notifications found" — the user was told, in effect, that
+    // they had no notifications. A load failure is a condition, not an
+    // acknowledgement, so it renders inline where the list would have been and
+    // stays there until a retry succeeds. See src/lib/notify.ts.
 
     const preferences: NotificationPreferences | null = prefsQuery.data ?? null;
     const emailEnabled = (type: string) => emailEdits[type] ?? Boolean(preferences?.emailNotifications?.[type]);
@@ -97,7 +100,7 @@ export default function NotificationsPage() {
     const markAll = useMutation({
         mutationFn: notificationService.markAllAsRead,
         onSuccess: () => {
-            toast.success("All caught up!");
+            notify.success("All caught up!");
             invalidate();
         },
         onError: (err) => reportApiError(err, { fallback: "Action failed" }),
@@ -110,7 +113,7 @@ export default function NotificationsPage() {
     const deleteAll = useMutation({
         mutationFn: notificationService.deleteAllNotifications,
         onSuccess: () => {
-            toast.success("All notifications deleted");
+            notify.success("All notifications deleted");
             invalidate();
         },
         onError: (err) => reportApiError(err, { fallback: "Delete all failed" }),
@@ -118,7 +121,7 @@ export default function NotificationsPage() {
     const savePrefs = useMutation({
         mutationFn: (prefs: NotificationPreferences) => notificationService.updatePreferences(prefs),
         onSuccess: () => {
-            toast.success("Preferences updated");
+            notify.success("Preferences updated");
             setEmailEdits({});
             void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.preferences });
         },
@@ -211,6 +214,14 @@ export default function NotificationsPage() {
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 <div className="space-y-3 md:col-span-2">
+                    {listQuery.isError ? (
+                        <DataErrorState
+                            what="your notifications"
+                            error={listQuery.error}
+                            onRetry={() => listQuery.refetch()}
+                            isRetrying={listQuery.isFetching}
+                        />
+                    ) : null}
                     {notifications.map(n => {
                         const nid = resolveNotifId(n);
                         return (
@@ -255,7 +266,7 @@ export default function NotificationsPage() {
                             </Card>
                         );
                     })}
-                    {!notifications.length && (
+                    {!notifications.length && !listQuery.isError && (
                         <div className="rounded-card border border-dashed border-edge-subtle p-12 text-center text-muted-fg">
                             No notifications found
                         </div>

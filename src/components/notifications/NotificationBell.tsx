@@ -1,12 +1,12 @@
 "use client";
 
 import { safeInternalPath } from "@/lib/safe-url";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useOptimistic, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { notificationService, resolveNotifId } from "@/services/notificationService";
 import { formatRelativeTime } from "@/lib/time";
@@ -59,7 +59,7 @@ export function NotificationBell() {
     const markAll = useMutation({
         mutationFn: notificationService.markAllAsRead,
         onSuccess: refresh,
-        onError: () => toast.error("Couldn't mark notifications as read"),
+        onError: () => notify.error("Couldn't mark notifications as read"),
     });
     const markOne = useMutation({
         mutationFn: (id: string) => notificationService.markAsRead(id),
@@ -91,6 +91,27 @@ export function NotificationBell() {
     const unread = summaryQuery.data?.unreadCount ?? 0;
     const items = (listQuery.data?.notifications ?? []).filter((n) => !n.read).slice(0, LATEST_UNREAD_LIMIT);
 
+    /**
+     * "Mark all as read" used to leave the badge showing the old count for as
+     * long as the round trip took, which reads as a dead button. React 19's
+     * useOptimistic shows zero immediately and — this is the part a manual
+     * useState cannot do — puts it back by itself if the request fails, with
+     * no rollback code to get wrong. The revert is tied to the transition
+     * ending, so it cannot drift out of sync with the mutation.
+     */
+    const [optimisticUnread, showUnreadAs] = useOptimistic(unread, (_current, next: number) => next);
+    const [markingAll, startMarkingAll] = useTransition();
+
+    const markAllAsRead = () => {
+        startMarkingAll(async () => {
+            showUnreadAs(0);
+            // The rejection is already reported by the mutation's onError. If it
+            // escaped this transition it would reach the route error boundary and
+            // destroy the page over a failed bell action.
+            await markAll.mutateAsync().catch(() => undefined);
+        });
+    };
+
     const openItem = (notification: Notification) => {
         const id = resolveNotifId(notification);
         if (id) markOne.mutate(id);
@@ -105,7 +126,7 @@ export function NotificationBell() {
                 ref={triggerRef}
                 variant="outline"
                 size="icon"
-                aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+                aria-label={optimisticUnread > 0 ? `Notifications, ${optimisticUnread} unread` : "Notifications"}
                 aria-haspopup="dialog"
                 aria-expanded={open}
                 aria-controls={open ? panelId : undefined}
@@ -113,12 +134,12 @@ export function NotificationBell() {
                 className="relative"
             >
                 <Bell className="h-4 w-4" />
-                {unread > 0 ? (
+                {optimisticUnread > 0 ? (
                     <span
                         data-testid="notification-badge"
                         className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold leading-none text-white"
                     >
-                        {unread > BADGE_MAX ? `${BADGE_MAX}+` : unread}
+                        {optimisticUnread > BADGE_MAX ? `${BADGE_MAX}+` : optimisticUnread}
                     </span>
                 ) : null}
             </Button>
@@ -137,9 +158,9 @@ export function NotificationBell() {
                         <Button
                             variant="ghost"
                             size="sm"
-                            disabled={unread === 0 && items.length === 0}
-                            isLoading={markAll.isPending}
-                            onClick={() => markAll.mutate()}
+                            disabled={optimisticUnread === 0 && items.length === 0}
+                            isLoading={markingAll}
+                            onClick={markAllAsRead}
                         >
                             <CheckCheck className="mr-1 h-3.5 w-3.5" />
                             Mark all as read
@@ -149,7 +170,20 @@ export function NotificationBell() {
                     {listQuery.isLoading ? (
                         <p className="px-4 py-6 text-center text-sm text-muted-fg">Loading…</p>
                     ) : listQuery.isError ? (
-                        <p className="px-4 py-6 text-center text-sm text-muted-fg">Couldn&apos;t load notifications.</p>
+                        // Inline and retryable, not a toast: the panel is empty
+                        // because a request failed, and saying so here is the
+                        // only thing that distinguishes it from "all caught up".
+                        <div role="alert" className="space-y-2 px-4 py-6 text-center">
+                            <p className="text-sm text-foreground">We couldn&apos;t load your notifications.</p>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                isLoading={listQuery.isFetching}
+                                onClick={() => void listQuery.refetch()}
+                            >
+                                Try again
+                            </Button>
+                        </div>
                     ) : items.length === 0 ? (
                         <p className="px-4 py-6 text-center text-sm text-muted-fg">You&apos;re all caught up</p>
                     ) : (
