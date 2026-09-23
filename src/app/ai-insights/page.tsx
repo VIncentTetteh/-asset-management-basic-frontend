@@ -68,14 +68,20 @@ const formatDate = (dateStr: string) =>
 
 // ── Health Score ──────────────────────────────────────────────────────────────
 
+/**
+ * Severity alone. The old score multiplied each deduction by `confidence`,
+ * which the backend has now confirmed was a hardcoded constant with no model
+ * behind it — so the multiplication was arithmetic on a made-up number, and
+ * halving a CRITICAL finding's weight because of it was the opposite of
+ * conservative.
+ */
 const computeHealthScore = (insights: PredictiveInsight[]): number => {
     if (!insights.length) return 100;
     const unresolved = insights.filter(i => !i.resolved);
     if (!unresolved.length) return 100;
     const deductions = unresolved.reduce((sum, i) => {
         const weight = { CRITICAL: 25, HIGH: 12, MEDIUM: 5, LOW: 2 }[i.severity] ?? 2;
-        const conf = i.confidence ?? 0.5;
-        return sum + weight * conf;
+        return sum + weight;
     }, 0);
     return Math.max(0, Math.round(100 - deductions));
 };
@@ -186,7 +192,12 @@ export default function AiInsightsPage() {
                 const sevScore = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
                 const diff = (sevScore[b.severity] ?? 0) - (sevScore[a.severity] ?? 0);
                 if (diff !== 0) return diff;
-                return (b.confidence ?? 0) - (a.confidence ?? 0);
+                // Was a confidence tie-break, which ranked on a constant. The
+                // soonest predicted date is the thing a reader would actually
+                // order by; an insight with no date sorts last.
+                const aDate = a.predictedDate ?? "9999-12-31";
+                const bDate = b.predictedDate ?? "9999-12-31";
+                return aDate.localeCompare(bDate);
             }),
         [insights]);
 
@@ -230,7 +241,7 @@ export default function AiInsightsPage() {
                         </div>
                         <p className={cn("mt-2 text-sm font-semibold", healthColor(healthScore))}>{healthLabel(healthScore)}</p>
                         <p className="mt-1 text-xs text-faint-fg">
-                            Based on {unresolvedCount} unresolved insight{unresolvedCount !== 1 ? "s" : ""} · weighted by severity and confidence
+                            Based on {unresolvedCount} unresolved insight{unresolvedCount !== 1 ? "s" : ""} · weighted by severity
                         </p>
                     </CardContent>
                 </Card>
@@ -403,6 +414,23 @@ export default function AiInsightsPage() {
                                                     <p className="font-semibold text-foreground">{insight.title}</p>
                                                     <p className="text-sm text-muted-fg">{insight.description}</p>
 
+                                                    {/* The evidence, in the rule's own words. This replaced a
+                                                        confidence bar whose number was a constant — a reader can
+                                                        argue with "3 maintenance events in 90 days"; nobody could
+                                                        argue with "78%". */}
+                                                    {insight.basis && (
+                                                        <p
+                                                            className="flex items-start gap-1.5 rounded-control border border-edge-subtle bg-surface-muted px-2.5 py-1.5 text-xs text-muted-fg"
+                                                            data-testid="insight-basis"
+                                                        >
+                                                            <BarChart3 className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                                                            <span>
+                                                                <span className="font-semibold text-foreground">Based on: </span>
+                                                                {insight.basis}
+                                                            </span>
+                                                        </p>
+                                                    )}
+
                                                     <div className="flex flex-wrap gap-4 pt-1">
                                                         <span className="text-xs text-faint-fg">
                                                             Asset: <span className="font-medium text-muted-fg">{insight.assetName || insight.assetId}</span>
@@ -412,17 +440,6 @@ export default function AiInsightsPage() {
                                                                 Tag: <span className="data-mono text-faint-fg">{insight.assetTag}</span>
                                                             </span>
                                                         )}
-                                                        <span className="flex items-center gap-1.5 text-xs text-faint-fg">
-                                                            <BarChart3 className="h-3 w-3" />
-                                                            Confidence:
-                                                            <span className="inline-flex items-center gap-1">
-                                                                <span className="inline-block h-1.5 w-16 overflow-hidden rounded-full bg-surface-muted">
-                                                                    <span className={cn("block h-full rounded-full", SEVERITY_BAR[insight.severity])}
-                                                                        style={{ width: `${(insight.confidence ?? 0) * 100}%` }} />
-                                                                </span>
-                                                                <span className="font-medium text-muted-fg">{Math.round((insight.confidence ?? 0) * 100)}%</span>
-                                                            </span>
-                                                        </span>
                                                         {daysAway !== null && (
                                                             <span className={cn("text-xs font-medium", daysAway < 0 ? "text-danger" : daysAway <= 7 ? "text-orange-600 dark:text-orange-300" : "text-faint-fg")}>
                                                                 {daysAway < 0 ? `${Math.abs(daysAway)}d overdue` : daysAway === 0 ? "Today" : `In ${daysAway} days`}
@@ -498,9 +515,10 @@ export default function AiInsightsPage() {
                                                             <p className="text-xs text-faint-fg">
                                                                 {insight.assetName || insight.assetId}
                                                                 {insight.assetTag ? ` · ${insight.assetTag}` : ""}
-                                                                {" · "}
-                                                                <span className="font-medium">{Math.round((insight.confidence ?? 0) * 100)}% confidence</span>
                                                             </p>
+                                                            {insight.basis && (
+                                                                <p className="text-xs text-muted-fg">{insight.basis}</p>
+                                                            )}
                                                             {meta?.action && (
                                                                 <p className="text-xs font-medium text-brand">{meta.action}</p>
                                                             )}
@@ -615,7 +633,9 @@ export default function AiInsightsPage() {
                                                         <div className="flex flex-wrap gap-3 pt-1 text-xs text-faint-fg">
                                                             <span>Asset: <span className="font-medium text-muted-fg">{insight.assetName || insight.assetId}</span></span>
                                                             {insight.assetTag && <span>Tag: <span className="data-mono">{insight.assetTag}</span></span>}
-                                                            <span>Confidence: <span className="font-medium text-muted-fg">{Math.round((insight.confidence ?? 0) * 100)}%</span></span>
+                                                            {insight.basis && (
+                                                                <span>Based on: <span className="font-medium text-muted-fg">{insight.basis}</span></span>
+                                                            )}
                                                             {insight.predictedDate && (
                                                                 <span>Predicted: <span className="font-medium text-muted-fg">{formatDate(insight.predictedDate)}</span></span>
                                                             )}

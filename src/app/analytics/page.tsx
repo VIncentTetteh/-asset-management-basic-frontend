@@ -13,10 +13,10 @@ import {
     TrendingUp,
     Wrench,
 } from "lucide-react";
+import Link from "next/link";
 import { analyticsService } from "@/services/analyticsService";
 import {
     AssetAnalytics,
-    DepreciationTrend,
     FinancialAnalytics,
     MaintenanceAnalytics,
     PurchaseOrderAnalytics,
@@ -39,8 +39,7 @@ type AnalyticsKey =
     | "asset analytics"
     | "financial analytics"
     | "purchase order analytics"
-    | "maintenance analytics"
-    | "depreciation trends";
+    | "maintenance analytics";
 
 const PERIODS: { value: Period; label: string; description: string }[] = [
     { value: "week", label: "Last 7 days", description: "Activity in the last 7 days" },
@@ -57,14 +56,6 @@ const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
     { value: "department", label: "Department" },
     { value: "condition", label: "Condition" },
 ];
-
-const TREND_MONTHS_BY_PERIOD: Record<Period, number> = {
-    week: 1,
-    month: 1,
-    quarter: 3,
-    year: 12,
-    all: 24,
-};
 
 const BAR_COLORS = [
     "bg-teal-500",
@@ -90,12 +81,6 @@ const titleCase = (value: string) =>
         .map(part => part.charAt(0).toUpperCase() + part.slice(1))
         .join(" ");
 
-const formatMonth = (value: string) => {
-    const parsed = new Date(`${value}-01`);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-};
-
 const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
 const EmptySection = ({ message }: { message: string }) => (
@@ -117,7 +102,6 @@ export default function AnalyticsPage() {
     const [financialAnalytics, setFinancialAnalytics] = useState<FinancialAnalytics | null>(null);
     const [poAnalytics, setPOAnalytics] = useState<PurchaseOrderAnalytics | null>(null);
     const [maintenanceAnalytics, setMaintenanceAnalytics] = useState<MaintenanceAnalytics | null>(null);
-    const [depreciationTrend, setDepreciationTrend] = useState<DepreciationTrend | null>(null);
 
     const fetchData = useCallback(async (isRefresh = false) => {
         try {
@@ -129,7 +113,6 @@ export default function AnalyticsPage() {
                 analyticsService.getFinancialAnalytics({ period }),
                 analyticsService.getPurchaseOrderAnalytics({ period }),
                 analyticsService.getMaintenanceAnalytics({ period }),
-                analyticsService.getDepreciationTrends({ months: TREND_MONTHS_BY_PERIOD[period] }),
             ]);
 
             const [
@@ -137,7 +120,6 @@ export default function AnalyticsPage() {
                 financialResult,
                 purchaseOrderResult,
                 maintenanceResult,
-                depreciationResult,
             ] = results;
 
             const requiredResults = [assetResult, financialResult, purchaseOrderResult];
@@ -181,12 +163,6 @@ export default function AnalyticsPage() {
             else {
                 setMaintenanceAnalytics(null);
                 unavailable.push("maintenance analytics");
-            }
-
-            if (depreciationResult.status === "fulfilled") setDepreciationTrend(depreciationResult.value);
-            else {
-                setDepreciationTrend(null);
-                unavailable.push("depreciation trends");
             }
 
             setUnavailableSections(unavailable);
@@ -248,8 +224,6 @@ export default function AnalyticsPage() {
         ];
     }, [poAnalytics]);
 
-    const trendRows = depreciationTrend?.data?.slice(-12) ?? [];
-
     // Every section reports its money already converted server-side into the
     // org's base currency (`response.currency`). Each formatter converts from
     // that currency into the viewer's display currency, so figures from
@@ -258,7 +232,6 @@ export default function AnalyticsPage() {
     const fmtFin = (amount?: number | null) => formatCurrency(amount, financialAnalytics?.currency);
     const fmtPo = (amount?: number | null) => formatCurrency(amount, poAnalytics?.currency);
     const fmtMaint = (amount?: number | null) => formatCurrency(amount, maintenanceAnalytics?.currency);
-    const fmtTrend = (amount?: number | null) => formatCurrency(amount, depreciationTrend?.currency);
 
     const heroAssetValue = financialAnalytics
         ? formatCompact(financialAnalytics.totalAssetValue, financialAnalytics.currency)
@@ -267,7 +240,7 @@ export default function AnalyticsPage() {
     const heroPoValue = formatCompact(poAnalytics?.totalPOValue ?? 0, poAnalytics?.currency);
     const heroMaintenanceCost = formatCompact(maintenanceAnalytics?.totalMaintenanceCost ?? 0, maintenanceAnalytics?.currency);
     const completeness = mergeCompleteness(
-        assetAnalytics, financialAnalytics, poAnalytics, maintenanceAnalytics, depreciationTrend,
+        assetAnalytics, financialAnalytics, poAnalytics, maintenanceAnalytics,
     );
 
     const currentPeriod = PERIODS.find(item => item.value === period);
@@ -276,8 +249,7 @@ export default function AnalyticsPage() {
         assetAnalytics ||
         financialAnalytics ||
         poAnalytics ||
-        maintenanceAnalytics ||
-        depreciationTrend
+        maintenanceAnalytics
     );
 
     if (paywall) {
@@ -777,79 +749,47 @@ export default function AnalyticsPage() {
                             </CardContent>
                         </Card>
 
+                        {/*
+                          The depreciation trend card that lived here was
+                          reconstructed: it took today's asset set and revalued
+                          it backwards month by month. That is right for
+                          depreciation and wrong as a trend - an asset added
+                          last week appeared in last year's figures, and a
+                          disposal retroactively erased its own history.
+                          /operations?view=trends reads recorded daily
+                          snapshots instead, and says out loud when a tenant
+                          has too little history to draw.
+                        */}
                         <Card>
                             <CardHeader className="border-b border-edge-subtle bg-surface-muted/50 pb-3">
                                 <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                                    <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-300" /> Depreciation Trend
+                                    <TrendingUp className="h-4 w-4 text-brand" /> Trends
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="p-0">
-                                {trendRows.length === 0 ? (
-                                    <EmptySection message="No depreciation trend data was returned for the selected window." />
-                                ) : (
-                                    <div className="divide-y divide-[var(--border-subtle)]">
-                                        {trendRows.map((row, index) => (
-                                            <div key={`${row.month}-${index}`} className="flex items-center justify-between gap-4 px-5 py-4">
-                                                <div>
-                                                    <p className="text-sm font-semibold text-foreground">{formatMonth(row.month)}</p>
-                                                    <p className="text-xs text-faint-fg">
-                                                        Charge: {fmtTrend(row.newDepreciation ?? row.totalDepreciation)}
-                                                    </p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-sm font-bold text-foreground">{fmtTrend(row.netBookValue)}</p>
-                                                    <p className="text-xs text-faint-fg">Book value</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                            <CardContent className="p-5">
+                                <p className="text-sm text-muted-fg">
+                                    Trends now come from recorded daily snapshots rather than from revaluing today&apos;s
+                                    assets backwards, so what you see actually happened.
+                                </p>
+                                <Link
+                                    href="/operations?view=trends"
+                                    className="ea-focus mt-3 inline-flex items-center gap-1 rounded-sm text-sm font-semibold text-brand underline-offset-2 hover:underline"
+                                >
+                                    Open Operations · Trends <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                                </Link>
                             </CardContent>
                         </Card>
                     </div>
 
-                    {categoryBreakdown.length > 0 && (
-                        <Card>
-                            <CardHeader className="border-b border-edge-subtle bg-surface-muted/50 pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-sm font-semibold text-foreground">Financial Breakdown by Category</CardTitle>
-                                    <span className="text-xs text-faint-fg">Backend category payload</span>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b border-edge-subtle bg-surface-muted/50">
-                                                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-faint-fg">Category</th>
-                                                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-faint-fg">Assets</th>
-                                                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-faint-fg">Value</th>
-                                                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-faint-fg">Monthly Depr.</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-[var(--border-subtle)]">
-                                            {categoryBreakdown.map((category, index) => (
-                                                <tr key={`${category.name}-${index}`} className="hover:bg-surface-muted/50">
-                                                    <td className="px-5 py-3">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className={cn("h-2.5 w-2.5 rounded-full", BAR_COLORS[index % BAR_COLORS.length])} />
-                                                            <span className="font-medium text-foreground">{category.name}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-5 py-3 text-right text-muted-fg">{category.count.toLocaleString()}</td>
-                                                    <td className="px-5 py-3 text-right font-semibold text-foreground">{fmtFin(category.value)}</td>
-                                                    <td className="px-5 py-3 text-right text-warn">
-                                                        {category.monthlyDepreciation > 0 ? fmtFin(category.monthlyDepreciation) : "Not provided"}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
+                    {/*
+                      "Financial Breakdown by Category" stood here and rendered
+                      the same `categoryBreakdown` array as the Top Categories
+                      list a few hundred pixels above it - the same six rows,
+                      the same numbers, neither of them clickable. The version
+                      that survives is the one you can interrogate:
+                      /operations?view=estate grouped by category, where every
+                      row opens the assets behind it.
+                    */}
                     {unavailableSections.length > 0 && (
                         <Card className="border-warn/40 bg-warn-soft/80">
                             <CardContent className="flex items-start gap-3 p-4">

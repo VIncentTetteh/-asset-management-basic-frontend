@@ -869,7 +869,6 @@ export interface DashboardSummary extends MoneyAggregateMeta {
     netBookValue?: number;
     inMaintenanceAssets?: number;
     disposedAssets?: number;
-    totalOrganisations?: number;
     totalUsers?: number;
     pendingPOs?: number;
     pendingPurchaseOrders?: number;
@@ -883,10 +882,22 @@ export interface DashboardSummary extends MoneyAggregateMeta {
     inProgressMaintenance?: number;
     assetsNeedingMaintenance?: number;
     expiredLicenses?: number;
-    totalWebhooks?: number;
-    activeWebhooks?: number;
     generatedAt?: string;
 }
+
+/*
+ * Three fields the backend still sends on /dashboard/summary and this type
+ * deliberately no longer names, so nothing can wire them into a tile again:
+ *
+ *   totalOrganisations — a tenant has exactly one organisation, so this is the
+ *     constant 1 dressed as a metric.
+ *   totalWebhooks, activeWebhooks — integration plumbing. Nobody reading an
+ *     executive dashboard changes a decision because six webhooks are
+ *     registered; the place to see them is /webhooks, where you can act on one.
+ *
+ * The backend keeps sending them (other clients may read them); the extra keys
+ * are simply ignored here.
+ */
 
 export interface AssetsByStatus extends MoneyAggregateMeta {
     data: {
@@ -2268,7 +2279,19 @@ export interface PredictiveInsight {
     severity: InsightSeverity;
     title: string;
     description: string;
-    confidence: number;
+    /**
+     * What the rule actually counted, in words — e.g. "Warranty expiry date
+     * 2026-11-04" or "3 maintenance events in the last 90 days; condition
+     * POOR". This is the evidence, and it is what the UI shows.
+     */
+    basis?: string | null;
+    /**
+     * @deprecated Always null since V64. No model ever produced it — it was a
+     * hardcoded constant dressed up as a score. Read {@link basis} instead, and
+     * never render a percentage, bar or gauge from this, or compute one from
+     * anything else on the payload.
+     */
+    confidence?: number | null;
     predictedDate?: string | null;
     resolved: boolean;
     resolvedAt?: string | null;

@@ -41,6 +41,7 @@ import { commercialFeatures, isCommercialRouteDisabled } from "@/config/commerci
 // a redirect to /dashboard.
 const ROUTE_PERMISSIONS: { pattern: string; permission: string }[] = [
     { pattern: "/analytics",          permission: "VIEW_REPORTS" },
+    { pattern: "/operations",         permission: "VIEW_ASSETS" },
     { pattern: "/reports",            permission: "VIEW_REPORTS" },
     { pattern: "/organisations",      permission: "MANAGE_ORGANIZATION_SETTINGS" },
     { pattern: "/departments",        permission: "VIEW_DEPARTMENTS" },

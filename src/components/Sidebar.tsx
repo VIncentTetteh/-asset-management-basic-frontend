@@ -22,6 +22,7 @@ import {
     UserCircle,
     Tags,
     BarChart3,
+    Gauge,
     FileText,
     Webhook,
     Bell,
@@ -99,6 +100,7 @@ export function Sidebar() {
             group: "Overview",
             items: [
                 { href: "/dashboard", label: "Dashboard", icon: LayoutGrid, active: pathname.startsWith("/dashboard") },
+                { href: "/operations", label: "Operations", icon: Gauge, active: pathname.startsWith("/operations"), permission: "VIEW_ASSETS" },
                 { href: "/analytics", label: "Analytics", icon: BarChart3, active: pathname.startsWith("/analytics"), permission: "VIEW_REPORTS" },
                 { href: "/reports", label: "Reports", icon: FileText, active: pathname.startsWith("/reports"), permission: "VIEW_REPORTS" },
             ]

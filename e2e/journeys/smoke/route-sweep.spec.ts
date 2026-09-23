@@ -12,7 +12,7 @@ import { OVERLAY } from "../../fixtures/forms";
  * platform health, license key) are covered when the tenant shows them.
  */
 const SIDEBAR_ROUTES = [
-    "/dashboard", "/analytics", "/reports",
+    "/dashboard", "/operations", "/analytics", "/reports",
     "/assets", "/categories", "/checkouts", "/maintenance", "/transfers", "/disposals", "/audits",
     "/discovery", "/cloud-assets",
     "/employees", "/users", "/roles", "/departments", "/profile",
