@@ -10,13 +10,28 @@ export const documentService = {
         return response.data;
     },
 
-    /** Upload a file and attach it to an entity. Returns saved attachment with download URL. */
-    upload: async (entityType: AttachmentEntityType, entityId: string, file: File): Promise<DocumentAttachment> => {
+    /**
+     * Upload a file and attach it to an entity. Returns the saved attachment.
+     * `onProgress` receives 0–100 while the body is in flight (browsers report
+     * this only when the total length is known; it is left alone otherwise).
+     */
+    upload: async (
+        entityType: AttachmentEntityType,
+        entityId: string,
+        file: File,
+        onProgress?: (percent: number) => void,
+    ): Promise<DocumentAttachment> => {
         const formData = new FormData();
         formData.append("file", file);
         const response = await api.post<DocumentAttachment>("/documents", formData, {
             params: { entityType, entityId },
             headers: { "Content-Type": "multipart/form-data" },
+            onUploadProgress: onProgress
+                ? (event) => {
+                    if (!event.total) return;
+                    onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+                }
+                : undefined,
         });
         return response.data;
     },
