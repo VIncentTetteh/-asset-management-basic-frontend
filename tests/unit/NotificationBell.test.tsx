@@ -17,7 +17,10 @@ vi.mock("@/services/notificationService", () => ({
 
 const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
-vi.mock("react-hot-toast", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+const toastError = vi.hoisted(() => vi.fn());
+vi.mock("react-hot-toast", () => ({
+    toast: { error: toastError, success: vi.fn() },
+}));
 
 const unreadItem = {
     id: "n-1",
@@ -92,6 +95,57 @@ describe("NotificationBell", () => {
         await screen.findByText("Maintenance due");
         fireEvent.click(screen.getByRole("button", { name: /Mark all as read/ }));
         await waitFor(() => expect(svc.markAllAsRead).toHaveBeenCalledTimes(1));
+    });
+
+    it("drops the badge to zero the moment Mark all is pressed, without waiting for the server", async () => {
+        // The badge used to sit at its old count for the whole round trip,
+        // which reads as a button that did nothing. useOptimistic shows the
+        // result immediately; the request is still in flight here.
+        let resolve: (value: unknown) => void = () => {};
+        svc.markAllAsRead.mockImplementation(() => new Promise((r) => { resolve = r; }));
+
+        renderBell();
+        expect((await screen.findByTestId("notification-badge")).textContent).toBe("3");
+        fireEvent.click(trigger());
+        await screen.findByText("Maintenance due");
+
+        fireEvent.click(screen.getByRole("button", { name: /Mark all as read/ }));
+
+        await waitFor(() => expect(screen.queryByTestId("notification-badge")).toBeNull());
+        expect(svc.markAllAsRead).toHaveBeenCalledTimes(1);
+        resolve({ markedAsRead: 3 });
+    });
+
+    it("puts the badge back — and says so — when marking all fails", async () => {
+        svc.markAllAsRead.mockRejectedValue(new Error("network"));
+
+        renderBell();
+        await screen.findByTestId("notification-badge");
+        fireEvent.click(trigger());
+        await screen.findByText("Maintenance due");
+
+        fireEvent.click(screen.getByRole("button", { name: /Mark all as read/ }));
+
+        // The optimistic zero is reverted by React when the transition ends;
+        // no hand-written rollback is involved, which is why it cannot drift.
+        await waitFor(() => expect(screen.getByTestId("notification-badge").textContent).toBe("3"));
+        expect(toastError).toHaveBeenCalledWith("Couldn't mark notifications as read", expect.anything());
+    });
+
+    it("shows an inline retry when its own list fails, rather than an empty panel", async () => {
+        svc.getNotifications.mockRejectedValueOnce(new Error("boom"));
+
+        renderBell();
+        fireEvent.click(trigger());
+
+        expect(await screen.findByText(/couldn't load your notifications/i)).toBeTruthy();
+        // Not "You're all caught up" — the difference between "nothing to see"
+        // and "we could not look" is the whole message.
+        expect(screen.queryByText("You're all caught up")).toBeNull();
+
+        svc.getNotifications.mockResolvedValue({ totalNotifications: 1, unreadCount: 1, limit: 5, notifications: [unreadItem] });
+        fireEvent.click(screen.getByRole("button", { name: /Try again/ }));
+        expect(await screen.findByText("Maintenance due")).toBeTruthy();
     });
 
     it("shows the empty state and a View all link to /notifications", async () => {
