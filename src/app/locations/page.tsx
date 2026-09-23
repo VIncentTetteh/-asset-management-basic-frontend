@@ -23,6 +23,7 @@ import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { allowedParents, buildLocationPayload } from "@/features/locations/payload";
 import { useConfirm } from "@/hooks/useConfirm";
+import { ImportButton } from "@/features/imports/ImportButton";
 
 // Edits go through PUT (full replace) so cleared fields and parents are cleared.
 const L = FIELD_LIMITS.location;
@@ -181,9 +182,12 @@ export default function LocationsPage() {
       subtitle={isLoading ? "Loading locations…" : `${rows.length} sites and rooms`}
       actions={
         canManage ? (
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" /> New location
-          </Button>
+          <>
+            <ImportButton type="locations" />
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" /> New location
+            </Button>
+          </>
         ) : undefined
       }
       toolbar={

@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { PageSpinner } from "@/components/ui/spinner";
 import { usePagedEmployees, useEmployeeMasterData } from "@/features/employees/hooks";
 import { EmployeeFormModal } from "@/features/employees/EmployeeFormModal";
+import { ImportButton } from "@/features/imports/ImportButton";
 
 const STATUSES: EmployeeStatus[] = ["ONBOARDING", "ACTIVE", "ON_LEAVE", "OFFBOARDING", "TERMINATED"];
 
@@ -105,9 +106,12 @@ function EmployeesPageInner() {
       subtitle={isLoading ? "Loading employees…" : `${total.toLocaleString()} employees on record`}
       actions={
         canManage ? (
-          <Button onClick={() => setIsFormOpen(true)}>
-            <UserPlus className="mr-2 h-4 w-4" /> New employee
-          </Button>
+          <>
+            <ImportButton type="employees" />
+            <Button onClick={() => setIsFormOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" /> New employee
+            </Button>
+          </>
         ) : undefined
       }
       toolbar={

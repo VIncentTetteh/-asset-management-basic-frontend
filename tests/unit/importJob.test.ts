@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { importJobPhase, importResultLabels, shouldPollImportJob } from "@/features/assets/importJob";
+import { importJobPhase, importResultLabels, shouldPollImportJob } from "@/features/imports/importJob";
 
 describe("importJobPhase", () => {
     it.each([

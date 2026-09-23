@@ -26,7 +26,7 @@ import { AssetFilterBar } from "@/features/assets/AssetFilterBar";
 import { AssetRegisterTable } from "@/features/assets/AssetRegisterTable";
 import { AssetFormModal } from "@/features/assets/AssetFormModal";
 import { AssignUserModal } from "@/features/assets/AssignUserModal";
-import { ImportAssetsModal } from "@/features/assets/ImportAssetsModal";
+import { ImportWizardModal } from "@/features/imports/ImportWizardModal";
 
 function AssetsPageInner() {
   const { filters, searchInput, setSearchInput, setParam, clearAdvanced, queryParams, hasAdvancedFilters } =
@@ -97,7 +97,7 @@ function AssetsPageInner() {
       actions={
         <>
           <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-            <FileSpreadsheet className="mr-2 h-4 w-4" /> Import Excel
+            <FileSpreadsheet className="mr-2 h-4 w-4" /> Import
           </Button>
           <Button onClick={openCreate}>
             <PackagePlus className="mr-2 h-4 w-4" /> Add asset
@@ -176,7 +176,7 @@ function AssetsPageInner() {
         users={master.users}
       />
 
-      <ImportAssetsModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} />
+      <ImportWizardModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} type="assets" />
 
       <AssetDetailModal
         isOpen={shownAsset !== null}

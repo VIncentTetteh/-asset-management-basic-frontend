@@ -25,6 +25,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { usePermissions } from "@/contexts/PermissionContext";
 import Link from "next/link";
 import { reportApiError, reportFormErrors } from "@/lib/api-validation";
+import { ImportButton } from "@/features/imports/ImportButton";
 
 const L = FIELD_LIMITS.department;
 
@@ -228,9 +229,12 @@ export default function DepartmentsPage() {
       title="Departments"
       subtitle={isLoading ? "Loading departments…" : `${departments.length} departments and cost centers`}
       actions={canManageDepartments ? (
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> New department
-        </Button>
+        <>
+          <ImportButton type="departments" />
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" /> New department
+          </Button>
+        </>
       ) : undefined}
       toolbar={
         <div className="relative w-full max-w-xs">

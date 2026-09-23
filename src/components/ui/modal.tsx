@@ -8,10 +8,17 @@ interface ModalProps {
     onClose: () => void;
     title: string;
     description?: string;
+    /** "wide" is for multi-column content such as the import wizard's mapping step. */
+    size?: "default" | "wide";
     children: React.ReactNode;
 }
 
-export function Modal({ isOpen, onClose, title, description, children }: ModalProps) {
+const SIZES: Record<NonNullable<ModalProps["size"]>, string> = {
+    default: "max-w-lg",
+    wide: "max-w-3xl",
+};
+
+export function Modal({ isOpen, onClose, title, description, size = "default", children }: ModalProps) {
     if (!isOpen || typeof document === "undefined") return null;
 
     // Portaled to <body> — page wrappers use a `page-enter` mount animation
@@ -24,7 +31,7 @@ export function Modal({ isOpen, onClose, title, description, children }: ModalPr
     // ancestor transform/overflow/z-index issue — for good.
     return createPortal(
         <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center overflow-y-auto p-4 animate-in fade-in duration-200">
-            <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-panel border border-edge bg-surface text-foreground shadow-lg animate-in zoom-in-95 duration-200">
+            <div className={`flex max-h-[85vh] w-full ${SIZES[size]} flex-col overflow-hidden rounded-panel border border-edge bg-surface text-foreground shadow-lg animate-in zoom-in-95 duration-200`}>
                 <div className="flex shrink-0 items-center justify-between border-b border-edge-subtle px-6 py-4">
                     <div>
                         <h3 className="text-lg font-bold text-foreground">{title}</h3>

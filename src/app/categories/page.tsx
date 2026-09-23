@@ -24,6 +24,7 @@ import { allowedTreeParents } from "@/lib/tree";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useDepreciationPolicies } from "@/features/depreciation/hooks";
 import { depreciationMethodLabel, usefulLifeLabel } from "@/features/assets/depreciation";
+import { ImportButton } from "@/features/imports/ImportButton";
 
 const categories = makeCrudHooks<Category, CategoryDto>("categories", categoryService, { entity: "Category" });
 
@@ -208,9 +209,12 @@ export default function CategoriesPage() {
       title="Categories"
       subtitle={isLoading ? "Loading categories…" : `${rows.length} asset categories`}
       actions={
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> New category
-        </Button>
+        <>
+          <ImportButton type="categories" />
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" /> New category
+          </Button>
+        </>
       }
       toolbar={
         <div className="relative w-full max-w-xs">

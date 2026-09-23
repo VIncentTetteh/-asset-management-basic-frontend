@@ -22,6 +22,7 @@ import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
 import { buildSupplierPayload, SUPPLIER_STATUSES } from "@/features/finance/payloads";
+import { ImportButton } from "@/features/imports/ImportButton";
 
 // Edits are a full-replace PUT so a field the user empties is cleared (PATCH skips nulls).
 const suppliers = makeCrudHooks<Supplier, SupplierDto>(
@@ -204,6 +205,7 @@ export default function SuppliersPage() {
           <Button variant="outline" onClick={() => handleExport("EXCEL")} disabled={isExporting}>
             <Download className="mr-2 h-4 w-4" /> Export
           </Button>
+          <ImportButton type="suppliers" />
           <Button onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" /> New supplier
           </Button>
