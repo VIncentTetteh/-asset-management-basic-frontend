@@ -33,6 +33,7 @@ import { formatLocalDate } from "@/lib/local-date";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { AttachmentField, attachAfterCreate, useAttachmentField } from "@/components/ui/attachment-field";
+import { ImportButton } from "@/features/imports/ImportButton";
 
 const CONTRACT_TYPES = ["PURCHASE", "LEASE", "MAINTENANCE", "SERVICE_LEVEL_AGREEMENT", "WARRANTY", "INSURANCE", "OTHER"];
 const CONTRACT_STATUSES = ["DRAFT", "ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATED", "RENEWED"];
@@ -88,7 +89,7 @@ export default function ContractsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
 
-  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<ContractForm>();
+  const { register, handleSubmit, reset, setError, setValue, watch, formState: { errors } } = useForm<ContractForm>();
   // Documents are uploaded, not linked. An existing contract attaches straight
   // away; a new one holds the file until the create returns its id.
   const attachments = useAttachmentField({ entityType: "CONTRACT", entityId: editing?.id ?? null });
@@ -294,9 +295,12 @@ export default function ContractsPage() {
       title="Contracts"
       subtitle={isLoading ? "Loading contracts…" : `${rows.length} agreements ${view === "expiring" ? "expiring soon" : "on file"}`}
       actions={
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> New contract
-        </Button>
+        <>
+          <ImportButton type="contracts" />
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" /> New contract
+          </Button>
+        </>
       }
       toolbar={
         <div className="flex gap-1.5">
@@ -465,7 +469,10 @@ export default function ContractsPage() {
           <AttachmentField
             state={attachments}
             label="Contract document"
-            legacyUrl={editing?.documentUrl}
+            // From form state, not the loaded record: a cleared link must stay
+            // cleared on the next render rather than re-appearing from `editing`.
+            legacyUrl={watch("documentUrl")}
+            onClearLegacy={() => setValue("documentUrl", "", { shouldDirty: true })}
             fallback={
               <div className="space-y-2">
                 <Label htmlFor="ct-doc">Document URL</Label>

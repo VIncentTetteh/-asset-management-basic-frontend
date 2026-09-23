@@ -94,7 +94,7 @@ export default function BogReportPage() {
   const [isUpsertOpen, setIsUpsertOpen] = useState(false);
   const [editControl, setEditControl] = useState<BOGControl | null>(null);
 
-  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<BOGControlDto>();
+  const { register, handleSubmit, reset, setError, setValue, watch, formState: { errors } } = useForm<BOGControlDto>();
   const attachments = useAttachmentField({ entityType: "BOG_CONTROL", entityId: editControl?.id ?? null });
 
   useEffect(() => {
@@ -372,10 +372,14 @@ export default function BogReportPage() {
             <Label htmlFor="b-date">Target date</Label>
             <Input id="b-date" type="date" {...register("targetDate")} />
           </div>
+          {/* The form carries evidenceUrl through without an input of its own, so
+              this is the only place a stale link can be dropped. */}
+          <input type="hidden" {...register("evidenceUrl")} />
           <AttachmentField
             state={attachments}
             label="Evidence documents"
-            legacyUrl={editControl?.evidenceUrl}
+            legacyUrl={watch("evidenceUrl")}
+            onClearLegacy={() => setValue("evidenceUrl", "", { shouldDirty: true })}
           />
           <div className="flex gap-3 border-t border-edge-subtle pt-4">
             <Button type="submit" isLoading={upsertControl.isPending} className="flex-1">

@@ -30,6 +30,7 @@ import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { AttachmentField, attachAfterCreate, useAttachmentField } from "@/components/ui/attachment-field";
 import { assetService } from "@/services/assetService";
 import { qk } from "@/lib/queryClient";
+import { ImportButton } from "@/features/imports/ImportButton";
 
 const LICENSE_STATUSES: LicenseStatus[] = ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "SUSPENDED", "CANCELLED"];
 
@@ -104,7 +105,7 @@ export default function LicensesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<SoftwareLicense | null>(null);
 
-  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<LicenseForm>();
+  const { register, handleSubmit, reset, setError, setValue, watch, formState: { errors } } = useForm<LicenseForm>();
   // Documents are uploaded, not linked. A new licence holds the file until the
   // create returns its id (see attachAfterCreate in onSubmit).
   const attachments = useAttachmentField({ entityType: "SOFTWARE_LICENSE", entityId: editing?.id ?? null });
@@ -300,9 +301,12 @@ export default function LicensesPage() {
       title="Software licenses"
       subtitle={isLoading ? "Loading licenses…" : `${rows.length} licenses in view`}
       actions={
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> New license
-        </Button>
+        <>
+          <ImportButton type="licenses" />
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" /> New license
+          </Button>
+        </>
       }
       toolbar={
         <div className="flex gap-1.5">
@@ -505,7 +509,9 @@ export default function LicensesPage() {
               <AttachmentField
                 state={attachments}
                 label="Licence document"
-                legacyUrl={editing?.licenseDocumentUrl}
+                // From form state, not the loaded record, so a clear sticks.
+                legacyUrl={watch("licenseDocumentUrl")}
+                onClearLegacy={() => setValue("licenseDocumentUrl", "", { shouldDirty: true })}
                 fallback={
                   <>
                     <Label htmlFor="lic-doc">Document URL</Label>

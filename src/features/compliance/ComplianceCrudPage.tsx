@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useForm, type FieldValues, type Path, type DefaultValues } from "react-hook-form";
+import { useForm, type FieldValues, type Path, type PathValue, type DefaultValues } from "react-hook-form";
 import toast from "react-hot-toast";
 import { Plus, Pencil, Trash2, Search, type LucideIcon } from "lucide-react";
 import { makeCrudHooks } from "@/features/shared/crudHooks";
@@ -178,7 +178,7 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
 
-  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<TDto>();
+  const { register, handleSubmit, reset, setError, setValue, watch, formState: { errors } } = useForm<TDto>();
 
   // Evidence/report/policy documents are uploaded, not linked. A new record holds
   // the file until the create returns its id (see attachAfterCreate in onSubmit).
@@ -363,8 +363,11 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
                       <AttachmentField
                         state={attachments}
                         label={field.label}
-                        legacyUrl={
-                          editing ? String((editing as Record<string, unknown>)[field.name] ?? "") || null : null
+                        // From form state, not `editing`: a cleared link must stay
+                        // cleared on the next render rather than re-appearing.
+                        legacyUrl={String(watch(field.name as Path<TDto>) ?? "") || null}
+                        onClearLegacy={() =>
+                          setValue(field.name as Path<TDto>, "" as PathValue<TDto, Path<TDto>>, { shouldDirty: true })
                         }
                         fallback={
                           <>

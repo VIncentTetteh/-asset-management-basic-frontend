@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { File as FileIconGeneric, FileSpreadsheet, FileText, Image as ImageIcon, Paperclip, Trash2, Upload } from "lucide-react";
+import { File as FileIconGeneric, FileSpreadsheet, FileText, Image as ImageIcon, Paperclip, Trash2, Upload, X } from "lucide-react";
 import api from "@/lib/axios";
 import { qk } from "@/lib/queryClient";
 import { safeExternalUrl } from "@/lib/safe-url";
@@ -352,8 +352,19 @@ export interface AttachmentFieldProps {
     state: AttachmentFieldState;
     /** Visible label, e.g. "Contract document". */
     label: string;
-    /** A URL stored before uploads existed; rendered as "Currently linked". */
+    /**
+     * A URL stored before uploads existed; rendered as "Currently linked".
+     * Pass the **form's** current value, not the loaded record's, so the line
+     * always shows what a save would write — see `onClearLegacy`.
+     */
     legacyUrl?: string | null;
+    /**
+     * Lets the user drop a stored link that has gone stale. The field owns the
+     * value (these forms save by full replace), so this clears it in form state
+     * and the next save writes the cleared value; nothing is deleted here and
+     * now. Omit it where the value is not the caller's to clear.
+     */
+    onClearLegacy?: () => void;
     /** Extra guidance under the picker. */
     hint?: string;
     /** Hides the picker and the remove buttons (a locked or read-only record). */
@@ -370,6 +381,7 @@ export function AttachmentField({
     state,
     label,
     legacyUrl,
+    onClearLegacy,
     hint,
     readOnly = false,
     fallback,
@@ -404,10 +416,32 @@ export function AttachmentField({
             </Label>
 
             {legacyUrl ? (
-                <p className="text-xs text-muted-fg">
-                    Currently linked:{" "}
-                    <ExternalLink href={legacyUrl} className="text-brand underline-offset-2 hover:underline" />
-                </p>
+                <div className="space-y-1">
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-fg">
+                        <span>
+                            Currently linked:{" "}
+                            <ExternalLink href={legacyUrl} className="text-brand underline-offset-2 hover:underline" />
+                        </span>
+                        {onClearLegacy && !readOnly ? (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-1.5 text-xs text-danger"
+                                title="Removes the stored link from this record. Attached files are not deleted."
+                                onClick={onClearLegacy}
+                            >
+                                <X className="mr-1 h-3 w-3" aria-hidden /> Clear stored link
+                            </Button>
+                        ) : null}
+                    </p>
+                    {onClearLegacy && !readOnly ? (
+                        <p className="text-[11px] text-faint-fg">
+                            Clearing removes the link only — it does not delete any attached file, and it takes
+                            effect when you save.
+                        </p>
+                    ) : null}
+                </div>
             ) : null}
 
             {!readOnly && (

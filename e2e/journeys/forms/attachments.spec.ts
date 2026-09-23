@@ -137,6 +137,40 @@ test.describe("Contract document attachments", () => {
         await expect(reopened.getByTestId("attachment-list")).toContainText(FILE_NAME, { timeout: 30_000 });
     });
 
+    /**
+     * Legacy links outlive the inputs that created them: the eight document-only
+     * fields still hold URLs on existing rows and no longer have a text box, so
+     * the clear control is the only way to drop one that has gone stale. Worth an
+     * end-to-end check because what matters is the column, not the screen.
+     */
+    test("clears a stored link that has gone stale, and it stays cleared", async ({ page, api }) => {
+        const stale = "https://files.example.com/e2e/dead-link.pdf";
+        contractId = (await createContract(api, CONTRACT, { documentUrl: stale })).id;
+
+        await page.goto("/contracts");
+        await searchList(page, CONTRACT);
+        await page.locator("tr").filter({ hasText: CONTRACT }).first()
+            .getByRole("button", { name: /^Edit contract$/i }).first().click();
+
+        const form = formModal(page);
+        await expect(form).toBeVisible();
+        test.skip(
+            (await form.locator('input[type="file"]').count()) === 0,
+            "document attachments are off for this tenant; the URL field is still editable",
+        );
+
+        await expect(form.getByText(/Currently linked/i)).toBeVisible();
+        await form.getByRole("button", { name: /Clear stored link/i }).click();
+        await expect(form.getByText(/Currently linked/i)).toBeHidden();
+
+        await submitAndClose(page, form);
+
+        // The column, not the screen: a clear that only looked right in the form
+        // would still read back here.
+        const stored = await api.get<{ documentUrl?: string | null }>(`/contracts/${contractId}`);
+        expect(stored.documentUrl ?? null).toBeNull();
+    });
+
     test("refuses a file type the API would reject, before sending it", async ({ page, api }) => {
         contractId = (await createContract(api, CONTRACT)).id;
 

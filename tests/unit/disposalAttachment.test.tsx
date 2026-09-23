@@ -149,6 +149,21 @@ describe("disposal compliance document attachment", () => {
         });
     });
 
+    it("needs no separate clear control: emptying the reference input clears the column", async () => {
+        // Unlike the eight document-only fields, this value lives in an input the
+        // user can edit directly, so there is nothing here they can see but not
+        // remove. optionalString("") is null, and the PUT reads null as "clear it".
+        renderModal(existing({ complianceDocumentUrl: "certificate of destruction #12345" }));
+        const input = await screen.findByLabelText(/^Compliance document \(link or reference\)$/);
+
+        fireEvent.change(input, { target: { value: "" } });
+        fireEvent.click(screen.getByRole("button", { name: /^Save changes$/ }));
+
+        await waitFor(() => expect(disposals.replace).toHaveBeenCalled());
+        expect(disposals.replace.mock.calls[0][1]).toMatchObject({ complianceDocumentUrl: null });
+        expect(screen.queryByRole("button", { name: /Clear stored link/i })).toBeNull();
+    });
+
     it("records a reference for a paper certificate with no file attached at all", async () => {
         renderModal();
         fireEvent.change(screen.getByLabelText(/^Primary reason/), { target: { value: "Irreparable" } });

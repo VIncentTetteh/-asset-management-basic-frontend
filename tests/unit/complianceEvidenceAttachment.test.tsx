@@ -180,6 +180,24 @@ describe("compliance register evidence attachment", () => {
         expect(screen.getByText(/Currently linked/i)).toBeTruthy();
     });
 
+    it("clears a stored report link through the generic field, and the save carries it", async () => {
+        scans.getAll.mockResolvedValue([scan({ reportUrl: "https://files.example.com/dead-scan.pdf" })]);
+        renderPage();
+        await openEdit();
+        expect(await screen.findByText(/Currently linked/i)).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: /Clear stored link/i }));
+        // Driven by form state, so it goes at once rather than lingering until a
+        // refetch — the register page reads it through `watch`, not from the row.
+        await waitFor(() => expect(screen.queryByText(/Currently linked/i)).toBeNull());
+
+        fireEvent.click(screen.getByRole("button", { name: /^Save changes$/ }));
+        await waitFor(() => expect(scans.update).toHaveBeenCalled());
+        // buildComplianceReplacePayload sends a blank field as null, which the
+        // register's PUT reads as "clear it".
+        expect(scans.update.mock.calls[0][1]).toMatchObject({ reportUrl: null });
+    });
+
     it("keeps the stored URL on the full-replace payload when the scan is saved again", async () => {
         scans.getAll.mockResolvedValue([scan({ reportUrl: "https://files.example.com/legacy-scan.pdf" })]);
         renderPage();

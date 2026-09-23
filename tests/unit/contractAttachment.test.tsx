@@ -181,6 +181,85 @@ describe("contract document attachment", () => {
         expect(screen.getByText(/Currently linked/i)).toBeTruthy();
     });
 
+    it("clears a stored link, and the cleared value is what the save carries", async () => {
+        const withLink = {
+            id: CONTRACT_ID,
+            title: "Support",
+            contractType: "MAINTENANCE",
+            status: "ACTIVE",
+            startDate: "2026-01-01",
+            endDate: "2026-12-31",
+            documentUrl: "https://files.example.com/dead-link.pdf",
+        };
+        contracts.getAll.mockResolvedValue([withLink]);
+        renderPage();
+        fireEvent.click(await screen.findByRole("button", { name: /^Edit contract$/i }));
+        expect(await screen.findByText(/Currently linked/i)).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: /Clear stored link/i }));
+
+        // The line is driven by form state, so it goes at once. Reading it from
+        // the loaded record instead would leave a "cleared" link on screen.
+        await waitFor(() => expect(screen.queryByText(/Currently linked/i)).toBeNull());
+        expect(screen.queryByRole("link", { name: /dead-link\.pdf/ })).toBeNull();
+
+        fireEvent.click(screen.getByRole("button", { name: /^Save changes$/ }));
+        await waitFor(() => expect(contracts.replace).toHaveBeenCalled());
+        // Contracts save by full replace, and optionalString("") is null: the
+        // column is actually cleared rather than left as it was.
+        expect(contracts.replace.mock.calls[0][1]).toMatchObject({ documentUrl: null });
+    });
+
+    it("shows the link gone when the record is reopened after a clear", async () => {
+        const withLink = {
+            id: CONTRACT_ID,
+            title: "Support",
+            contractType: "MAINTENANCE",
+            status: "ACTIVE",
+            startDate: "2026-01-01",
+            endDate: "2026-12-31",
+            documentUrl: "https://files.example.com/dead-link.pdf",
+        };
+        contracts.getAll.mockResolvedValueOnce([withLink]).mockResolvedValue([{ ...withLink, documentUrl: null }]);
+        renderPage();
+
+        fireEvent.click(await screen.findByRole("button", { name: /^Edit contract$/i }));
+        fireEvent.click(await screen.findByRole("button", { name: /Clear stored link/i }));
+        fireEvent.click(screen.getByRole("button", { name: /^Save changes$/ }));
+        await waitFor(() => expect(contracts.replace).toHaveBeenCalled());
+
+        // Reopen from the refetched list: the clear survived the round trip.
+        fireEvent.click(await screen.findByRole("button", { name: /^Edit contract$/i }));
+        await screen.findByLabelText(/^Title/);
+        expect(screen.queryByText(/Currently linked/i)).toBeNull();
+    });
+
+    it("does not let a clear look saved when the save fails", async () => {
+        contracts.getAll.mockResolvedValue([
+            {
+                id: CONTRACT_ID,
+                title: "Support",
+                contractType: "MAINTENANCE",
+                status: "ACTIVE",
+                startDate: "2026-01-01",
+                endDate: "2026-12-31",
+                documentUrl: "https://files.example.com/dead-link.pdf",
+            },
+        ]);
+        contracts.replace.mockRejectedValue({ response: { status: 500, data: { message: "Save failed" } } });
+        renderPage();
+        fireEvent.click(await screen.findByRole("button", { name: /^Edit contract$/i }));
+        fireEvent.click(await screen.findByRole("button", { name: /Clear stored link/i }));
+        fireEvent.click(screen.getByRole("button", { name: /^Save changes$/ }));
+
+        await waitFor(() => expect(contracts.replace).toHaveBeenCalled());
+        await waitFor(() => expect(toastFns.error).toHaveBeenCalled());
+        // The form stays open with the clear still pending, so the user can see
+        // it did not go through and retry — nothing says the link is gone.
+        expect(screen.getByRole("button", { name: /^Save changes$/ })).toBeTruthy();
+        expect(toastFns.success).not.toHaveBeenCalled();
+    });
+
     it("keeps the stored URL on the payload when the contract is saved again", async () => {
         contracts.getAll.mockResolvedValue([
             {
