@@ -50,6 +50,48 @@ export interface DetectedColumn {
  */
 export type ColumnMapping = Record<string, number | null>;
 
+/** One distinct value found in an enum-typed column, and the server's reading of it. */
+export interface ImportValueSuggestion {
+    /** The cell exactly as it appears in the user's file. */
+    value: string;
+    /**
+     * The constant the server thinks it means, or `null` for "we do not know".
+     * Explicitly null rather than absent — the wizard leaves the dropdown blank
+     * instead of guessing, which is the difference between asking the user and
+     * quietly importing the wrong thing.
+     */
+    suggested: string | null;
+    /** True when the raw value *is* one of the allowed constants, punctuation aside. */
+    exact: boolean;
+    /** How many rows carry this value — what a choice here affects. */
+    rowCount: number;
+}
+
+/** An enum-typed field, its allowed constants, and what the file actually says. */
+export interface ImportEnumField {
+    field: string;
+    label: string;
+    /** The column feeding it at analysis time, or `null` when nothing does. */
+    column: number | null;
+    header?: string | null;
+    allowedValues: string[];
+    values: ImportValueSuggestion[];
+}
+
+/** What may happen to one of the user's columns. */
+export type ImportColumnAction = "FIELD" | "CUSTOM_FIELD" | "IGNORE";
+
+/** The backend's proposal for one column of the file. Every part of it is a default. */
+export interface ImportColumnPlan {
+    index: number;
+    header?: string | null;
+    action: ImportColumnAction;
+    field?: string | null;
+    customFieldName?: string | null;
+    inferredType?: string | null;
+    canBeCustomField: boolean;
+}
+
 export interface ImportAnalysis {
     uploadId: string;
     detectedColumns: DetectedColumn[];
@@ -58,30 +100,89 @@ export interface ImportAnalysis {
     /** Columns the backend could not place. Advisory: the wizard derives its own from the live mapping. */
     unmappedColumns?: Array<number | string>;
     missingRequiredFields?: string[];
+    truncated?: boolean;
+    expiresAt?: string;
+    /** Per enum-typed field: the constants we accept and the values their file holds. */
+    enumFields?: ImportEnumField[];
+    /** What the backend proposes for each column. */
+    columnPlan?: ImportColumnPlan[];
+    /** False when this type or this tenant cannot hold a custom field at all. */
+    customFieldsAvailable?: boolean;
+    /** Why, in words the wizard can show, when `customFieldsAvailable` is false. */
+    customFieldsUnavailableReason?: string;
+    /** What "create missing categories, departments…" should start as. */
+    createMissingReferencesDefault?: boolean;
 }
 
-/** Options carried through preview and commit unchanged. */
+/** The sentinel a value dropdown sends for "do not import this value". */
+export const IMPORT_IGNORE_VALUE = "__IGNORE__";
+
+/**
+ * Options carried through preview and commit unchanged — that identity is why
+ * the check step and the import cannot disagree.
+ */
 export interface ImportOptions {
+    /** SKIP, UPDATE or FAIL. Omitted leaves the server's default (SKIP). */
+    duplicateStrategy?: string;
+    /** Create categories, departments, locations and suppliers the sheet names. Defaults to true. */
+    createMissingReferences?: boolean;
     /** Import the rows that pass and report the rest, instead of refusing the batch. */
     skipInvalidRows?: boolean;
+    /** Validate and report without writing anything. */
+    dryRun?: boolean;
+    /** 0-based columns to keep as custom fields rather than ignore. */
+    customFieldColumns?: number[];
+    /**
+     * What the user decided each unfamiliar value means, e.g.
+     * `{ assetType: { Laptop: "HARDWARE", Sundry: "__IGNORE__" } }`. Inner keys
+     * are the raw cell values as they appear in the file; the server matches
+     * them case- and punctuation-insensitively.
+     */
+    valueMappings?: Record<string, Record<string, string>>;
 }
 
-export interface ImportRowError {
-    /** The column as the *user* labelled it, not our field name. */
-    column?: string;
+/** What a run — real or dry — should be reported as. Never inferred client-side. */
+export type ImportOutcome = "SUCCESS" | "PARTIAL" | "FAILED" | "NOTHING_TO_IMPORT";
+
+/**
+ * One thing that happened to one row. An *error* means the row does not import;
+ * a *note* means it does, with something left out or created for it.
+ */
+export interface ImportRowIssue {
+    /** 1-based row in the user's file. The backend guarantees it is never 0. */
+    row: number;
     message: string;
+    /** Our internal field name, for pointing back at the mapping row. */
+    field?: string | null;
+    /** The heading as the *user* wrote it, so they can find the cell. */
+    column?: string | null;
+    /** The offending cell, for a note. */
+    value?: string | null;
 }
 
-export interface ImportPreviewRow {
-    rowNumber: number;
-    errors: ImportRowError[];
-}
-
-export interface ImportPreviewResult {
+export interface ImportPreviewTotals {
     valid: number;
     invalid: number;
     total: number;
-    rows: ImportPreviewRow[];
+}
+
+/**
+ * A dry run of the real engine. Its job is to agree with the commit, so the
+ * wizard renders it verbatim and never re-derives a verdict from the counts.
+ */
+export interface ImportPreviewResult {
+    totals: ImportPreviewTotals;
+    errors: ImportRowIssue[];
+    notes: ImportRowIssue[];
+    rowsChecked: number;
+    totalRowsInFile: number;
+    outcome: ImportOutcome;
+    /** A problem with the file or the mapping rather than with any row. */
+    fatalError?: string | null;
+    /** Records a real run would create on the user's behalf, by type. */
+    wouldCreate?: Record<string, string[]>;
+    /** Custom field definitions a real run would create from column headers. */
+    wouldCreateCustomFields?: string[];
 }
 
 export interface SavedImportMapping {
