@@ -45,13 +45,22 @@ export function roleCard(page: Page, name: string): Locator {
         .last();
 }
 
-/** A card's edit button: by accessible name when it has one, else the first card button (pencil). */
+/**
+ * A card's edit button, by its accessible name.
+ *
+ * Each card carries three: "See what the <role> role allows", "Edit role
+ * <role>" and "Delete role <role>". An earlier version of these helpers fell
+ * back to the card's first or last button when the name did not match, but
+ * `.or()` resolves to *both* candidates and `.first()` then picks whichever
+ * comes first in the DOM — which is the "what it allows" button, opening a
+ * dialog with no form in it. The buttons are named, so name them.
+ */
 export const roleEditButton = (card: Locator): Locator =>
-    card.getByRole("button", { name: /edit/i }).or(card.getByRole("button").first()).first();
+    card.getByRole("button", { name: /^Edit role\b/i }).first();
 
-/** A card's delete button: by accessible name when it has one, else the last card button (trash). */
+/** A card's delete button, by its accessible name. */
 export const roleDeleteButton = (card: Locator): Locator =>
-    card.getByRole("button", { name: /delete|remove/i }).or(card.getByRole("button").last()).last();
+    card.getByRole("button", { name: /^Delete role\b/i }).first();
 
 /** Opens the edit modal of the role named `name` on /roles. */
 export async function openRoleEdit(page: Page, name: string): Promise<Locator> {

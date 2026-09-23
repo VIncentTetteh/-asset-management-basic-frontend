@@ -14,9 +14,9 @@ import {
   expenseCurrencyFor,
   expenseFundsError,
 } from "@/features/finance/payloads";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Receipt, ThumbsUp, XCircle, Search } from "lucide-react";
-import type { Expense, ExpenseStatus } from "@/types";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Paperclip, Plus, Trash2, Receipt, ThumbsUp, XCircle, Search } from "lucide-react";
+import type { DocumentAttachment, Expense, ExpenseStatus } from "@/types";
 import { expenseService, type ExpenseDto } from "@/services/expenseService";
 import { assetService } from "@/services/assetService";
 import { budgetService } from "@/services/budgetService";
@@ -39,7 +39,9 @@ import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 import { formatLocalDate, todayLocal } from "@/lib/local-date";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
-import { AttachmentField, attachAfterCreate, useAttachmentField } from "@/components/ui/attachment-field";
+import { AttachmentField, attachAfterCreate, documentsKey, downloadAttachment, useAttachmentField } from "@/components/ui/attachment-field";
+import { documentService } from "@/services/documentService";
+import { commercialFeatures } from "@/config/commercialFeatures";
 import { FieldError } from "@/components/ui/field-error";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -61,6 +63,50 @@ const fmtDate = (d?: string) =>
   formatLocalDate(d, { locale: "en-US", month: "short", day: "numeric", year: "numeric" });
 
 const L = FIELD_LIMITS.expense;
+
+/**
+ * What a row says about the expense's receipt.
+ *
+ * Whether a receipt exists is the thing an approver needs from a list of spend
+ * requests, so the absence is stated as plainly as the presence: silence would
+ * read as "not loaded yet" and leave the approver guessing. Files attached
+ * through the form open straight from here; a link stored before uploads
+ * existed still opens as a link.
+ */
+function ReceiptCell({
+  expense,
+  files,
+  settled,
+}: {
+  expense: Expense;
+  files: DocumentAttachment[];
+  settled: boolean;
+}) {
+  if (files.length > 0) {
+    const [first] = files;
+    return (
+      <button
+        type="button"
+        className="ea-focus flex items-center gap-1 rounded-control text-xs text-brand underline-offset-2 hover:underline"
+        title={`Open ${first.originalName}`}
+        onClick={() => void downloadAttachment(first)}
+      >
+        <Paperclip className="h-3 w-3" aria-hidden />
+        Receipt{files.length > 1 ? ` (${files.length})` : ""}
+      </button>
+    );
+  }
+  if (expense.receiptUrl) {
+    return (
+      <SafeExternalLink href={expense.receiptUrl} className="text-xs text-brand underline-offset-2 hover:underline">
+        Receipt
+      </SafeExternalLink>
+    );
+  }
+  // Attachments off for this deployment: there is nothing to know, so say nothing.
+  if (!commercialFeatures.documentAttachments || !settled) return null;
+  return <p className="text-xs text-faint-fg">No receipt</p>;
+}
 
 export default function ExpensesPage() {
   // useSearchParams requires a Suspense boundary in the App Router.
@@ -250,6 +296,46 @@ function ExpensesContent() {
     setRejectReason("");
   };
 
+  const rows = focusId ? (focused ? [focused as unknown as Expense] : []) : paged?.items ?? [];
+
+  /**
+   * Receipts for the rows on screen.
+   *
+   * An expense has no detail or edit form — it is submitted once and then only
+   * approved, rejected or deleted — so the list row is the only place its
+   * receipt can ever be seen. When the receipt field became an upload, the row
+   * kept showing only the legacy `receiptUrl` link, which a newly created
+   * expense never has: the file went up and became unreachable, and an approver
+   * was asked to approve spend with no way to look at what backed it.
+   *
+   * There is no batch endpoint for attachments, so this is one small GET per
+   * visible row (a page is 20). They share the uploader's cache key, so an
+   * upload made through the form refreshes the row it belongs to.
+   */
+  const receiptQueries = useQueries({
+    queries: rows.map((expense) => ({
+      queryKey: documentsKey("EXPENSE", expense.id ?? "none"),
+      queryFn: () => documentService.list("EXPENSE", expense.id!),
+      enabled: commercialFeatures.documentAttachments && !!expense.id,
+      staleTime: 60_000,
+    })),
+  });
+  const receipts = new Map<string, { files: DocumentAttachment[]; settled: boolean }>(
+    rows.map((expense, index) => {
+      const query = receiptQueries[index];
+      return [expense.id ?? "", { files: query?.data ?? [], settled: !query?.isPending }];
+    }),
+  );
+  // A stable identity for the memo below: the cell only cares about whether each
+  // row has been answered and with how many files, not about the query objects,
+  // which are new on every render.
+  const receiptsSignature = rows
+    .map((expense) => {
+      const entry = receipts.get(expense.id ?? "");
+      return `${expense.id}:${entry?.settled ? entry.files.length : "?"}`;
+    })
+    .join("|");
+
   const columns = useMemo<ColumnDef<Expense, unknown>[]>(
     () => [
       {
@@ -269,11 +355,11 @@ function ExpensesContent() {
             {lookups.assetName(row.original.linkedAssetId) ? (
               <p className="truncate text-xs text-faint-fg">Asset · {lookups.assetName(row.original.linkedAssetId)}</p>
             ) : null}
-            {row.original.receiptUrl ? (
-              <SafeExternalLink href={row.original.receiptUrl} className="text-xs text-brand underline-offset-2 hover:underline">
-                Receipt
-              </SafeExternalLink>
-            ) : null}
+            <ReceiptCell
+              expense={row.original}
+              files={receipts.get(row.original.id ?? "")?.files ?? []}
+              settled={receipts.get(row.original.id ?? "")?.settled ?? false}
+            />
           </div>
         ),
       },
@@ -353,10 +439,9 @@ function ExpensesContent() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lookups, format, baseCurrency],
+    [lookups, format, baseCurrency, receiptsSignature],
   );
 
-  const rows = focusId ? (focused ? [focused as unknown as Expense] : []) : paged?.items ?? [];
   const total = focusId ? rows.length : paged?.total ?? 0;
   // Each expense is converted into the display currency; expenses without a rate are excluded and flagged.
   const pageAmount = sum(rows.map((e) => ({ amount: e.amount, currency: e.currency })));

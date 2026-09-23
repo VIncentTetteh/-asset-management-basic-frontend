@@ -9,10 +9,17 @@ import { Button } from "@/components/ui/button";
  * The 404 page.
  *
  * Under `output: "export"` this is what `next build` emits as `out/404.html`,
- * which is also the document CloudFront serves for a path that matches no
- * object — so this one file covers both "the router found no route" and "S3
- * found no key". Previously both landed on the framework default, which is a
- * bare black-on-white "404 This page could not be found" with no way back.
+ * so it covers "the router found no route" and, on any origin that resolves
+ * error documents, "the origin found no object" too. Previously both landed on
+ * the framework default, which is a bare black-on-white "404 This page could
+ * not be found" with no way back.
+ *
+ * The staging/production CDN is the exception: CloudFront's custom error
+ * responses are per-distribution, and the distribution also fronts `/api/*`, so
+ * mapping S3's 403 onto this document rewrote every API 403 into a 404. It was
+ * removed deliberately — see `infra/aws/compute-cdn.yaml`. An unknown *static*
+ * path there returns S3's own 403; every path the app itself routes still lands
+ * here.
  *
  * It renders inside the root layout, so the sidebar and header are still there
  * and the user is never stranded.

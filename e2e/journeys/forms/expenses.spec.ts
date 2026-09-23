@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test, uniq } from "../../fixtures/auth";
 import type { ApiClient } from "../../fixtures/api";
 import {
@@ -64,6 +64,35 @@ async function prepare(api: ApiClient): Promise<void> {
     prepared = true;
 }
 
+const RECEIPT_NAME = "e2e-expense-receipt.txt";
+const RECEIPT_URL = "https://files.example.com/e2e/expense-receipt.pdf";
+
+/** True when the receipt went up as a file; false when the deployment still takes a URL. */
+let receiptWasUploaded = false;
+
+/**
+ * Puts a receipt on the expense being created.
+ *
+ * The receipt field is an upload (held until the POST returns an id, then
+ * attached). Deployments with `commercial.document-attachments` off still show
+ * the legacy URL input instead, so this uses whichever control is on the form
+ * and records which, rather than skipping an otherwise unrelated round trip.
+ */
+async function attachReceipt(form: Locator): Promise<void> {
+    const picker = form.locator('input[type="file"]');
+    receiptWasUploaded = (await picker.count()) > 0;
+    if (receiptWasUploaded) {
+        await picker.setInputFiles({
+            name: RECEIPT_NAME,
+            mimeType: "text/plain",
+            buffer: Buffer.from("AssetIQ e2e receipt fixture — safe to delete.\n", "utf8"),
+        });
+        await expect(form.getByText(/will be attached when this is saved/i)).toBeVisible();
+        return;
+    }
+    await form.getByLabel(/^Receipt URL$/).fill(RECEIPT_URL);
+}
+
 async function openSubmit(page: Page) {
     await page.goto(PATH);
     await page.getByRole("button", { name: /^Submit expense$/i }).first().click();
@@ -119,9 +148,10 @@ test.describe("Expenses", () => {
         try {
             await test.step("prerequisites", () => prepare(api));
 
-            await test.step("a) submit with every field filled", async () => {
+            await test.step("a) submit with every field filled, receipt included", async () => {
                 const form = await openSubmit(page);
                 await fillForm(form, fields, "create");
+                await attachReceipt(form);
                 await submitAndClose(page, form);
                 created = true;
             });
@@ -137,7 +167,19 @@ test.describe("Expenses", () => {
                 await expect(row).toContainText(`Asset · ${asset}`);
                 await expect(row).toContainText(budget);
                 await expect(row).toContainText(/submitted/i);
-                await expect(row.getByRole("link", { name: "Receipt" })).toBeVisible();
+
+                // The receipt. An expense has no detail or edit form, so the row is
+                // the only place its receipt is ever reachable: an uploaded file
+                // opens from a button here, and a legacy stored link from a link.
+                // Whichever the deployment uses, the row must show the receipt is
+                // there — a row that showed nothing would mean an approver had no
+                // way to see what the spend was for.
+                if (receiptWasUploaded) {
+                    await expect(row.getByRole("button", { name: /^Receipt$/ })).toBeVisible();
+                } else {
+                    await expect(row.getByRole("link", { name: "Receipt" })).toBeVisible();
+                }
+                await expect(row.getByText("No receipt")).toHaveCount(0);
             });
 
             await test.step("c) every field was stored (no edit form to reopen)", async () => {

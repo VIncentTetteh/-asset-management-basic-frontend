@@ -109,6 +109,15 @@ test.describe("DSAR requests", () => {
                 await expect(detail).toContainText(subjectEmail);
                 await expect(detail).toContainText("Erasure (right to be forgotten)");
                 await expect(detail).toContainText(String(SUBMIT_FIELDS[2].value));
+
+                // Two controls dismiss this dialog: the header icon and the
+                // full-width button at the end of the detail. Both are wanted —
+                // the detail scrolls, so the button at the bottom is where the
+                // hand already is — but they must not share an accessible name,
+                // or a screen-reader button list reads "Close, Close" with no way
+                // to tell them apart. The header one is named for what it closes.
+                await expect(detail.getByRole("button", { name: "Close DSAR detail" })).toBeVisible();
+                await expect(detail.getByRole("button", { name: /^Close$/ })).toHaveCount(1);
                 await detail.getByRole("button", { name: /^Close$/ }).click();
             });
 

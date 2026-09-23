@@ -111,6 +111,40 @@ function IconFor({ contentType }: { contentType: string }) {
     return <FileIconGeneric className="h-4 w-4 shrink-0 text-faint-fg" aria-hidden />;
 }
 
+/**
+ * Gets one attachment's bytes in front of the user.
+ *
+ * Module level, not a hook method, because the uploader is no longer the only
+ * place a stored file has to be reachable: the expenses list opens receipts
+ * straight from its rows (there is no expense detail form to open them from).
+ * Both paths must behave identically, including the failure message.
+ */
+export async function downloadAttachment(attachment: DocumentAttachment): Promise<void> {
+    try {
+        const url = await documentService.getDownloadUrl(attachment.id);
+        // A backend streaming URL carries both markers; anything else is a
+        // presigned S3 URL that is already signed and needs no auth header.
+        const isStreaming = url.includes("/api/v1/documents/") && url.includes("/download");
+        if (!isStreaming) {
+            const safe = safeExternalUrl(url);
+            if (!safe) throw new Error("Unsupported download URL");
+            window.open(safe, "_blank", "noopener,noreferrer");
+            return;
+        }
+        const response = await api.get(url, { responseType: "blob" });
+        const blobUrl = window.URL.createObjectURL(response.data as Blob);
+        const anchor = document.createElement("a");
+        anchor.href = blobUrl;
+        anchor.download = attachment.originalName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10_000);
+    } catch {
+        toast.error(`"${attachment.originalName}" could not be downloaded`);
+    }
+}
+
 // ── State ────────────────────────────────────────────────────────────────────
 
 export interface AttachmentFieldState {
@@ -146,7 +180,8 @@ export interface AttachmentFieldState {
     reset: () => void;
 }
 
-const documentsKey = (entityType: AttachmentEntityType, entityId: string) =>
+/** The cache key for one record's attachments — shared so an upload refreshes every reader. */
+export const documentsKey = (entityType: AttachmentEntityType, entityId: string) =>
     qk.module("documents").list({ entityType, entityId });
 
 export function useAttachmentField({
@@ -243,31 +278,7 @@ export function useAttachmentField({
         [id, invalidate],
     );
 
-    const download = useCallback(async (attachment: DocumentAttachment) => {
-        try {
-            const url = await documentService.getDownloadUrl(attachment.id);
-            // A backend streaming URL carries both markers; anything else is a
-            // presigned S3 URL that is already signed and needs no auth header.
-            const isStreaming = url.includes("/api/v1/documents/") && url.includes("/download");
-            if (!isStreaming) {
-                const safe = safeExternalUrl(url);
-                if (!safe) throw new Error("Unsupported download URL");
-                window.open(safe, "_blank", "noopener,noreferrer");
-                return;
-            }
-            const response = await api.get(url, { responseType: "blob" });
-            const blobUrl = window.URL.createObjectURL(response.data as Blob);
-            const anchor = document.createElement("a");
-            anchor.href = blobUrl;
-            anchor.download = attachment.originalName;
-            document.body.appendChild(anchor);
-            anchor.click();
-            document.body.removeChild(anchor);
-            setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10_000);
-        } catch {
-            toast.error(`"${attachment.originalName}" could not be downloaded`);
-        }
-    }, []);
+    const download = useCallback((attachment: DocumentAttachment) => downloadAttachment(attachment), []);
 
     const reset = useCallback(() => {
         setPendingFile(null);

@@ -42,7 +42,14 @@ export function Modal({ isOpen, onClose, title, description, size = "default", c
                             <p className="mt-1 text-sm text-muted-fg">{description}</p>
                         )}
                     </div>
-                    <Button variant="ghost" size="icon" className="-mt-1 shrink-0" onClick={onClose} aria-label="Close">
+                    {/* Named for what it closes, not just "Close". Several dialogs
+                        (DSAR detail, a role's effective permissions, an audit event,
+                        webhook deliveries) also end with a full-width "Close" button,
+                        and two controls called exactly "Close" in one dialog is
+                        ambiguous for anyone navigating by accessible name — a screen
+                        reader's button list read "Close, Close". The header control
+                        says which dialog it dismisses; the footer one stays plain. */}
+                    <Button variant="ghost" size="icon" className="-mt-1 shrink-0" onClick={onClose} aria-label={`Close ${title}`}>
                         <X className="h-4 w-4" aria-hidden="true" />
                     </Button>
                 </div>
