@@ -8,15 +8,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { FieldError } from "@/components/ui/field-error";
-import type { ColumnMapping, DetectedColumn, ImportFieldDefinition, SavedImportMapping } from "@/services/importService";
+import { Alert } from "@/components/ui/alert";
+import type {
+    ColumnMapping,
+    DetectedColumn,
+    ImportColumnPlan,
+    ImportFieldDefinition,
+    SavedImportMapping,
+} from "@/services/importService";
 import {
     columnFor,
     describeColumn,
     duplicatedColumns,
-    ignoredColumns,
     missingRequiredFields,
     sampleValues,
 } from "@/features/imports/mapping";
+import {
+    COLUMN_CUSTOM_FIELD,
+    COLUMN_IGNORE,
+    COLUMN_MULTIPLE,
+    canBeCustomField,
+    columnChoice,
+    customFieldName,
+    fieldsUsingColumn,
+} from "@/features/imports/columnPlan";
 import { StepHeading } from "@/features/imports/WizardChrome";
 
 const NOT_MAPPED = "";
@@ -41,6 +56,12 @@ export function ImportMapStep({
     onBack,
     onContinue,
     isPreviewing,
+    continueLabel,
+    columnPlan,
+    customFieldsAvailable,
+    customFieldsUnavailableReason,
+    customFieldColumns,
+    onColumnChoice,
 }: {
     fields: ImportFieldDefinition[];
     columns: DetectedColumn[];
@@ -55,13 +76,19 @@ export function ImportMapStep({
     onBack: () => void;
     onContinue: () => void;
     isPreviewing: boolean;
+    /** "Check my rows", or "Match values" when a value step stands between. */
+    continueLabel: string;
+    columnPlan: ImportColumnPlan[] | undefined;
+    customFieldsAvailable: boolean;
+    customFieldsUnavailableReason: string | undefined;
+    customFieldColumns: number[];
+    onColumnChoice: (index: number, choice: string) => void;
 }) {
     const [attempted, setAttempted] = useState(false);
     const [mappingName, setMappingName] = useState("");
     const selectRefs = useRef<Record<string, HTMLSelectElement | null>>({});
 
     const missing = missingRequiredFields(fields, mapping);
-    const ignored = ignoredColumns(columns, mapping);
     const duplicates = duplicatedColumns(fields, mapping, columns);
 
     const handleContinue = () => {
@@ -164,20 +191,16 @@ export function ImportMapStep({
                 </p>
             ) : null}
 
-            <div className="rounded-card border border-edge bg-surface-muted p-3 text-xs" data-testid="import-ignored-columns">
-                <p className="font-semibold text-muted-fg">
-                    {ignored.length === 0
-                        ? "Every column in your file is being used."
-                        : `${ignored.length} ${ignored.length === 1 ? "column" : "columns"} will be ignored`}
-                </p>
-                {ignored.length > 0 ? (
-                    <p className="mt-1 text-muted-fg">
-                        {ignored.map((column) => column.name?.trim() || `Column ${column.index + 1}`).join(", ")} — nothing in
-                        AssetIQ reads {ignored.length === 1 ? "it" : "them"}, and {ignored.length === 1 ? "it" : "they"} will
-                        not be imported.
-                    </p>
-                ) : null}
-            </div>
+            <ColumnPlanList
+                fields={fields}
+                columns={columns}
+                mapping={mapping}
+                columnPlan={columnPlan}
+                customFieldsAvailable={customFieldsAvailable}
+                customFieldsUnavailableReason={customFieldsUnavailableReason}
+                customFieldColumns={customFieldColumns}
+                onColumnChoice={onColumnChoice}
+            />
 
             <div className="space-y-1.5 border-t border-edge-subtle pt-3">
                 <Label htmlFor="import-mapping-name">Save this mapping for next time (optional)</Label>
@@ -209,7 +232,7 @@ export function ImportMapStep({
                     Back
                 </Button>
                 <Button type="button" onClick={handleContinue} isLoading={isPreviewing} data-testid="import-to-preview">
-                    Check my rows
+                    {continueLabel}
                 </Button>
             </div>
         </div>
@@ -293,5 +316,132 @@ function MappingRow({
                 ) : null}
             </div>
         </div>
+    );
+}
+
+/**
+ * The other half of matching: what happens to each of *their* columns.
+ *
+ * Three honest answers — fill one of our fields, become a custom field, or be
+ * ignored — and the third used to be the only one, applied silently. "Create as
+ * a custom field" appears only when the analyser said this tenant and this
+ * record type can hold one; where it cannot, the reason is shown once instead
+ * of an option that would be refused.
+ */
+function ColumnPlanList({
+    fields,
+    columns,
+    mapping,
+    columnPlan,
+    customFieldsAvailable,
+    customFieldsUnavailableReason,
+    customFieldColumns,
+    onColumnChoice,
+}: {
+    fields: ImportFieldDefinition[];
+    columns: DetectedColumn[];
+    mapping: ColumnMapping;
+    columnPlan: ImportColumnPlan[] | undefined;
+    customFieldsAvailable: boolean;
+    customFieldsUnavailableReason: string | undefined;
+    customFieldColumns: number[];
+    onColumnChoice: (index: number, choice: string) => void;
+}) {
+    const kept = customFieldColumns.length;
+    const ignoredCount = columns.filter(
+        (column) =>
+            fieldsUsingColumn(fields, mapping, column.index).length === 0 && !customFieldColumns.includes(column.index),
+    ).length;
+
+    return (
+        <section aria-labelledby="import-column-plan-heading" className="space-y-3" data-testid="import-column-plan">
+            <div>
+                <h5 id="import-column-plan-heading" className="text-sm font-bold text-foreground">
+                    What happens to each of your columns
+                </h5>
+                <p className="mt-0.5 text-xs text-muted-fg" data-testid="import-column-plan-summary">
+                    {kept > 0 ? `${kept} kept as custom ${kept === 1 ? "field" : "fields"} · ` : ""}
+                    {ignoredCount} of {columns.length} {columns.length === 1 ? "column" : "columns"}{" "}
+                    {ignoredCount === 1 ? "is" : "are"} being ignored.
+                </p>
+            </div>
+
+            {!customFieldsAvailable && customFieldsUnavailableReason ? (
+                <p className="text-xs text-muted-fg" data-testid="import-custom-fields-unavailable">
+                    {customFieldsUnavailableReason}
+                </p>
+            ) : null}
+
+            <ul className="space-y-2">
+                {columns.map((column) => {
+                    const selectId = `import-column-${column.index}`;
+                    const choice = columnChoice(fields, mapping, customFieldColumns, column.index);
+                    const allowCustom = canBeCustomField(columnPlan, customFieldsAvailable, column.index);
+                    const heading = column.name?.trim() || `Column ${column.index + 1}`;
+                    const samples = sampleValues(column, 2);
+                    const used = fieldsUsingColumn(fields, mapping, column.index);
+
+                    return (
+                        <li
+                            key={column.index}
+                            className="grid gap-1.5 rounded-control border border-edge-subtle bg-surface p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:items-center sm:gap-3"
+                        >
+                            <div className="min-w-0">
+                                <label htmlFor={selectId} className="block text-sm font-semibold text-foreground">
+                                    <span className="sr-only">What should we do with your column </span>
+                                    <span className="break-words">{heading}</span>
+                                    <span className="sr-only">?</span>
+                                </label>
+                                {samples.length > 0 ? (
+                                    <p className="truncate text-xs text-faint-fg">
+                                        <span className="data-mono">{samples.join(", ")}</span>
+                                    </p>
+                                ) : null}
+                            </div>
+                            <Select
+                                id={selectId}
+                                data-testid={selectId}
+                                className="pr-8"
+                                value={choice}
+                                onChange={(event) => onColumnChoice(column.index, event.target.value)}
+                            >
+                                {choice === COLUMN_MULTIPLE ? (
+                                    <option value={COLUMN_MULTIPLE}>
+                                        Fills {used.map((field) => field.label).join(" and ")}
+                                    </option>
+                                ) : null}
+                                <option value={COLUMN_IGNORE}>Ignore this column</option>
+                                {allowCustom ? (
+                                    <option value={COLUMN_CUSTOM_FIELD}>Create as a custom field</option>
+                                ) : null}
+                                <optgroup label="Fill one of our fields">
+                                    {fields.map((field) => (
+                                        <option key={field.name} value={field.name}>
+                                            {field.label}
+                                            {field.required ? " (required)" : ""}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            </Select>
+                        </li>
+                    );
+                })}
+            </ul>
+
+            {kept > 0 ? (
+                <Alert
+                    tone="info"
+                    live={false}
+                    data-testid="import-custom-fields-planned"
+                    title={`${kept} new custom ${kept === 1 ? "field" : "fields"} will be created in your organisation`}
+                >
+                    {columns
+                        .filter((column) => customFieldColumns.includes(column.index))
+                        .map((column) => customFieldName(columnPlan, column))
+                        .join(", ")}
+                    . You will see this again before anything is written.
+                </Alert>
+            ) : null}
+        </section>
     );
 }

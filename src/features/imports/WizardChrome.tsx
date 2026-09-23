@@ -13,13 +13,14 @@ import { cn } from "@/lib/utils";
  * the document.
  */
 
-export const IMPORT_STEPS = ["start", "upload", "map", "preview", "import"] as const;
+export const IMPORT_STEPS = ["start", "upload", "map", "values", "preview", "import"] as const;
 export type ImportStep = (typeof IMPORT_STEPS)[number];
 
 const STEP_LABELS: Record<ImportStep, string> = {
     start: "Start",
     upload: "Upload",
     map: "Match columns",
+    values: "Match values",
     preview: "Check",
     import: "Import",
 };
