@@ -16,7 +16,7 @@ import {
     type ImportPreviewResult,
     type SavedImportMapping,
 } from "@/services/importService";
-import { importEntityType, mergeImportType } from "@/features/imports/importTypes";
+import { mergeImportType } from "@/features/imports/importTypes";
 import { useImportFields, useImportJobPolling, useImportTypes, useSavedImportMappings, savedMappingsQueryKey } from "@/features/imports/hooks";
 import { applySavedMapping, initialMapping, mappingPayload, normaliseAnalysis } from "@/features/imports/mapping";
 import { importJobPhase } from "@/features/imports/importJob";
@@ -75,9 +75,9 @@ function ImportWizardBody({ onClose, type, onImported }: ImportWizardProps) {
     const [downloadingFormat, setDownloadingFormat] = useState<"xlsx" | "csv" | null>(null);
     const settledJobRef = useRef<string | null>(null);
 
-    const typesQuery = useImportTypes(true);
-    const fieldsQuery = useImportFields(type, true);
-    const mappingsQuery = useSavedImportMappings(type, true);
+    const typesQuery = useImportTypes();
+    const fieldsQuery = useImportFields(type);
+    const mappingsQuery = useSavedImportMappings(type);
     const fields = useMemo(() => fieldsQuery.data ?? EMPTY_FIELDS, [fieldsQuery.data]);
     const entity = mergeImportType(type, typesQuery.data?.find((candidate) => candidate.type === type));
 
@@ -314,6 +314,3 @@ function MapStepGate({
     }
     return <>{children}</>;
 }
-
-/** Convenience for callers that only know a route, not a type. */
-export const importWizardEntity = importEntityType;

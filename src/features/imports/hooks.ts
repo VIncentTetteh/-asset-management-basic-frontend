@@ -7,7 +7,9 @@ import { importJobPollMs, shouldPollImportJob } from "@/features/imports/importJ
 
 /**
  * Data the import wizard reads. Every one of these is scoped to an entity type
- * so the same hooks serve assets, suppliers, employees and the rest.
+ * so the same hooks serve assets, suppliers, employees and the rest. They are
+ * only ever called from inside the open wizard, which is why none of them take
+ * an `enabled` flag.
  */
 
 const key = {
@@ -21,11 +23,10 @@ const key = {
  * `GET /imports/types`. Used only to enrich the local registry's label and
  * description, so a failure is not worth a toast or a blocked wizard.
  */
-export function useImportTypes(enabled: boolean) {
+export function useImportTypes() {
     return useQuery<ImportTypeSummary[]>({
         queryKey: key.types,
         queryFn: () => importService.listTypes(),
-        enabled,
         retry: false,
         staleTime: 300_000,
     });
@@ -35,21 +36,19 @@ export function useImportTypes(enabled: boolean) {
  * `GET /imports/{type}/fields`. The mapping step cannot be drawn without this,
  * so its error is surfaced in the step with a Retry.
  */
-export function useImportFields(type: string, enabled: boolean) {
+export function useImportFields(type: string) {
     return useQuery({
         queryKey: key.fields(type),
         queryFn: () => importService.listFields(type),
-        enabled,
         staleTime: 300_000,
     });
 }
 
 /** `GET /imports/{type}/mappings`. Optional convenience; a failure leaves the list empty. */
-export function useSavedImportMappings(type: string, enabled: boolean) {
+export function useSavedImportMappings(type: string) {
     return useQuery({
         queryKey: key.mappings(type),
         queryFn: () => importService.listMappings(type),
-        enabled,
         retry: false,
     });
 }
