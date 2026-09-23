@@ -21,31 +21,11 @@ import { usePermissions } from "@/contexts/PermissionContext";
 import { useConfirm } from "@/hooks/useConfirm";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { PermissionPicker } from "@/features/roles/PermissionPicker";
+import { EffectivePermissionsPanel } from "@/features/roles/EffectivePermissionsPanel";
+import { useCatalogueIndex } from "@/features/roles/hooks";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 
-
-// Permission groups matching the backend Permission enum categories
-const PERMISSION_GROUPS: { label: string; permissions: string[] }[] = [
-    { label: "Assets", permissions: ["VIEW_ASSETS", "CREATE_ASSET", "EDIT_ASSET", "DELETE_ASSET", "DISPOSE_ASSET", "TRANSFER_ASSET", "CHECKOUT_ASSET", "REGENERATE_QR"] },
-    { label: "Approvals", permissions: ["APPROVE_REQUESTS", "REJECT_REQUESTS", "ESCALATE_REQUESTS"] },
-    { label: "Budgets", permissions: ["VIEW_BUDGETS", "MANAGE_BUDGETS", "APPROVE_BUDGET"] },
-    { label: "Users", permissions: ["VIEW_USERS", "MANAGE_USERS", "EDIT_USER", "DELETE_USER"] },
-    { label: "Departments", permissions: ["VIEW_DEPARTMENTS", "MANAGE_DEPARTMENTS"] },
-    { label: "Locations", permissions: ["VIEW_LOCATIONS", "MANAGE_LOCATIONS"] },
-    { label: "Categories", permissions: ["VIEW_CATEGORIES", "MANAGE_CATEGORIES"] },
-    { label: "Maintenance", permissions: ["VIEW_MAINTENANCE", "SCHEDULE_MAINTENANCE", "MARK_MAINTENANCE_COMPLETE"] },
-    { label: "Audit", permissions: ["VIEW_AUDIT_LOGS", "CONDUCT_AUDIT", "EXPORT_AUDIT_LOGS"] },
-    { label: "Reports", permissions: ["VIEW_REPORTS", "GENERATE_REPORTS", "EXPORT_REPORTS"] },
-    { label: "Finance", permissions: ["MANAGE_EXPENSES", "VIEW_TCO", "MANAGE_EXCHANGE_RATES", "MANAGE_LEASES", "VIEW_DEPRECIATION", "MANAGE_DEPRECIATION"] },
-    { label: "Procurement", permissions: ["VIEW_PROCUREMENT", "MANAGE_PROCUREMENT", "APPROVE_PROCUREMENT"] },
-    { label: "Suppliers & Vendors", permissions: ["VIEW_SUPPLIERS", "MANAGE_SUPPLIERS", "VIEW_VENDOR_REVIEWS", "MANAGE_VENDOR_REVIEWS"] },
-    { label: "Software & Licenses", permissions: ["VIEW_SOFTWARE_LICENSES", "MANAGE_SOFTWARE_LICENSES"] },
-    { label: "Contracts", permissions: ["VIEW_CONTRACTS", "MANAGE_CONTRACTS"] },
-    { label: "Compliance", permissions: ["VIEW_COMPLIANCE", "MANAGE_COMPLIANCE"] },
-    { label: "Infrastructure", permissions: ["VIEW_NETWORK_DISCOVERY", "MANAGE_NETWORK_DISCOVERY", "VIEW_CLOUD_ASSETS", "MANAGE_CLOUD_ASSETS"] },
-    { label: "Employees", permissions: ["VIEW_EMPLOYEES", "MANAGE_EMPLOYEES", "OFFBOARD_EMPLOYEE"] },
-    { label: "Roles", permissions: ["VIEW_ROLES", "MANAGE_ROLES"] },
-    { label: "Settings & Admin", permissions: ["MANAGE_ORGANIZATION_SETTINGS", "MANAGE_SECURITY_SETTINGS", "REVIEW_ACCESS", "SYSTEM_ADMIN"] },
-];
 
 export default function RolesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,15 +39,13 @@ export default function RolesPage() {
 
     const queryClient = useQueryClient();
     const rolesKey = qk.module("roles");
-    const { data: roles = [], isLoading } = useQuery({
+    const { data: roles = [], isLoading, error: rolesError, refetch: refetchRoles, isFetching } = useQuery({
         queryKey: rolesKey.list(),
         queryFn: () => roleService.getAll(),
     });
-    const { data: allPermissions = [] } = useQuery({
-        queryKey: [...rolesKey.all, "permissions"],
-        queryFn: () => roleService.getPermissions(),
-        staleTime: 300_000,
-    });
+    // Labels, groups and the "is this enforced?" fact all come from the API's
+    // own catalogue now. The page used to carry its own copy of all three.
+    const { describe, isEnforced } = useCatalogueIndex();
     const invalidate = () => queryClient.invalidateQueries({ queryKey: rolesKey.all });
     const deleteRole = useMutation({
         mutationFn: (id: string) => roleService.delete(id),
@@ -76,20 +54,9 @@ export default function RolesPage() {
         onError: (err) => reportApiError(err, { fallback: "Failed to delete role" }),
     });
 
-    // Build the grouped permission list: known groups first, then any extra from the server
-    const permissionGroups = (() => {
-        const grouped = PERMISSION_GROUPS.map(g => ({
-            ...g,
-            permissions: g.permissions.filter(p => allPermissions.includes(p)),
-        })).filter(g => g.permissions.length > 0);
-
-        const knownPerms = new Set(PERMISSION_GROUPS.flatMap(g => g.permissions));
-        const extra = allPermissions.filter(p => !knownPerms.has(p));
-        if (extra.length > 0) grouped.push({ label: "Other", permissions: extra });
-        return grouped;
-    })();
-
     const { confirm, ConfirmDialog } = useConfirm();
+    /** The role whose effective permissions are open, resolved by the API. */
+    const [viewingRole, setViewingRole] = useState<Role | null>(null);
     const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
     const parsePermissions = (value: Role["permissions"]): string[] => {
         if (Array.isArray(value)) return value;
@@ -206,7 +173,14 @@ export default function RolesPage() {
                 )}
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {/* A failed load is not an empty workspace: "No roles configured" to
+                an organisation with twelve of them is a claim about their data
+                that nothing supports. */}
+            {rolesError ? (
+                <DataErrorState what="your roles" error={rolesError} onRetry={refetchRoles} isRetrying={isFetching} />
+            ) : null}
+
+            <div className={`grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4${rolesError ? " hidden" : ""}`}>
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
                         <PageSpinner />
@@ -247,28 +221,42 @@ export default function RolesPage() {
                                     <p className="line-clamp-2" title={role.description}>{role.description || "No description provided."}</p>
 
                                     <div className="mt-4 pt-4 border-t border-edge-subtle">
-                                        <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg mb-2">Granted permissions ({parsePermissions(role.permissions).length})</div>
-                                        <div className="flex flex-wrap gap-1">
+                                        <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-faint-fg mb-2">
+                                            {role.grantAllPermissions
+                                                ? "Allows everything"
+                                                : `Allows ${parsePermissions(role.permissions).length} thing${parsePermissions(role.permissions).length === 1 ? "" : "s"}`}
+                                        </div>
+                                        {/* Labels, not authority strings: "Dispose of assets", not
+                                            DISPOSE_ASSET. The words are the backend's own. */}
+                                        <ul className="space-y-0.5 text-[11px] text-muted-fg">
                                             {parsePermissions(role.permissions).slice(0, 4).map(p => (
-                                                <span key={p} className="data-mono px-1.5 py-0.5 bg-surface-sunken text-[10px] rounded border border-edge text-muted-fg" title={p}>
-                                                    {p.replace('_', ' ')}
-                                                </span>
+                                                <li key={p} className="truncate" title={describe(p)}>
+                                                    · {describe(p)}
+                                                    {!isEnforced(p) ? <span className="ml-1 text-warn">(not enforced yet)</span> : null}
+                                                </li>
                                             ))}
                                             {parsePermissions(role.permissions).length > 4 && (
-                                                <span className="data-mono px-1.5 py-0.5 bg-surface-muted text-[10px] rounded border border-edge text-faint-fg">
+                                                <li className="text-faint-fg">
                                                     +{parsePermissions(role.permissions).length - 4} more
-                                                </span>
+                                                </li>
                                             )}
-                                        </div>
+                                        </ul>
                                     </div>
                                 </div>
 
-                                <div className="flex justify-end items-center gap-2 pt-4">
-                                    {role.systemRole || !canManage ? (
-                                        <Button variant="outline" size="sm" onClick={() => handleOpenEdit(role)} className="h-8">
-                                            <ShieldAlert className="h-3.5 w-3.5 mr-1" /> {role.systemRole ? "View System Policy" : "View permissions"}
-                                        </Button>
-                                    ) : (
+                                <div className="flex flex-wrap justify-end items-center gap-2 pt-4">
+                                    {/* The question an administrator is actually asking.
+                                        Answered by the API, resolved, in words. */}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setViewingRole(role)}
+                                        className="h-8"
+                                        aria-label={`See what the ${role.name} role allows`}
+                                    >
+                                        <ShieldAlert className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> What it allows
+                                    </Button>
+                                    {role.systemRole || !canManage ? null : (
                                         <>
                                             <Button variant="outline" size="sm" onClick={() => handleOpenEdit(role)} className="h-8 w-8 p-0" aria-label={`Edit role ${role.name}`} title="Edit role">
                                                 <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
@@ -319,37 +307,11 @@ export default function RolesPage() {
                     </div>
 
                     <div className="space-y-3 border-t border-edge-subtle pt-4 border-b pb-4">
-                        <div className="flex items-center justify-between">
-                            <Label>Granular Permissions</Label>
-                            <span className="data-mono text-xs text-faint-fg">{selectedPermissions.length} selected</span>
-                        </div>
-                        <div className="max-h-[280px] overflow-y-auto space-y-4 pr-1">
-                            {permissionGroups.map(group => (
-                                <div key={group.label}>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-faint-fg mb-1.5 px-1">{group.label}</p>
-                                    <div className="grid grid-cols-2 gap-1.5">
-                                        {group.permissions.map(perm => (
-                                            <div key={perm} className="flex items-center space-x-2 px-2 py-1.5 rounded-md hover:bg-surface-sunken transition-colors">
-                                                <input
-                                                    type="checkbox"
-                                                    id={`perm-${perm}`}
-                                                    className="ea-focus rounded border-edge accent-[var(--primary)]"
-                                                    checked={selectedPermissions.includes(perm)}
-                                                    onChange={() => !readOnly && togglePermission(perm)}
-                                                    disabled={readOnly}
-                                                />
-                                                <Label htmlFor={`perm-${perm}`} className="data-mono text-xs cursor-pointer leading-tight">
-                                                    {perm.replace(/_/g, ' ')}
-                                                </Label>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                            {permissionGroups.length === 0 && (
-                                <p className="text-xs text-faint-fg italic text-center py-4">Loading permissions…</p>
-                            )}
-                        </div>
+                        <PermissionPicker
+                            selected={selectedPermissions}
+                            onToggle={togglePermission}
+                            readOnly={readOnly}
+                        />
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
@@ -364,6 +326,18 @@ export default function RolesPage() {
                     </div>
                 </form>
         {ConfirmDialog}
+            </Modal>
+
+            <Modal
+                isOpen={viewingRole !== null}
+                onClose={() => setViewingRole(null)}
+                title={viewingRole ? `What ${viewingRole.name} allows` : "What this role allows"}
+                description="Resolved by the server, in plain language — this is what a person holding the role can actually do."
+            >
+                {viewingRole ? <EffectivePermissionsPanel roleId={viewingRole.id!} /> : null}
+                <div className="flex justify-end pt-4">
+                    <Button variant="outline" onClick={() => setViewingRole(null)}>Close</Button>
+                </div>
             </Modal>
         </div>
     );
