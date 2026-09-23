@@ -34,7 +34,7 @@ export default function NotFound() {
             <h1
                 ref={headingRef}
                 tabIndex={-1}
-                className="ea-focus text-lg font-semibold text-foreground outline-none"
+                className="text-lg font-semibold text-foreground outline-none"
             >
                 We couldn&apos;t find that page
             </h1>

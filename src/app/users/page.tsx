@@ -263,7 +263,7 @@ export default function UsersPage() {
   return (
     <ListPageTemplate
       title="Users"
-      subtitle={isLoading ? "Loading users…" : `${users.length} accounts with platform access`}
+      subtitle={isLoading ? "Loading users…" : error ? "Couldn't load right now" : `${users.length} accounts with platform access`}
       actions={
         canManage ? (
           <Button onClick={openCreate}>

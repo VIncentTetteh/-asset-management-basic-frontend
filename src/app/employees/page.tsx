@@ -103,7 +103,7 @@ function EmployeesPageInner() {
   return (
     <ListPageTemplate
       title="Employees"
-      subtitle={isLoading ? "Loading employees…" : `${total.toLocaleString()} employees on record`}
+      subtitle={isLoading ? "Loading employees…" : error ? "Couldn't load right now" : `${total.toLocaleString()} employees on record`}
       actions={
         canManage ? (
           <>

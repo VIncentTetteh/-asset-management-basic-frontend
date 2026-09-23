@@ -241,7 +241,7 @@ export default function VendorReviewsPage() {
   return (
     <ListPageTemplate
       title="Vendor reviews"
-      subtitle={isLoading ? "Loading reviews…" : `${reviews.length} performance reviews`}
+      subtitle={isLoading ? "Loading reviews…" : error ? "Couldn't load right now" : `${reviews.length} performance reviews`}
       actions={
         <Button onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" /> Add review

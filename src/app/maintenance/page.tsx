@@ -175,7 +175,7 @@ export default function MaintenancePage() {
   return (
     <ListPageTemplate
       title="Maintenance"
-      subtitle={isLoading ? "Loading records…" : `${records.length} records · ${openCount} open`}
+      subtitle={isLoading ? "Loading records…" : error ? "Couldn't load right now" : `${records.length} records · ${openCount} open`}
       actions={
         canManage ? (
           <Button onClick={openCreate}>

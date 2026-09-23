@@ -263,7 +263,7 @@ export default function AuditsPage() {
   return (
     <ListPageTemplate
       title="Audits & inspections"
-      subtitle={isLoading ? "Loading audits…" : `${audits.length} audits · ${openCount} open`}
+      subtitle={isLoading ? "Loading audits…" : error ? "Couldn't load right now" : `${audits.length} audits · ${openCount} open`}
       actions={
         canConduct ? (
           <Button onClick={openCreate}>

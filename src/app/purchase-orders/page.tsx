@@ -420,7 +420,7 @@ function PurchaseOrdersContent() {
   return (
     <ListPageTemplate
       title="Purchase orders"
-      subtitle={isLoading ? "Loading orders…" : `${orders.length} orders · ${pendingCount} awaiting approval`}
+      subtitle={isLoading ? "Loading orders…" : error ? "Couldn't load right now" : `${orders.length} orders · ${pendingCount} awaiting approval`}
       actions={
         <>
           <Button variant="outline" onClick={() => handleExport("EXCEL")} disabled={isExporting}>

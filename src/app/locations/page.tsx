@@ -179,7 +179,7 @@ export default function LocationsPage() {
   return (
     <ListPageTemplate
       title="Locations"
-      subtitle={isLoading ? "Loading locations…" : `${rows.length} sites and rooms`}
+      subtitle={isLoading ? "Loading locations…" : error ? "Couldn't load right now" : `${rows.length} sites and rooms`}
       actions={
         canManage ? (
           <>

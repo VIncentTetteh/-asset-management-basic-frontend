@@ -117,7 +117,19 @@ export function DataTable<TData>({
 
   return (
     <div className={cn("overflow-hidden rounded-card border border-edge bg-surface", className)}>
-      <div className="overflow-x-auto">
+      {/*
+        The failure lives outside the horizontally scrolling table wrapper.
+        Inside it, at phone width, the message sat in a container the user had
+        to scroll sideways to read - seen by rendering it at 400px, not by
+        reading the classes.
+      */}
+      {showError ? (
+        <div className="p-4">
+          <DataErrorState what={errorWhat} error={error} onRetry={onRetry} isRetrying={isRetrying} />
+        </div>
+      ) : null}
+
+      <div className={cn("overflow-x-auto", showError && "hidden")}>
         <table className="ea-table w-full border-collapse text-sm">
           <thead>
             {table.getHeaderGroups().map((hg) => (
@@ -178,11 +190,6 @@ export function DataTable<TData>({
                 ))}
           </tbody>
         </table>
-        {showError ? (
-          <div className="p-4">
-            <DataErrorState what={errorWhat} error={error} onRetry={onRetry} isRetrying={isRetrying} />
-          </div>
-        ) : null}
         {showEmpty ? (
           <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
         ) : null}

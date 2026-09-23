@@ -199,7 +199,7 @@ export default function SuppliersPage() {
   return (
     <ListPageTemplate
       title="Suppliers"
-      subtitle={isLoading ? "Loading suppliers…" : `${rows.length} vendors on file`}
+      subtitle={isLoading ? "Loading suppliers…" : error ? "Couldn't load right now" : `${rows.length} vendors on file`}
       actions={
         <>
           <Button variant="outline" onClick={() => handleExport("EXCEL")} disabled={isExporting}>

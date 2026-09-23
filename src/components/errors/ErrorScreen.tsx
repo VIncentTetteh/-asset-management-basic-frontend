@@ -126,7 +126,11 @@ export function ErrorScreen({
                 ref={headingRef}
                 tabIndex={-1}
                 role="alert"
-                className="ea-focus text-lg font-semibold text-foreground outline-none"
+                // tabIndex={-1} + focus() is for the screen-reader
+                // announcement; the element is not tab-reachable, and a brand
+                // ring drawn round the title of an error page looks like a
+                // second fault. Verified by rendering it, not by reading it.
+                className="text-lg font-semibold text-foreground outline-none"
             >
                 {copy.title}
             </h1>

@@ -364,7 +364,7 @@ function ExpensesContent() {
   return (
     <ListPageTemplate
       title="Expenses"
-      subtitle={isLoading ? "Loading expenses…" : `${total.toLocaleString()} expenses · submit → approve workflow`}
+      subtitle={isLoading ? "Loading expenses…" : (focusId ? focusError : listError) ? "Couldn't load right now" : `${total.toLocaleString()} expenses · submit → approve workflow`}
       actions={
         <Button onClick={() => setIsModalOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> Submit expense

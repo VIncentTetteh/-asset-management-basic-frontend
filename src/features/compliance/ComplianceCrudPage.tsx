@@ -297,7 +297,7 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
   return (
     <ListPageTemplate
       title={title}
-      subtitle={isLoading ? `Loading ${entityPlural.toLowerCase()}…` : `${rows.length} records`}
+      subtitle={isLoading ? `Loading ${entityPlural.toLowerCase()}…` : error ? "Couldn't load right now" : `${rows.length} records`}
       actions={
         canManage ? (
           <Button onClick={openCreate}>

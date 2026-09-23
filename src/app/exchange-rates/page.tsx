@@ -194,7 +194,7 @@ export default function ExchangeRatesPage() {
   return (
     <ListPageTemplate
       title="Exchange rates"
-      subtitle={isLoading ? "Loading rates…" : `${rates.length} rate entries drive multi-currency reporting`}
+      subtitle={isLoading ? "Loading rates…" : error ? "Couldn't load right now" : `${rates.length} rate entries drive multi-currency reporting`}
       actions={
         <Button onClick={() => setIsModalOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> Add rate

@@ -327,7 +327,7 @@ export default function LeasesPage() {
   return (
     <ListPageTemplate
       title="Lease records"
-      subtitle={isLoading ? "Loading leases…" : `${leases.length} leases · ${expiring.length} ending within 30 days`}
+      subtitle={isLoading ? "Loading leases…" : error ? "Couldn't load right now" : `${leases.length} leases · ${expiring.length} ending within 30 days`}
       actions={
         <Button onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" /> New lease

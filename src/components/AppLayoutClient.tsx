@@ -229,10 +229,22 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     // problem.
 
     // Auth state has not resolved yet. Normally a few hundred milliseconds.
+    //
+    // This branch is also what `next build` prerenders into every exported
+    // HTML file, 404.html included: every page in this app is a client
+    // component, so the static document can only ever contain the shell's
+    // pre-hydration state. A visitor to a bad URL therefore sees this before
+    // the 404 copy appears — for exactly as long as the JS bundle takes, the
+    // same as any other page. Giving the 404 its own prerendered document
+    // would mean a second root layout outside this client auth shell, which
+    // is a restructure out of proportion to a sub-second spinner.
+    //
+    // What it costs nothing to fix is the silence: an unlabelled spinner tells
+    // a screen reader nothing and tells a user on a slow link nothing either.
     if (!isMounted || !isReady) {
         return (
             <div className="flex min-h-screen items-center justify-center">
-                <PageSpinner />
+                <PageSpinner label="Loading AssetIQ…" />
             </div>
         );
     }

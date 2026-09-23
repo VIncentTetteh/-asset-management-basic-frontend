@@ -298,7 +298,7 @@ export default function ContractsPage() {
   return (
     <ListPageTemplate
       title="Contracts"
-      subtitle={isLoading ? "Loading contracts…" : `${rows.length} agreements ${view === "expiring" ? "expiring soon" : "on file"}`}
+      subtitle={isLoading ? "Loading contracts…" : loadError ? "Couldn't load right now" : `${rows.length} agreements ${view === "expiring" ? "expiring soon" : "on file"}`}
       actions={
         <>
           <ImportButton type="contracts" />

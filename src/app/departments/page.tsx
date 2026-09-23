@@ -227,7 +227,7 @@ export default function DepartmentsPage() {
   return (
     <ListPageTemplate
       title="Departments"
-      subtitle={isLoading ? "Loading departments…" : `${departments.length} departments and cost centers`}
+      subtitle={isLoading ? "Loading departments…" : error ? "Couldn't load right now" : `${departments.length} departments and cost centers`}
       actions={canManageDepartments ? (
         <>
           <ImportButton type="departments" />

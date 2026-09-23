@@ -32,6 +32,7 @@ const TONES = {
         live: "polite" as const,
         box: "border-info/40 bg-info-soft",
         mark: "text-info",
+        ring: "focus-visible:shadow-[0_0_0_2px_var(--info)]",
     },
     ok: {
         icon: CheckCircle2,
@@ -39,6 +40,7 @@ const TONES = {
         live: "polite" as const,
         box: "border-ok/40 bg-ok-soft",
         mark: "text-ok",
+        ring: "focus-visible:shadow-[0_0_0_2px_var(--success)]",
     },
     warn: {
         icon: AlertTriangle,
@@ -46,6 +48,7 @@ const TONES = {
         live: "assertive" as const,
         box: "border-warn/40 bg-warn-soft",
         mark: "text-warn",
+        ring: "focus-visible:shadow-[0_0_0_2px_var(--warning)]",
     },
     danger: {
         icon: OctagonAlert,
@@ -53,6 +56,7 @@ const TONES = {
         live: "assertive" as const,
         box: "border-danger/40 bg-danger-soft",
         mark: "text-danger",
+        ring: "focus-visible:shadow-[0_0_0_2px_var(--danger)]",
     },
 } as const;
 
@@ -76,7 +80,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(function Alert
     { tone = "info", title, action, live = true, className, children, ...props },
     ref,
 ) {
-    const { icon: Icon, role, live: politeness, box, mark } = TONES[tone];
+    const { icon: Icon, role, live: politeness, box, mark, ring } = TONES[tone];
     return (
         <div
             ref={ref}
@@ -85,8 +89,12 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(function Alert
             aria-live={live ? politeness : undefined}
             data-tone={tone}
             className={cn(
-                "ea-focus flex flex-col gap-3 rounded-card border px-4 py-3 text-sm text-foreground outline-none sm:flex-row sm:items-start",
+                // The focus ring is tone-coloured rather than the app's brand
+                // green: a green ring drawn around a red error box reads as a
+                // selection, not as focus. Seen on a rendered page at 400px.
+                "flex flex-col gap-3 rounded-card border px-4 py-3 text-sm text-foreground outline-none sm:flex-row sm:items-start",
                 box,
+                ring,
                 className,
             )}
             {...props}

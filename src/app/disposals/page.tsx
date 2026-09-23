@@ -258,7 +258,7 @@ export default function DisposalsPage() {
   return (
     <ListPageTemplate
       title="Disposals"
-      subtitle={isLoading ? "Loading records…" : `${disposals.length} disposals · ${pendingCount} awaiting approval`}
+      subtitle={isLoading ? "Loading records…" : error ? "Couldn't load right now" : `${disposals.length} disposals · ${pendingCount} awaiting approval`}
       actions={
         <Button variant="destructive" onClick={openCreate}>
           <Trash className="mr-2 h-4 w-4" /> Request disposal

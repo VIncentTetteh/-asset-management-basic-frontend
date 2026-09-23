@@ -207,7 +207,7 @@ export default function CategoriesPage() {
   return (
     <ListPageTemplate
       title="Categories"
-      subtitle={isLoading ? "Loading categories…" : `${rows.length} asset categories`}
+      subtitle={isLoading ? "Loading categories…" : error ? "Couldn't load right now" : `${rows.length} asset categories`}
       actions={
         <>
           <ImportButton type="categories" />

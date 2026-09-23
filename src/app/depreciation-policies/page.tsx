@@ -146,7 +146,7 @@ export default function DepreciationPoliciesPage() {
   return (
     <ListPageTemplate
       title="Depreciation policies"
-      subtitle={isLoading ? "Loading policies…" : `${policies.length} policies define how book value declines`}
+      subtitle={isLoading ? "Loading policies…" : error ? "Couldn't load right now" : `${policies.length} policies define how book value declines`}
       actions={
         <Button onClick={openCreate}>
           <Calculator className="mr-2 h-4 w-4" /> New policy

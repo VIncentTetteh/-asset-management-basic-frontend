@@ -31,9 +31,14 @@ export function Spinner({ className, size = "default", color }: SpinnerProps) {
 
 export function PageSpinner({ label }: { label?: string }) {
     return (
-        <div className="flex flex-col items-center justify-center h-64 gap-3">
+        // A spinner is a picture; a screen reader needs the sentence. The
+        // label is announced politely when there is one, and an unlabelled
+        // spinner still says "Loading" rather than nothing at all.
+        <div role="status" aria-live="polite" className="flex flex-col items-center justify-center h-64 gap-3">
             <Spinner size="lg" className="text-brand" />
-            {label && <p className="text-sm text-muted-fg animate-pulse">{label}</p>}
+            {label
+                ? <p className="text-sm text-muted-fg animate-pulse">{label}</p>
+                : <span className="sr-only">Loading</span>}
         </div>
     );
 }

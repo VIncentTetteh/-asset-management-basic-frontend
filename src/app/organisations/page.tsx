@@ -132,7 +132,7 @@ export default function OrganisationsPage() {
   return (
     <ListPageTemplate
       title="Organisations"
-      subtitle={isLoading ? "Loading organisations…" : `${organisations.length} tenant organisations`}
+      subtitle={isLoading ? "Loading organisations…" : error ? "Couldn't load right now" : `${organisations.length} tenant organisations`}
       toolbar={
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-faint-fg" />

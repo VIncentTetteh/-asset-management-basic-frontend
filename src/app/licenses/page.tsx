@@ -303,7 +303,7 @@ export default function LicensesPage() {
   return (
     <ListPageTemplate
       title="Software licenses"
-      subtitle={isLoading ? "Loading licenses…" : `${rows.length} licenses in view`}
+      subtitle={isLoading ? "Loading licenses…" : loadError ? "Couldn't load right now" : `${rows.length} licenses in view`}
       actions={
         <>
           <ImportButton type="licenses" />
