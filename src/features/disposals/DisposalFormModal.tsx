@@ -22,6 +22,7 @@ import { todayLocal } from "@/lib/local-date";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { AssetSearchPicker, type PickedAsset } from "@/components/assets/AssetSearchPicker";
+import { AttachmentField, attachAfterCreate, useAttachmentField } from "@/components/ui/attachment-field";
 
 const L = FIELD_LIMITS.disposal;
 
@@ -39,9 +40,16 @@ export function DisposalFormModal({
   const locked = disposalTermsLocked(editingDisposal);
   // The picked asset (searched server-side); its id is the form's assetId.
   const [pickedAsset, setPickedAsset] = useState<PickedAsset | null>(null);
+  // Compliance certificates are uploaded, not linked. A new request holds the
+  // file until the create returns its id (see attachAfterCreate in onSubmit).
+  const attachments = useAttachmentField({
+    entityType: "DISPOSAL_RECORD",
+    entityId: editingDisposal?.id ?? null,
+  });
 
   useEffect(() => {
     if (!isOpen) return;
+    attachments.reset();
     reset(
       editingDisposal
         ? {
@@ -63,6 +71,8 @@ export function DisposalFormModal({
             complianceDocumentUrl: "",
           },
     );
+    // `attachments.reset` only clears local picker state; it is stable per modal open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, editingDisposal, reset]);
 
   // An edit shows the record's own asset (not changeable); a new request shows the pick.
@@ -82,7 +92,12 @@ export function DisposalFormModal({
   const onSubmit = async (data: DisposalForm) => {
     const payload = buildDisposalPayload(data, editingDisposal);
     try {
-      await save.mutateAsync(editingDisposal ? { id: editingDisposal.id!, data: payload } : { data: payload });
+      const saved = await save.mutateAsync(
+        editingDisposal ? { id: editingDisposal.id!, data: payload } : { data: payload },
+      );
+      // The record exists now, so the held certificate can finally be attached.
+      // A failure here says so rather than passing for a clean save.
+      if (!editingDisposal) await attachAfterCreate(attachments, saved?.id, "disposal record");
       close();
     } catch (err) {
       // Toasted by the mutation; keep the form open with field errors marked.
@@ -177,16 +192,27 @@ export function DisposalFormModal({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="dp-doc">Compliance document (link or reference)</Label>
-          <Input
-            id="dp-doc"
-            maxLength={DISPOSAL_DOC_MAX_LENGTH}
-            placeholder="https://… or certificate of destruction #12345"
-            {...register("complianceDocumentUrl", limitRules<DisposalForm, "complianceDocumentUrl">(L.complianceDocumentUrl, "Compliance document"))}
-          />
-          <FieldError error={errors.complianceDocumentUrl} />
-        </div>
+        {/* The stored reference is carried through untouched so a legacy link or
+            certificate number is never cleared by the switch to uploads. */}
+        {attachments.enabled ? <input type="hidden" {...register("complianceDocumentUrl")} /> : null}
+        <AttachmentField
+          state={attachments}
+          label="Compliance document"
+          hint="Certificate of destruction, weighbridge ticket or recycler receipt."
+          legacyUrl={editingDisposal?.complianceDocumentUrl}
+          fallback={
+            <div className="space-y-2">
+              <Label htmlFor="dp-doc">Compliance document (link or reference)</Label>
+              <Input
+                id="dp-doc"
+                maxLength={DISPOSAL_DOC_MAX_LENGTH}
+                placeholder="https://… or certificate of destruction #12345"
+                {...register("complianceDocumentUrl", limitRules<DisposalForm, "complianceDocumentUrl">(L.complianceDocumentUrl, "Compliance document"))}
+              />
+              <FieldError error={errors.complianceDocumentUrl} />
+            </div>
+          }
+        />
 
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={close}>Cancel</Button>

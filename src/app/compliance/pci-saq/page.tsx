@@ -15,7 +15,7 @@ const FIELDS: FieldSpec<PCISAQDto>[] = [
   { name: "requirementText", label: "Requirement text", type: "textarea" },
   { name: "compensatingControl", label: "Compensating control", type: "textarea" },
   { name: "targetDate", label: "Target date", type: "date" },
-  { name: "evidenceUrl", label: "Evidence URL", type: "text", placeholder: "https://…" },
+  { name: "evidenceUrl", label: "Evidence document", type: "attachment", attachmentEntityType: "PCI_SAQ", placeholder: "https://…" },
   { name: "notes", label: "Notes", type: "textarea" },
 ];
 

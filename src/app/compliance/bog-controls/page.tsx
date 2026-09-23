@@ -14,7 +14,7 @@ const FIELDS: FieldSpec<BOGControlDto>[] = [
   { name: "remediationPlan", label: "Remediation plan", type: "textarea" },
   { name: "targetDate", label: "Target date", type: "date" },
   { name: "ownerId", label: "Owner", type: "select" },
-  { name: "evidenceUrl", label: "Evidence URL", type: "text", placeholder: "https://…" },
+  { name: "evidenceUrl", label: "Evidence document", type: "attachment", attachmentEntityType: "BOG_CONTROL", placeholder: "https://…" },
 ];
 
 const CREATE_DEFAULTS = { directiveRef: "", requirement: "", status: "NOT_IMPLEMENTED" } as const;

@@ -32,6 +32,7 @@ import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 import { formatLocalDate } from "@/lib/local-date";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { AttachmentField, attachAfterCreate, useAttachmentField } from "@/components/ui/attachment-field";
 
 const CONTRACT_TYPES = ["PURCHASE", "LEASE", "MAINTENANCE", "SERVICE_LEVEL_AGREEMENT", "WARRANTY", "INSURANCE", "OTHER"];
 const CONTRACT_STATUSES = ["DRAFT", "ACTIVE", "EXPIRING_SOON", "EXPIRED", "TERMINATED", "RENEWED"];
@@ -88,9 +89,13 @@ export default function ContractsPage() {
   const [editing, setEditing] = useState<Contract | null>(null);
 
   const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<ContractForm>();
+  // Documents are uploaded, not linked. An existing contract attaches straight
+  // away; a new one holds the file until the create returns its id.
+  const attachments = useAttachmentField({ entityType: "CONTRACT", entityId: editing?.id ?? null });
 
   useEffect(() => {
     if (!isModalOpen || !pickersReady) return;
+    attachments.reset();
     reset(
       editing
         ? {
@@ -126,6 +131,8 @@ export default function ContractsPage() {
             notes: "",
           },
     );
+    // `attachments.reset` only clears local picker state; it is stable per modal open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModalOpen, editing, reset, baseCurrency, pickersReady]);
 
   const supplierName = useMemo(() => {
@@ -146,7 +153,10 @@ export default function ContractsPage() {
   const onSubmit = async (data: ContractForm) => {
     const payload = buildContractPayload(data);
     try {
-      await save.mutateAsync(editing ? { id: editing.id, data: payload } : { data: payload });
+      const saved = await save.mutateAsync(editing ? { id: editing.id, data: payload } : { data: payload });
+      // The record exists now, so the held file finally has something to hang off.
+      // A failure here says so; it never passes for a clean save.
+      if (!editing) await attachAfterCreate(attachments, saved?.id, "contract");
       setIsModalOpen(false);
     } catch (err) {
       applyApiFieldErrors(err, setError); // the save hook already toasted the field list
@@ -450,12 +460,21 @@ export default function ContractsPage() {
             </Label>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="ct-doc">Document URL</Label>
-            <Input id="ct-doc" type="url" placeholder="https://…" {...limitInputProps(L.documentUrl)}
-              {...register("documentUrl", limitRules<ContractForm, "documentUrl">(L.documentUrl, "Document URL"))} />
-            <FieldError error={errors.documentUrl} />
-          </div>
+          {/* The stored URL is carried through untouched so a legacy link is never cleared. */}
+          {attachments.enabled ? <input type="hidden" {...register("documentUrl")} /> : null}
+          <AttachmentField
+            state={attachments}
+            label="Contract document"
+            legacyUrl={editing?.documentUrl}
+            fallback={
+              <div className="space-y-2">
+                <Label htmlFor="ct-doc">Document URL</Label>
+                <Input id="ct-doc" type="url" placeholder="https://…" {...limitInputProps(L.documentUrl)}
+                  {...register("documentUrl", limitRules<ContractForm, "documentUrl">(L.documentUrl, "Document URL"))} />
+                <FieldError error={errors.documentUrl} />
+              </div>
+            }
+          />
 
           <div className="space-y-2">
             <Label htmlFor="ct-terms">Key terms</Label>

@@ -18,7 +18,7 @@ const FIELDS: FieldSpec<ComplianceControlDto>[] = [
   { name: "justification", label: "Justification", type: "textarea" },
   { name: "gapDescription", label: "Gap description", type: "textarea" },
   { name: "remediationPlan", label: "Remediation plan", type: "textarea" },
-  { name: "evidenceUrl", label: "Evidence URL", type: "text", span2: true, placeholder: "https://…" },
+  { name: "evidenceUrl", label: "Evidence document", type: "attachment", attachmentEntityType: "COMPLIANCE_CONTROL", span2: true, placeholder: "https://…" },
 ];
 
 const CREATE_DEFAULTS = { framework: "ISO_27001", controlRef: "", controlName: "", status: "NOT_IMPLEMENTED" } as const;

@@ -9,7 +9,8 @@
  * from UTC-11 to UTC+11.
  */
 
-export type ComplianceFieldType = "text" | "textarea" | "number" | "date" | "select" | "checkbox";
+/** "attachment" is a document-uploader field whose column still holds a legacy URL string. */
+export type ComplianceFieldType = "text" | "textarea" | "number" | "date" | "select" | "checkbox" | "attachment";
 
 export interface PayloadField {
   name: string;
@@ -40,7 +41,7 @@ export function buildCompliancePayload(
     const field = byName.get(key);
     if (isBlank(raw)) {
       const wasSet = editing != null && !isBlank(editing[key]);
-      if (wasSet && field && (field.type === "text" || field.type === "textarea")) out[key] = "";
+      if (wasSet && field && (field.type === "text" || field.type === "textarea" || field.type === "attachment")) out[key] = "";
       continue;
     }
     if (field?.type === "number") {

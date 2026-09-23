@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/ui/field-error";
 import { ExternalLink as SafeExternalLink } from "@/components/ui/external-link";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { AttachmentField, attachAfterCreate, useAttachmentField } from "@/components/ui/attachment-field";
 import { assetService } from "@/services/assetService";
 import { qk } from "@/lib/queryClient";
 
@@ -104,9 +105,13 @@ export default function LicensesPage() {
   const [editing, setEditing] = useState<SoftwareLicense | null>(null);
 
   const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<LicenseForm>();
+  // Documents are uploaded, not linked. A new licence holds the file until the
+  // create returns its id (see attachAfterCreate in onSubmit).
+  const attachments = useAttachmentField({ entityType: "SOFTWARE_LICENSE", entityId: editing?.id ?? null });
 
   useEffect(() => {
     if (!isModalOpen) return;
+    attachments.reset();
     reset(
       editing
         ? {
@@ -145,6 +150,8 @@ export default function LicensesPage() {
             assetId: "",
           },
     );
+    // `attachments.reset` only clears local picker state; it is stable per modal open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModalOpen, editing, reset, baseCurrency]);
 
   const openCreate = () => {
@@ -159,7 +166,9 @@ export default function LicensesPage() {
 
   const onSubmit = async (data: LicenseForm) => {
     try {
-      await save.mutateAsync({ id: editing?.id, data: buildLicensePayload(data) });
+      const saved = await save.mutateAsync({ id: editing?.id, data: buildLicensePayload(data) });
+      // The licence exists now, so a file held through the create can be attached.
+      if (!editing) await attachAfterCreate(attachments, saved?.id, "licence");
       setIsModalOpen(false);
     } catch (err) {
       applyApiFieldErrors(err, setError); // the save hook already toasted the field list
@@ -491,10 +500,21 @@ export default function LicensesPage() {
               <FieldError error={errors.assetId} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lic-doc">Document URL</Label>
-              <Input id="lic-doc" type="url" placeholder="https://…" {...limitInputProps(L.licenseDocumentUrl)}
-                {...register("licenseDocumentUrl", limitRules<LicenseForm, "licenseDocumentUrl">(L.licenseDocumentUrl, "Document URL"))} />
-              <FieldError error={errors.licenseDocumentUrl} />
+              {/* The stored URL is carried through untouched so a legacy link is never cleared. */}
+              {attachments.enabled ? <input type="hidden" {...register("licenseDocumentUrl")} /> : null}
+              <AttachmentField
+                state={attachments}
+                label="Licence document"
+                legacyUrl={editing?.licenseDocumentUrl}
+                fallback={
+                  <>
+                    <Label htmlFor="lic-doc">Document URL</Label>
+                    <Input id="lic-doc" type="url" placeholder="https://…" {...limitInputProps(L.licenseDocumentUrl)}
+                      {...register("licenseDocumentUrl", limitRules<LicenseForm, "licenseDocumentUrl">(L.licenseDocumentUrl, "Document URL"))} />
+                    <FieldError error={errors.licenseDocumentUrl} />
+                  </>
+                }
+              />
             </div>
           </div>
 

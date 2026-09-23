@@ -17,7 +17,7 @@ const FIELDS: FieldSpec<SecurityPolicyDto>[] = [
   { name: "reviewDueDate", label: "Review due", type: "date" },
   { name: "ownerId", label: "Owner", type: "select" },
   { name: "approvedByEmail", label: "Approved by", type: "select" },
-  { name: "documentUrl", label: "Document URL", type: "text", span2: true, placeholder: "https://…" },
+  { name: "documentUrl", label: "Policy document", type: "attachment", attachmentEntityType: "SECURITY_POLICY", span2: true, placeholder: "https://…" },
 ];
 
 const CREATE_DEFAULTS = { title: "", status: "DRAFT", version: "1.0" } as const;

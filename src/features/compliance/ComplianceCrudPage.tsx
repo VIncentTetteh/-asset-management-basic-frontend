@@ -21,12 +21,21 @@ import { buildCompliancePayload, buildComplianceReplacePayload } from "@/feature
 import { useConfirm } from "@/hooks/useConfirm";
 import { FieldError } from "@/components/ui/field-error";
 import { fieldLimit, limitInputProps, limitRules, type FieldLimit, type LimitedEntity } from "@/lib/field-limits";
+import { AttachmentField, attachAfterCreate, useAttachmentField } from "@/components/ui/attachment-field";
+import type { AttachmentEntityType } from "@/types";
 
 /** One form control, rendered in a two-column grid (span2 for full width). */
 export interface FieldSpec<TDto> {
   name: keyof TDto & string;
   label: string;
-  type: "text" | "textarea" | "number" | "date" | "select" | "checkbox";
+  /**
+   * "attachment" turns the field into the document uploader: the column still
+   * holds whatever URL was stored before uploads existed (shown as a link), and
+   * `attachmentEntityType` says what the file is attached to. At most one per page.
+   */
+  type: "text" | "textarea" | "number" | "date" | "select" | "checkbox" | "attachment";
+  /** Required for `type: "attachment"`. */
+  attachmentEntityType?: AttachmentEntityType;
   options?: { value: string; label: string }[];
   required?: boolean;
   mono?: boolean;
@@ -171,8 +180,20 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
 
   const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<TDto>();
 
+  // Evidence/report/policy documents are uploaded, not linked. A new record holds
+  // the file until the create returns its id (see attachAfterCreate in onSubmit).
+  const attachmentSpec = fields.find((f) => f.type === "attachment");
+  const attachments = useAttachmentField({
+    entityType: attachmentSpec?.attachmentEntityType ?? "COMPLIANCE_CONTROL",
+    entityId: editing?.id ?? null,
+  });
+
   useEffect(() => {
-    if (isModalOpen) reset(toFormDefaults(editing));
+    if (isModalOpen) {
+      attachments.reset();
+      reset(toFormDefaults(editing));
+    }
+    // `attachments.reset` only clears local picker state; it is stable per modal open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModalOpen, editing, reset]);
 
@@ -216,7 +237,10 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
         await save.mutateAsync({ id: editing.id!, data: payload as TDto });
       } else {
         const payload = buildCompliancePayload(fields, transformed) as TDto;
-        await save.mutateAsync({ data: payload });
+        const saved = await save.mutateAsync({ data: payload });
+        // The record exists now, so the held file finally has something to hang
+        // off. A failure here says so; it never passes for a clean save.
+        if (attachmentSpec) await attachAfterCreate(attachments, saved?.id, entity.toLowerCase());
       }
       setIsModalOpen(false);
     } catch (err) {
@@ -326,13 +350,36 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
               };
               const rules = limitRules<TDto>(limit, field.label);
               return (
-                <div key={field.name} className={`space-y-2 ${field.span2 || field.type === "textarea" ? "col-span-2" : ""}`}>
-                  {field.type !== "checkbox" && (
+                <div key={field.name} className={`space-y-2 ${field.span2 || field.type === "textarea" || field.type === "attachment" ? "col-span-2" : ""}`}>
+                  {field.type !== "checkbox" && field.type !== "attachment" && (
                     <Label htmlFor={id}>
                       {field.label} {limit.required && <span className="text-danger">*</span>}
                     </Label>
                   )}
-                  {field.type === "select" ? (
+                  {field.type === "attachment" ? (
+                    <>
+                      {/* The stored URL is carried through untouched so a legacy link is never cleared. */}
+                      {attachments.enabled ? <input type="hidden" {...register(field.name as Path<TDto>)} /> : null}
+                      <AttachmentField
+                        state={attachments}
+                        label={field.label}
+                        legacyUrl={
+                          editing ? String((editing as Record<string, unknown>)[field.name] ?? "") || null : null
+                        }
+                        fallback={
+                          <>
+                            <Label htmlFor={id}>{field.label}</Label>
+                            <Input
+                              {...common}
+                              type="text"
+                              maxLength={limit.maxLength}
+                              {...register(field.name as Path<TDto>, rules)}
+                            />
+                          </>
+                        }
+                      />
+                    </>
+                  ) : field.type === "select" ? (
                     <Select
                       {...common}
                       disabled={!!editing && field.lockedOnEdit}

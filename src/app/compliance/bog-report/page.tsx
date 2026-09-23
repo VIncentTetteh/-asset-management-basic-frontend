@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { AssetTag } from "@/components/ui/asset-tag";
-import DocumentAttachments from "@/components/DocumentAttachments";
+import { AttachmentField, attachAfterCreate, useAttachmentField } from "@/components/ui/attachment-field";
 import { useBogReport, useBogControlsList, useUpsertBogControl, useUpdateBogControlStatus } from "@/features/compliance/bogReportHooks";
 import { todayLocal } from "@/lib/local-date";
 import { buildBogControlPayload } from "@/features/compliance/payload";
@@ -95,9 +95,11 @@ export default function BogReportPage() {
   const [editControl, setEditControl] = useState<BOGControl | null>(null);
 
   const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<BOGControlDto>();
+  const attachments = useAttachmentField({ entityType: "BOG_CONTROL", entityId: editControl?.id ?? null });
 
   useEffect(() => {
     if (!isUpsertOpen) return;
+    attachments.reset();
     reset({
       directiveRef: editControl?.directiveRef || "",
       requirement: editControl?.requirement || "",
@@ -107,6 +109,8 @@ export default function BogReportPage() {
       targetDate: editControl?.targetDate?.split("T")[0] || "",
       evidenceUrl: editControl?.evidenceUrl || "",
     });
+    // `attachments.reset` only clears local picker state; it is stable per modal open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUpsertOpen, editControl, reset]);
 
   const handleDownloadPdf = async () => {
@@ -135,7 +139,10 @@ export default function BogReportPage() {
 
   const onUpsert = async (data: BOGControlDto) => {
     try {
-      await upsertControl.mutateAsync(buildBogControlPayload(data) as BOGControlDto);
+      const saved = await upsertControl.mutateAsync(buildBogControlPayload(data) as BOGControlDto);
+      // The control exists now (this endpoint upserts by directive ref), so a file
+      // held through the save finally has something to hang off.
+      await attachAfterCreate(attachments, editControl?.id ?? saved?.id, "control");
       setIsUpsertOpen(false);
     } catch (err) {
       // Toasted by the mutation; the dialog stays open with the server's field
@@ -365,18 +372,11 @@ export default function BogReportPage() {
             <Label htmlFor="b-date">Target date</Label>
             <Input id="b-date" type="date" {...register("targetDate")} />
           </div>
-          {editControl?.id ? (
-            <div className="space-y-1.5">
-              <Label>Evidence documents</Label>
-              {editControl.evidenceUrl ? (
-                <p className="mb-1 text-xs text-muted-fg">
-                  Legacy link:{" "}
-                  <SafeExternalLink href={editControl.evidenceUrl} className="text-brand hover:underline" />
-                </p>
-              ) : null}
-              <DocumentAttachments entityType="BOG_CONTROL" entityId={editControl.id} />
-            </div>
-          ) : null}
+          <AttachmentField
+            state={attachments}
+            label="Evidence documents"
+            legacyUrl={editControl?.evidenceUrl}
+          />
           <div className="flex gap-3 border-t border-edge-subtle pt-4">
             <Button type="submit" isLoading={upsertControl.isPending} className="flex-1">
               <ShieldCheck className="mr-2 h-4 w-4" />

@@ -39,6 +39,7 @@ import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
 import { MoneyTotalValue } from "@/components/currency/MoneyTotalValue";
 import { formatLocalDate, todayLocal } from "@/lib/local-date";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { AttachmentField, attachAfterCreate, useAttachmentField } from "@/components/ui/attachment-field";
 import { FieldError } from "@/components/ui/field-error";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -169,9 +170,13 @@ function ExpensesContent() {
   });
 
   const { register, handleSubmit, reset, watch, setValue, setError, formState: { errors } } = useForm<FormData>();
+  // Receipts are uploaded, not linked. The form only ever creates, so the file
+  // is held until the expense is saved (see attachAfterCreate in onSubmit).
+  const attachments = useAttachmentField({ entityType: "EXPENSE" });
 
   useEffect(() => {
     if (!isModalOpen) return;
+    attachments.reset();
     reset({
       title: "",
       description: "",
@@ -184,6 +189,8 @@ function ExpensesContent() {
       receiptUrl: "",
       expenseDate: todayLocal(),
     });
+    // `attachments.reset` only clears local picker state; it is stable per modal open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModalOpen, reset, baseCurrency]);
 
   const lookups = useMemo(() => {
@@ -221,7 +228,10 @@ function ExpensesContent() {
     }
     const payload = buildExpensePayload(data, currency) as Partial<ExpenseDto>;
     try {
-      await submitExpense.mutateAsync(payload);
+      const saved = await submitExpense.mutateAsync(payload);
+      // The expense exists now, so the held receipt finally has something to hang
+      // off. A failure here says so rather than passing for a clean submission.
+      await attachAfterCreate(attachments, saved?.id, "expense");
       setIsModalOpen(false);
     } catch (err) {
       reportApiError(err, { fallback: "Failed to submit expense", setError, labels: { linkedBudgetId: "Linked budget" } });
@@ -555,10 +565,19 @@ function ExpensesContent() {
               <FieldError error={errors.departmentId} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ex-receipt">Receipt URL</Label>
-              <Input id="ex-receipt" type="url" placeholder="https://…" {...limitInputProps(L.receiptUrl)}
-                {...register("receiptUrl", limitRules<FormData, "receiptUrl">(L.receiptUrl, "Receipt URL"))} />
-              <FieldError error={errors.receiptUrl} />
+              <AttachmentField
+                state={attachments}
+                label="Receipt"
+                hint="Attach the receipt — it uploads once the expense is submitted."
+                fallback={
+                  <>
+                    <Label htmlFor="ex-receipt">Receipt URL</Label>
+                    <Input id="ex-receipt" type="url" placeholder="https://…" {...limitInputProps(L.receiptUrl)}
+                      {...register("receiptUrl", limitRules<FormData, "receiptUrl">(L.receiptUrl, "Receipt URL"))} />
+                    <FieldError error={errors.receiptUrl} />
+                  </>
+                }
+              />
             </div>
           </div>
 
