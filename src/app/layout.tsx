@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { AppLayoutClient } from "@/components/AppLayoutClient";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ChunkRecoveryListener } from "@/components/errors/ChunkRecoveryListener";
 
 export const metadata: Metadata = {
   title: "AssetIQ — Enterprise Asset Management",
@@ -34,12 +35,32 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>
+        {/*
+          Recovers a tab left open across a deploy: a route chunk that 404s on
+          navigation rejects outside React, so no error boundary ever sees it.
+          Must sit outside AuthProvider — it has to work even if the app shell
+          is the thing that failed to load.
+        */}
+        <ChunkRecoveryListener />
         {/* AuthProvider wraps the entire app — provides useAuth() and <Can> everywhere */}
         <AuthProvider>
           <AppLayoutClient>
             {children}
           </AppLayoutClient>
-          <Toaster position="top-right" />
+          {/*
+            Toasts are acknowledgements only — see src/lib/notify.ts for when a
+            toast is the wrong channel. `ea-toast` exists so globals.css can
+            drop react-hot-toast's slide-in under prefers-reduced-motion, and
+            the aria defaults make an announcement polite unless a caller
+            (notify.error) upgrades it to assertive.
+          */}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              className: "ea-toast",
+              ariaProps: { role: "status", "aria-live": "polite" },
+            }}
+          />
         </AuthProvider>
       </body>
     </html>

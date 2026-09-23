@@ -152,6 +152,20 @@ h1, h2, h3, h4, h5, h6 {
   .animate-fade-in, .animate-slide-up, .animate-float, .skeleton-shimmer,
   .page-enter, .status-active { animation: none; }
   .card-lift, .card-lift:hover { transition: none; transform: none; }
+
+  /* Tailwind's pulse drives every loading skeleton. A skeleton still reads as
+     "not here yet" standing still, so it stops. */
+  .animate-pulse { animation: none; }
+
+  /* The spinner does not stop: a frozen spinner is indistinguishable from a
+     hung one, and it is often the only signal that work is in flight. It is
+     slowed instead, which is what the reduced-motion preference asks for. */
+  .animate-spin { animation-duration: 2.4s; }
+
+  /* react-hot-toast slides and scales each toast in via an inline `animation`
+     on its own wrapper, which only !important can reach. Toasts still appear
+     and disappear — they just stop moving. */
+  .ea-toast { animation: none !important; }
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
