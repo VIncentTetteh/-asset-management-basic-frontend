@@ -2231,9 +2231,6 @@ export type AttachmentEntityType =
     | 'CONTRACT'
     | 'DISPOSAL_RECORD'
     | 'VULNERABILITY_SCAN'
-    // Added for the licence form's document uploader. The backend's
-    // AttachmentEntityType is gaining this value; until it lands the API
-    // rejects it with 400 and the uploader reports that inline.
     | 'SOFTWARE_LICENSE';
 
 export interface DocumentAttachment {
