@@ -31,7 +31,7 @@ import { ImportWizardModal } from "@/features/imports/ImportWizardModal";
 function AssetsPageInner() {
   const { filters, searchInput, setSearchInput, setParam, clearAdvanced, queryParams, hasAdvancedFilters } =
     useAssetFilters();
-  const { data: paged, isLoading } = usePagedAssets(queryParams);
+  const { data: paged, isLoading, error, refetch, isFetching } = usePagedAssets(queryParams);
   const { data: stats } = useAssetStats();
   const master = useAssetMasterData();
   const deleteAsset = useDeleteAsset();
@@ -136,6 +136,9 @@ function AssetsPageInner() {
         <AssetRegisterTable
           paged={paged}
           isLoading={isLoading}
+          error={error}
+          onRetry={refetch}
+          isRetrying={isFetching}
           page={filters.page}
           onPageChange={(p) => setParam("page", String(p))}
           sort={filters.sort}

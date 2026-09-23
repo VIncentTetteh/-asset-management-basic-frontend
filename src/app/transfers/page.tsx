@@ -14,7 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionContext";
 
 export default function TransfersPage() {
-  const { data: transfers = [], isLoading } = useTransfers();
+  const { data: transfers = [], isLoading, error, refetch, isFetching } = useTransfers();
   const master = useTransferMasterData();
   const transferAction = useTransferAction();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -60,6 +60,9 @@ export default function TransfersPage() {
       }
     >
       <TransferTable
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
         transfers={transfers}
         isLoading={isLoading}
         lookups={lookups}

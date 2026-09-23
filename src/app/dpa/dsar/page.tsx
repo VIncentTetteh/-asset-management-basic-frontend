@@ -51,7 +51,7 @@ export default function DsarPage() {
   // The list is paged server-side: the screen used to pull 200 rows and silently
   // drop anything beyond them. The status filter goes to the API; the free-text
   // search narrows the page that is on screen.
-  const { data: pageData, isLoading } = useQuery({
+  const { data: pageData, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: [...dsarKey.list(), statusFilter, page],
     queryFn: () => dsarService.list({ page, status: statusFilter }),
   });
@@ -285,6 +285,10 @@ export default function DsarPage() {
           columns={columns}
           data={filtered}
           isLoading={isLoading}
+          error={error}
+          onRetry={refetch}
+          isRetrying={isFetching}
+          errorWhat="the DSAR register"
           pageInfo={{
             page,
             size: DSAR_PAGE_SIZE,

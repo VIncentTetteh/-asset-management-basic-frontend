@@ -20,10 +20,17 @@ export const isOverdue = (record: CheckoutRecordDto) =>
 export function CheckoutTable({
   records,
   isLoading,
+  error,
+  onRetry,
+  isRetrying,
   onCheckIn,
 }: {
   records: CheckoutRecordDto[];
   isLoading: boolean;
+  /** The checkout query's failure, if it failed. */
+  error?: unknown;
+  onRetry?: () => void | Promise<unknown>;
+  isRetrying?: boolean;
   onCheckIn: (record: CheckoutRecordDto) => void;
 }) {
   const columns = useMemo<ColumnDef<CheckoutRecordDto, unknown>[]>(
@@ -126,6 +133,10 @@ export function CheckoutTable({
       columns={columns}
       data={records}
       isLoading={isLoading}
+      error={error}
+      onRetry={onRetry}
+      isRetrying={isRetrying}
+      errorWhat="the custody trail"
       emptyTitle="No checkout records"
       emptyDescription="When assets are issued to people, the custody trail shows up here."
     />

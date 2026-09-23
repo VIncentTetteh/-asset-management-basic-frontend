@@ -42,7 +42,7 @@ export default function LeasesPage() {
   const leasesKey = qk.module("leases");
   const { confirm, ConfirmDialog } = useConfirm();
 
-  const { data: leases = [], isLoading } = useQuery({
+  const { data: leases = [], isLoading, error, refetch, isFetching } = useQuery({
     queryKey: leasesKey.list(),
     queryFn: () => leaseRecordService.listAll(),
   });
@@ -374,6 +374,10 @@ export default function LeasesPage() {
           columns={columns}
           data={filtered}
           isLoading={isLoading}
+          error={error}
+          onRetry={refetch}
+          isRetrying={isFetching}
+          errorWhat="your leases"
           emptyTitle="No lease records"
           emptyDescription="Track leased assets with monthly obligations, notice periods, and renewals."
           emptyAction={

@@ -7,9 +7,12 @@ import { ShieldCheck, XCircle, CheckCircle2, Search } from "lucide-react";
 import { dpaConsentService, CONSENT_PAGE_SIZE, type ConsentRecordDto, type ConsentPurpose } from "@/services/dpaConsentService";
 import { userService } from "@/services/userService";
 import { qk } from "@/lib/queryClient";
+import axios from "axios";
 import { reportApiError } from "@/lib/api-validation";
 import { ListPageTemplate } from "@/components/templates/ListPageTemplate";
 import { DataTable, type ColumnDef } from "@/components/patterns/DataTable";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
+import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,6 +93,11 @@ function MyConsentCard({ onChanged }: { onChanged: () => void }) {
   );
 }
 
+/** A 403 is a permission condition; anything else is a failed request. */
+function isConsentForbidden(error: unknown): boolean {
+    return axios.isAxiosError(error) && error.response?.status === 403;
+}
+
 export default function DpaConsentPage() {
   const queryClient = useQueryClient();
   const consentsKey = qk.module("dpa-consent");
@@ -98,7 +106,7 @@ export default function DpaConsentPage() {
 
   // The ledger is paged server-side: it used to be fetched 500 rows at a time
   // and anything past that was invisible. The search narrows the page on screen.
-  const { data: pageData, isLoading, error } = useQuery({
+  const { data: pageData, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: [...consentsKey.list(), page],
     queryFn: () => dpaConsentService.list({ page }),
   });
@@ -210,10 +218,24 @@ export default function DpaConsentPage() {
       <div className="space-y-4">
         <MyConsentCard onChanged={() => void invalidate()} />
 
-        {error ? (
-          <p className="rounded-card border border-danger/40 bg-danger-soft p-3 text-sm text-danger">
-            The consent ledger could not be loaded. Viewing it needs VIEW_COMPLIANCE or MANAGE_COMPLIANCE.
-          </p>
+        {/*
+          This page was already right not to show an empty table on failure.
+          What it got wrong was the diagnosis: it blamed the user's permissions
+          for every failure, including a 500 or a dropped connection, and gave
+          them nothing to press. Permission is now distinguished from breakage,
+          and breakage can be retried.
+        */}
+        {error && isConsentForbidden(error) ? (
+          <Alert tone="warn" title="You don't have permission to view the consent ledger">
+            Viewing it needs VIEW_COMPLIANCE or MANAGE_COMPLIANCE. Ask an administrator to grant it.
+          </Alert>
+        ) : error ? (
+          <DataErrorState
+            what="the consent ledger"
+            error={error}
+            onRetry={refetch}
+            isRetrying={isFetching}
+          />
         ) : (
           <DataTable
             columns={columns}

@@ -56,14 +56,19 @@ const L = FIELD_LIMITS.contract;
 export default function ContractsPage() {
   const { format, baseCurrency, sum } = useCurrency();
   const [view, setView] = useState<"all" | "expiring">("all");
-  const { data: allRows = [], isLoading: allLoading } = contracts.useList();
-  const { data: expiringRows = [], isLoading: expiringLoading } = useQuery({
+  const { data: allRows = [], isLoading: allLoading, error: allError, refetch: refetchAll, isFetching: allFetching } = contracts.useList();
+  const { data: expiringRows = [], isLoading: expiringLoading, error: expiringError, refetch: refetchExpiring, isFetching: expiringFetching } = useQuery({
     queryKey: [...contracts.key.all, "expiring"],
     queryFn: () => contractService.getExpiringSoon(),
     enabled: view === "expiring",
   });
   const rows = view === "expiring" ? expiringRows : allRows;
   const isLoading = view === "expiring" ? expiringLoading : allLoading;
+  // The table shows one of two queries; the failure it reports has to be
+  // the one whose rows are missing, not whichever failed most recently.
+  const loadError = view === "expiring" ? expiringError : allError;
+  const retry = view === "expiring" ? refetchExpiring : refetchAll;
+  const isRetrying = view === "expiring" ? expiringFetching : allFetching;
 
   const save = contracts.useSave();
   const remove = contracts.useDelete();
@@ -324,6 +329,10 @@ export default function ContractsPage() {
         columns={columns}
         data={rows}
         isLoading={isLoading}
+        error={loadError}
+        onRetry={retry}
+        isRetrying={isRetrying}
+        errorWhat="your contracts"
         emptyTitle={view === "expiring" ? "Nothing expiring soon" : "No contracts yet"}
         emptyDescription="Track supplier agreements — SLAs, warranties, leases — with renewal dates and value."
         emptyAction={

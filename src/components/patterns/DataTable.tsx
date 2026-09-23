@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/patterns/EmptyState";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 
 export type { ColumnDef };
 
@@ -36,6 +37,21 @@ interface DataTableProps<TData> {
   emptyTitle?: string;
   emptyDescription?: string;
   emptyAction?: React.ReactNode;
+  /**
+   * The failure of the query that produced `data`, if it failed.
+   *
+   * Without this, every list in the app rendered its empty state when a
+   * request failed: "No assets found - add your first asset" to someone with
+   * four thousand assets and a dropped connection. An empty list and a broken
+   * list are different facts and must not share a screen.
+   */
+  error?: unknown;
+  /** Re-runs the failed query. Usually the query's `refetch`. */
+  onRetry?: () => void | Promise<unknown>;
+  /** True while a retry is in flight — `isLoading` stays false on a refetch. */
+  isRetrying?: boolean;
+  /** What failed to load, mid-sentence: "We couldn't load **your assets**." */
+  errorWhat?: string;
   /**
    * Server-side sorting: when given, header clicks report the new state here
    * (the parent refetches) instead of sorting the loaded page in the browser.
@@ -63,6 +79,10 @@ export function DataTable<TData>({
   emptyTitle = "Nothing here yet",
   emptyDescription,
   emptyAction,
+  error,
+  onRetry,
+  isRetrying = false,
+  errorWhat = "this list",
   footerSummary,
   className,
   sorting: serverSorting,
@@ -89,7 +109,11 @@ export function DataTable<TData>({
     manualPagination: true,
   });
 
-  const showEmpty = !isLoading && data.length === 0;
+  // A failure outranks emptiness: a list that failed to load is empty only as
+  // an artefact of the failure, and saying "nothing here yet" would be a claim
+  // about the user's data that nothing supports.
+  const showError = !isLoading && error != null;
+  const showEmpty = !isLoading && !showError && data.length === 0;
 
   return (
     <div className={cn("overflow-hidden rounded-card border border-edge bg-surface", className)}>
@@ -154,12 +178,17 @@ export function DataTable<TData>({
                 ))}
           </tbody>
         </table>
+        {showError ? (
+          <div className="p-4">
+            <DataErrorState what={errorWhat} error={error} onRetry={onRetry} isRetrying={isRetrying} />
+          </div>
+        ) : null}
         {showEmpty ? (
           <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
         ) : null}
       </div>
 
-      {(pageInfo || footerSummary) && !showEmpty ? (
+      {(pageInfo || footerSummary) && !showEmpty && !showError ? (
         <div className="flex items-center justify-between border-t border-edge bg-surface-muted px-3 py-2 text-xs text-muted-fg">
           {pageInfo ? (
             <div className="flex items-center gap-3">

@@ -29,7 +29,7 @@ import { ImportButton } from "@/features/imports/ImportButton";
 const categories = makeCrudHooks<Category, CategoryDto>("categories", categoryService, { entity: "Category" });
 
 export default function CategoriesPage() {
-  const { data: rows = [], isLoading } = categories.useList();
+  const { data: rows = [], isLoading, error, refetch, isFetching } = categories.useList();
   const save = categories.useSave();
   const remove = categories.useDelete();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -227,6 +227,10 @@ export default function CategoriesPage() {
         columns={columns}
         data={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your categories"
         emptyTitle="No categories yet"
         emptyDescription="Organise assets into categories. A prefix code numbers new asset tags and a default warranty fills in warranty expiry."
         emptyAction={

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 import {
     ScanLine, Trash2, ArrowUpRight, Wifi, WifiOff, CheckCircle2,
     Server, Monitor, Printer, Smartphone, Router, HardDrive, Globe,
@@ -124,6 +125,7 @@ export default function DiscoveryPage() {
     // an unknown answer keeps the button (the endpoint refuses it anyway).
     const scanEnabled = summary?.scanEnabled !== false;
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState<unknown>(null);
     const [isScanModalOpen, setIsScanModalOpen] = useState(false);
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
@@ -147,6 +149,7 @@ export default function DiscoveryPage() {
     const fetchDevices = useCallback(async (p = 0) => {
         try {
             setIsLoading(true);
+            setLoadError(null);
             const [devicesResult, summaryResult] = await Promise.allSettled([
                 discoveryService.getDevices({ page: p, size: 50, status: statusFilter === "ALL" ? undefined : statusFilter }),
                 discoveryService.getSummary(),
@@ -155,11 +158,13 @@ export default function DiscoveryPage() {
                 setDevices(devicesResult.value.items ?? devicesResult.value.content ?? []);
                 setTotalPages(devicesResult.value.totalPages ?? 0);
             } else {
-                reportApiError(devicesResult.reason, { fallback: "Failed to load discovered devices" });
+                // Previously a toast, after which the page offered to run a
+                // network scan because it believed nothing had been discovered.
+                setLoadError(devicesResult.reason);
             }
             if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
-        } catch {
-            toast.error("Failed to load devices");
+        } catch (error) {
+            setLoadError(error);
         } finally {
             setIsLoading(false);
         }
@@ -304,6 +309,15 @@ export default function DiscoveryPage() {
                     {isLoading ? (
                         <div className="flex h-48 items-center justify-center">
                             <PageSpinner />
+                        </div>
+                    ) : loadError ? (
+                        <div className="p-4">
+                            <DataErrorState
+                                what="the discovered devices"
+                                error={loadError}
+                                onRetry={() => fetchDevices(page)}
+                                isRetrying={isLoading}
+                            />
                         </div>
                     ) : filteredDevices.length === 0 ? (
                         <div className="flex flex-col items-center justify-center p-12 text-center">

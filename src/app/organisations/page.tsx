@@ -28,7 +28,7 @@ export default function OrganisationsPage() {
   const queryClient = useQueryClient();
   const orgsKey = qk.module("organisations");
 
-  const { data: organisations = [], isLoading } = useQuery({
+  const { data: organisations = [], isLoading, error, refetch, isFetching } = useQuery({
     queryKey: orgsKey.list(),
     queryFn: () => organisationService.getAll(),
   });
@@ -155,6 +155,10 @@ export default function OrganisationsPage() {
         columns={columns}
         data={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your organisations"
         emptyTitle="No organisations found"
         emptyDescription="Tenant organisations appear here once registered."
       />

@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { toast } from "react-hot-toast";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 import {
     Loader2, Download, FileText, FileSpreadsheet, Wrench,
     BarChart3, Clock, CheckCircle2, AlertCircle, RefreshCw,
@@ -91,6 +92,7 @@ function FormatBadge({ format }: { format?: string }) {
 export default function ReportsPage() {
     const [history, setHistory] = useState<ReportHistory | null>(null);
     const [historyLoading, setHistoryLoading] = useState(true);
+    const [historyError, setHistoryError] = useState<unknown>(null);
     const [generating, setGenerating] = useState<ReportType | "">("");
     const [downloadingId, setDownloadingId] = useState("");
     const [deletingId, setDeletingId] = useState("");
@@ -102,10 +104,13 @@ export default function ReportsPage() {
     const fetchHistory = async (quiet = false) => {
         try {
             if (!quiet) setHistoryLoading(true);
+            setHistoryError(null);
             const data = await reportService.getReportHistory({ limit: 50 });
             setHistory(data);
-        } catch {
-            toast.error("Failed to load report history");
+        } catch (error) {
+            // A failed history fetch used to end as "No reports generated yet",
+            // which invites the user to generate a report they already have.
+            setHistoryError(error);
         } finally {
             setHistoryLoading(false);
         }
@@ -273,6 +278,15 @@ export default function ReportsPage() {
                     {historyLoading ? (
                         <div className="space-y-2 p-4">
                             {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-control bg-surface-muted" />)}
+                        </div>
+                    ) : historyError ? (
+                        <div className="p-4">
+                            <DataErrorState
+                                what="your report history"
+                                error={historyError}
+                                onRetry={() => fetchHistory()}
+                                isRetrying={historyLoading}
+                            />
                         </div>
                     ) : !history?.reports?.length ? (
                         <div className="flex flex-col items-center justify-center py-16 text-center">

@@ -74,13 +74,13 @@ export default function LicensesPage() {
   const { format, baseCurrency } = useCurrency();
   const [view, setView] = useState<ViewType>("all");
 
-  const { data: allRows = [], isLoading: allLoading } = licenses.useList();
-  const { data: expiringRows = [], isLoading: expLoading } = useQuery({
+  const { data: allRows = [], isLoading: allLoading, error: allError, refetch: refetchAll, isFetching: allFetching } = licenses.useList();
+  const { data: expiringRows = [], isLoading: expLoading, error: expError, refetch: refetchExp, isFetching: expFetching } = useQuery({
     queryKey: [...licenses.key.all, "expiring"],
     queryFn: () => licenseService.getExpiringSoon(30),
     enabled: view === "expiring",
   });
-  const { data: overRows = [], isLoading: overLoading } = useQuery({
+  const { data: overRows = [], isLoading: overLoading, error: overError, refetch: refetchOver, isFetching: overFetching } = useQuery({
     queryKey: [...licenses.key.all, "over-allocated"],
     queryFn: () => licenseService.getOverAllocated(),
     enabled: view === "over-allocated",
@@ -91,6 +91,10 @@ export default function LicensesPage() {
   });
   const rows = view === "expiring" ? expiringRows : view === "over-allocated" ? overRows : allRows;
   const isLoading = view === "expiring" ? expLoading : view === "over-allocated" ? overLoading : allLoading;
+  // Each view is its own query; report the failure of the one on screen.
+  const loadError = view === "expiring" ? expError : view === "over-allocated" ? overError : allError;
+  const retry = view === "expiring" ? refetchExp : view === "over-allocated" ? refetchOver : refetchAll;
+  const isRetrying = view === "expiring" ? expFetching : view === "over-allocated" ? overFetching : allFetching;
 
   const { data: assets = [] } = useQuery({
     queryKey: qk.module("assets-all").list(),
@@ -351,6 +355,10 @@ export default function LicensesPage() {
           columns={columns}
           data={rows}
           isLoading={isLoading}
+          error={loadError}
+          onRetry={retry}
+          isRetrying={isRetrying}
+          errorWhat="your software licenses"
           emptyTitle={view === "all" ? "No software licenses" : "Nothing in this view"}
           emptyDescription="Track subscriptions and perpetual licenses, seat allocation, and renewal dates."
           emptyAction={

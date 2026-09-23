@@ -22,6 +22,9 @@ import { ASSET_SORT_FIELDS, sortParamToState, sortStateToParam } from "@/feature
 export function AssetRegisterTable({
   paged,
   isLoading,
+  error,
+  onRetry,
+  isRetrying,
   page,
   onPageChange,
   sort,
@@ -39,6 +42,10 @@ export function AssetRegisterTable({
 }: {
   paged: PagedAssets | undefined;
   isLoading: boolean;
+  /** The register query's failure, if it failed. */
+  error?: unknown;
+  onRetry?: () => void | Promise<unknown>;
+  isRetrying?: boolean;
   page: number;
   onPageChange: (page: number) => void;
   /** Server sort param ("field,dir"); headers change it for the whole register. */
@@ -180,6 +187,13 @@ export function AssetRegisterTable({
       onSortingChange={(state) => onSortChange(sortStateToParam(state))}
       data={items}
       isLoading={isLoading}
+      // Without this the register showed "Your asset register is empty - import
+      // the spreadsheet you already track assets in" to a tenant with a full
+      // register and a failed request.
+      error={error}
+      onRetry={onRetry}
+      isRetrying={isRetrying}
+      errorWhat="your assets"
       onRowClick={onView}
       pageInfo={{ page, size, totalElements: total, totalPages: Math.max(1, Math.ceil(total / size)) }}
       onPageChange={(p) => onPageChange(p)}

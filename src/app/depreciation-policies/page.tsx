@@ -26,7 +26,7 @@ import { FieldError } from "@/components/ui/field-error";
 import { reportApiError, reportFormErrors } from "@/lib/api-validation";
 
 export default function DepreciationPoliciesPage() {
-  const { data: policies = [], isLoading } = useDepreciationPolicies();
+  const { data: policies = [], isLoading, error, refetch, isFetching } = useDepreciationPolicies();
   const save = useSavePolicy();
   const remove = useDeletePolicy();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -157,6 +157,10 @@ export default function DepreciationPoliciesPage() {
         columns={columns}
         data={policies}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your depreciation policies"
         emptyTitle="No depreciation policies"
         emptyDescription="Define how asset classes lose value — e.g. Standard IT hardware, straight line over 36 months."
         emptyAction={

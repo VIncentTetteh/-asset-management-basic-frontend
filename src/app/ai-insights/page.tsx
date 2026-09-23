@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 import {
     Brain, CheckCircle2, AlertTriangle, Calendar, Clock,
     TrendingUp, Wrench, ShieldAlert, Zap, BarChart3, ChevronRight,
@@ -100,10 +101,12 @@ export default function AiInsightsPage() {
     const [unresolvedOnly, setUnresolvedOnly] = useState(true);
     const [resolvingId, setResolvingId] = useState<string | null>(null);
     const [activeView, setActiveView] = useState<"timeline" | "priority" | "byType" | "list">("priority");
+    const [loadError, setLoadError] = useState<unknown>(null);
 
     const fetchAll = useCallback(async () => {
         try {
             setIsLoading(true);
+            setLoadError(null);
             const [insightsResult, summaryResult] = await Promise.allSettled([
                 aiInsightsService.getAll({
                     type: filterType || undefined,
@@ -114,8 +117,13 @@ export default function AiInsightsPage() {
             ]);
             if (insightsResult.status === "fulfilled") setInsights(insightsResult.value);
             if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
-        } catch {
-            toast.error("Failed to load insights");
+            // allSettled never throws, so the catch below could not see a failed
+            // request: a total outage left `insights` empty and the page said
+            // "All insights are resolved - your portfolio is in good shape."
+            // The insights call is the page; if it failed, say so.
+            if (insightsResult.status === "rejected") setLoadError(insightsResult.reason);
+        } catch (error) {
+            setLoadError(error);
         } finally {
             setIsLoading(false);
         }
@@ -338,6 +346,13 @@ export default function AiInsightsPage() {
                         <PageSpinner />
                     </CardContent>
                 </Card>
+            ) : loadError ? (
+                <DataErrorState
+                    what="your AI insights"
+                    error={loadError}
+                    onRetry={fetchAll}
+                    isRetrying={isLoading}
+                />
             ) : insights.length === 0 ? (
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center p-16 text-center">

@@ -69,7 +69,7 @@ function PurchaseOrdersContent() {
   const ordersKey = qk.module("purchase-orders");
   const { confirm, ConfirmDialog } = useConfirm();
 
-  const { data: orders = [], isLoading } = useQuery({
+  const { data: orders = [], isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ordersKey.list(),
     queryFn: () => purchaseOrderService.getAll(),
   });
@@ -444,6 +444,10 @@ function PurchaseOrdersContent() {
         columns={columns}
         data={focusId ? orders.filter((o) => o.id === focusId) : orders}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your purchase orders"
         emptyTitle="No purchase orders"
         emptyDescription="Raise procurement orders against suppliers with an approval workflow."
         emptyAction={

@@ -93,7 +93,7 @@ function ExpensesContent() {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  const { data: paged, isLoading } = useQuery({
+  const { data: paged, isLoading, error: listError, refetch: refetchList, isFetching: listFetching } = useQuery({
     queryKey: [...expensesKey.list(), activeTab, debouncedSearch, statusFilter, page],
     queryFn: async () => {
       if (activeTab === "pending") {
@@ -110,7 +110,7 @@ function ExpensesContent() {
     placeholderData: (prev) => prev,
   });
 
-  const { data: focused, isLoading: focusLoading } = useQuery({
+  const { data: focused, isLoading: focusLoading, error: focusError, refetch: refetchFocus, isFetching: focusFetching } = useQuery({
     queryKey: [...expensesKey.all, "one", focusId],
     queryFn: () => expenseService.getById(focusId!),
     enabled: !!focusId,
@@ -424,6 +424,10 @@ function ExpensesContent() {
         columns={columns}
         data={rows}
         isLoading={focusId ? focusLoading : isLoading}
+        error={focusId ? focusError : listError}
+        onRetry={focusId ? refetchFocus : refetchList}
+        isRetrying={focusId ? focusFetching : listFetching}
+        errorWhat="your expenses"
         pageInfo={
           activeTab === "all" && !focusId
             ? { page, size: 20, totalElements: total, totalPages: Math.max(1, Math.ceil(total / 20)) }

@@ -7,7 +7,7 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { PageSpinner } from "@/components/ui/spinner";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { reportApiError } from "@/lib/api-validation";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 import { formatBillingMonth } from "@/features/cloud/options";
 
 const PAGE_SIZE = 24;
@@ -18,16 +18,20 @@ export function CloudCostHistoryModal({ asset, onClose }: { asset: CloudAsset | 
     const [records, setRecords] = useState<CloudCostRecord[]>([]);
     const [total, setTotal] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
+    const [loadError, setLoadError] = useState<unknown>(null);
 
     const load = async (assetId: string, offset: number) => {
         setIsLoading(true);
+        setLoadError(null);
         try {
             const page = await cloudAssetService.getCosts(assetId, { limit: PAGE_SIZE, offset });
             const items = page.items ?? page.content ?? [];
             setRecords((prev) => (offset === 0 ? items : [...prev, ...items]));
             setTotal(page.total ?? items.length);
         } catch (err) {
-            reportApiError(err, { fallback: "Failed to load cost history" });
+            // "No costs recorded yet" is a statement about the asset. When the
+            // request failed it is a statement about nothing.
+            setLoadError(err);
         } finally {
             setIsLoading(false);
         }
@@ -49,6 +53,13 @@ export function CloudCostHistoryModal({ asset, onClose }: { asset: CloudAsset | 
         >
             {isLoading && records.length === 0 ? (
                 <div className="flex h-32 items-center justify-center"><PageSpinner /></div>
+            ) : loadError ? (
+                <DataErrorState
+                    what="this asset's cost history"
+                    error={loadError}
+                    onRetry={() => { if (asset) void load(asset.id, 0); }}
+                    isRetrying={isLoading}
+                />
             ) : records.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-fg">No costs recorded yet.</p>
             ) : (

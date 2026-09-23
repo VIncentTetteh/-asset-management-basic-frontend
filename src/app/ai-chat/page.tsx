@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import toast from "react-hot-toast";
+import { notify } from "@/lib/notify";
 import {
     Brain, Send, User, Loader2, Sparkles, Clock, Plus,
 } from "lucide-react";
@@ -139,7 +139,9 @@ export default function AiChatPage() {
                 { role: "assistant", content: response.message, timestamp: new Date() },
             ]);
         } catch {
-            toast.error("Failed to get a response. Please try again.");
+            // An action the user just took, whose result is the conversation on
+            // screen: a transient acknowledgement is the right channel here.
+            notify.error("We couldn't get a response. Try sending that again.");
             setMessages(prev => prev.slice(0, -1)); // remove the optimistic user message
         } finally {
             setIsLoading(false);

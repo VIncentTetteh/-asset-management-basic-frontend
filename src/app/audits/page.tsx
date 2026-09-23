@@ -45,7 +45,7 @@ import { formatLocalDate, toDateInputValue, todayLocal } from "@/lib/local-date"
 
 export default function AuditsPage() {
   const [filters, setFilters] = useState<AuditFilters>(EMPTY_AUDIT_FILTERS);
-  const { data: audits = [], isLoading } = useAudits(auditQueryParams(filters));
+  const { data: audits = [], isLoading, error, refetch, isFetching } = useAudits(auditQueryParams(filters));
   const master = useAuditMasterData();
   const createAudit = useCreateAudit();
   const updateStatus = useUpdateAuditStatus();
@@ -324,6 +324,10 @@ export default function AuditsPage() {
         columns={columns}
         data={audits}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your audits"
         emptyTitle="No audits yet"
         emptyDescription="Schedule physical inventory checks and record their outcome."
         emptyAction={

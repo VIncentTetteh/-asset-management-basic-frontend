@@ -55,7 +55,7 @@ export default function VendorReviewsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReview, setEditingReview] = useState<VendorReview | null>(null);
 
-  const { data: reviews = [], isLoading } = useQuery({
+  const { data: reviews = [], isLoading, error, refetch, isFetching } = useQuery({
     queryKey: [...reviewsKey.list(), selectedSupplierId],
     queryFn: () => vendorReviewService.getAll(selectedSupplierId || undefined),
   });
@@ -287,6 +287,10 @@ export default function VendorReviewsPage() {
           columns={columns}
           data={reviews}
           isLoading={isLoading}
+          error={error}
+          onRetry={refetch}
+          isRetrying={isFetching}
+          errorWhat="your vendor reviews"
           emptyTitle="No reviews yet"
           emptyDescription="Score suppliers on quality, delivery, and support to build a performance record."
           emptyAction={

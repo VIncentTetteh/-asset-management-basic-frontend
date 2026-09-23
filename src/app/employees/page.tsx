@@ -37,7 +37,7 @@ function EmployeesPageInner() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const { data, isLoading } = usePagedEmployees({
+  const { data, isLoading, error, refetch, isFetching } = usePagedEmployees({
     q: debouncedQ || undefined,
     status: statusFilter || undefined,
     departmentId: departmentId || undefined,
@@ -161,6 +161,10 @@ function EmployeesPageInner() {
         columns={columns}
         data={data?.content ?? []}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your employees"
         onRowClick={(emp) => router.push(`/employees/detail?id=${emp.id}`)}
         pageInfo={{
           page,

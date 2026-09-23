@@ -37,7 +37,7 @@ const METHOD_LABEL: Record<string, string> = {
 export default function DisposalsPage() {
   const { format, baseCurrency, sum } = useCurrency();
   const [filters, setFilters] = useState<DisposalFilters>(EMPTY_DISPOSAL_FILTERS);
-  const { data: disposals = [], isLoading } = useDisposals(disposalQueryParams(filters));
+  const { data: disposals = [], isLoading, error, refetch, isFetching } = useDisposals(disposalQueryParams(filters));
   const [rejecting, setRejecting] = useState<DisposalRecord | null>(null);
   const remove = useDeleteDisposal();
   const decide = useDisposalDecision();
@@ -304,6 +304,10 @@ export default function DisposalsPage() {
         columns={columns}
         data={disposals}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your disposal records"
         emptyTitle="No disposals yet"
         emptyDescription="Disposal requests and approvals are recorded here with method, reason, and recovered value."
         emptyAction={

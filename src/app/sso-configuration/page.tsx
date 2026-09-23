@@ -12,6 +12,8 @@ import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
+import { Alert } from "@/components/ui/alert";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 import { useForm } from "react-hook-form";
 import { BadgeCheck, Globe, KeyRound, Shield, ToggleLeft, ToggleRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,7 @@ const L = FIELD_LIMITS.ssoConfig;
 export default function SsoConfigurationPage() {
     const [config, setConfig] = useState<OrgSsoConfig | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState<unknown>(null);
     const [activeTab, setActiveTab] = useState<TabType>("oauth2");
     const [isToggling, setIsToggling] = useState(false);
     const [domain, setDomain] = useState<SsoDomainStatus | null>(null);
@@ -74,9 +77,11 @@ export default function SsoConfigurationPage() {
                 });
             }
         } catch (error) {
-            toast.error(axios.isAxiosError(error) && error.response?.status === 403
-                ? "You need admin or security permission to manage SSO."
-                : "Failed to load SSO configuration");
+            // Critically not a toast here: with `config` left null the page
+            // reads "SSO is not configured" and offers empty provider forms,
+            // so an admin whose load failed could be walked into overwriting a
+            // working configuration they could not see.
+            setLoadError(error);
         } finally {
             setIsLoading(false);
         }
@@ -175,6 +180,29 @@ export default function SsoConfigurationPage() {
         return (
             <div className="flex h-64 items-center justify-center">
                 <PageSpinner />
+            </div>
+        );
+    }
+
+    if (loadError) {
+        const forbidden = axios.isAxiosError(loadError) && loadError.response?.status === 403;
+        return (
+            <div className="mx-auto max-w-3xl space-y-6">
+                <PageHeader title="SSO Configuration" subtitle="Configure Single Sign-On for your organisation." />
+                {forbidden ? (
+                    // A permission problem is a different condition from a
+                    // failed request and must not offer a pointless retry.
+                    <Alert tone="warn" title="You don't have permission to manage SSO">
+                        Ask an administrator or your security team to grant you access, then reload this page.
+                    </Alert>
+                ) : (
+                    <DataErrorState
+                        what="your SSO configuration"
+                        error={loadError}
+                        onRetry={loadConfig}
+                        isRetrying={isLoading}
+                    />
+                )}
             </div>
         );
     }

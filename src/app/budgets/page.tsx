@@ -84,7 +84,7 @@ export default function BudgetsPage() {
   const budgetsKey = qk.module("budgets");
   const { confirm, ConfirmDialog } = useConfirm();
 
-  const { data: budgets = [], isLoading } = useQuery({
+  const { data: budgets = [], isLoading, error, refetch, isFetching } = useQuery({
     queryKey: budgetsKey.list(),
     queryFn: () => budgetService.getAll(),
   });
@@ -430,6 +430,10 @@ export default function BudgetsPage() {
         columns={columns}
         data={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your budgets"
         emptyTitle="No budgets yet"
         emptyDescription="Allocate spending envelopes per department or org-wide; approved expenses draw them down."
         emptyAction={

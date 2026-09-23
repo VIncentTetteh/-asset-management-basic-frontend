@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 import { Plus, Pencil, Trash2, Cloud, DollarSign, RefreshCw } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -74,6 +75,7 @@ export default function CloudAssetsPage() {
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState<unknown>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCostModalOpen, setIsCostModalOpen] = useState(false);
@@ -96,6 +98,7 @@ export default function CloudAssetsPage() {
     const fetchAll = useCallback(async (p = 0) => {
         try {
             setIsLoading(true);
+            setLoadError(null);
             const [assetsResult, summaryResult] = await Promise.allSettled([
                 cloudAssetService.getAll({
                     provider: filterProvider || undefined,
@@ -109,11 +112,14 @@ export default function CloudAssetsPage() {
                 setAssets(data.items ?? data.content ?? []);
                 setTotalPages(data.totalPages ?? Math.ceil((data.total ?? 0) / (data.limit || 20)));
             } else {
-                reportApiError(assetsResult.reason, { fallback: "Failed to load cloud assets" });
+                // The toast this used to raise was gone in four seconds and the
+                // table then read "No cloud assets found - register your cloud
+                // resources", inviting the user to re-create assets they own.
+                setLoadError(assetsResult.reason);
             }
             if (summaryResult.status === "fulfilled") setCostSummary(summaryResult.value);
-        } catch {
-            toast.error("Failed to load cloud assets");
+        } catch (error) {
+            setLoadError(error);
         } finally {
             setIsLoading(false);
         }
@@ -312,6 +318,15 @@ export default function CloudAssetsPage() {
                     {isLoading ? (
                         <div className="flex h-40 items-center justify-center">
                             <PageSpinner />
+                        </div>
+                    ) : loadError ? (
+                        <div className="p-4">
+                            <DataErrorState
+                                what="your cloud assets"
+                                error={loadError}
+                                onRetry={() => fetchAll(page)}
+                                isRetrying={isLoading}
+                            />
                         </div>
                     ) : assets.length === 0 ? (
                         <div className="flex flex-col items-center justify-center p-12 text-center">

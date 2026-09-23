@@ -13,6 +13,8 @@ import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { PageHeader } from "@/components/ui/page-header";
 import { Loader2, Webhook as WebhookIcon, Plus, CheckCircle, XCircle, Trash2, Activity, Clock, AlertCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { notify } from "@/lib/notify";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 import { useForm } from "react-hook-form";
 import { formatRelativeTime } from "@/lib/time";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -38,6 +40,8 @@ export default function WebhooksPage() {
     const [webhooks, setWebhooks] = useState<Webhook[]>([]);
     const [stats, setStats] = useState({ total: 0, active: 0 });
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<unknown>(null);
+    const [deliveriesError, setDeliveriesError] = useState<unknown>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
     const [eventsError, setEventsError] = useState(false);
@@ -59,11 +63,14 @@ export default function WebhooksPage() {
 
     const fetchWebhooks = async () => {
         try {
+            setLoadError(null);
             const data = await webhookService.list();
             setWebhooks(data.webhooks ?? []);
             setStats({ total: data.totalWebhooks ?? 0, active: data.activeWebhooks ?? 0 });
-        } catch {
-            toast.error("Failed to fetch webhooks");
+        } catch (error) {
+            // Otherwise the table says "No webhooks configured" and offers Add
+            // Webhook - to someone whose webhooks are configured and fine.
+            setLoadError(error);
         } finally {
             setLoading(false);
         }
@@ -150,10 +157,13 @@ export default function WebhooksPage() {
         setSelectedDelivery(null);
         setLoadingDeliveries(true);
         try {
+            setDeliveriesError(null);
             const data = await webhookService.getDeliveries(webhook.id);
             setDeliveries(data.deliveries || []);
-        } catch {
-            toast.error("Failed to fetch deliveries");
+        } catch (error) {
+            // "No delivery attempts recorded yet" is a diagnosis. It must not
+            // be shown when the truth is that we could not ask.
+            setDeliveriesError(error);
         } finally {
             setLoadingDeliveries(false);
         }
@@ -164,7 +174,10 @@ export default function WebhooksPage() {
             const detail = await webhookService.getDelivery(webhookId, deliveryId);
             setSelectedDelivery(detail);
         } catch {
-            toast.error("Failed to fetch delivery detail");
+            // Stays a toast: the previously selected delivery stays on screen,
+            // so there is no empty region to explain - only a click that would
+            // otherwise appear to do nothing.
+            notify.error("We couldn't open that delivery. Try again.");
         }
     };
 
@@ -224,7 +237,18 @@ export default function WebhooksPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {webhooks.length === 0 ? (
+                                {loadError ? (
+                                    <tr>
+                                        <td colSpan={5} className="p-4">
+                                            <DataErrorState
+                                                what="your webhooks"
+                                                error={loadError}
+                                                onRetry={fetchWebhooks}
+                                                isRetrying={loading}
+                                            />
+                                        </td>
+                                    </tr>
+                                ) : webhooks.length === 0 ? (
                                     <tr>
                                         <td colSpan={5}>
                                             <div className="flex flex-col items-center justify-center p-12 text-center">
@@ -377,6 +401,13 @@ export default function WebhooksPage() {
                         <div className="flex justify-center p-8">
                             <Loader2 className="h-8 w-8 animate-spin text-faint-fg" />
                         </div>
+                    ) : deliveriesError ? (
+                        <DataErrorState
+                            what="this webhook's delivery history"
+                            error={deliveriesError}
+                            onRetry={() => { if (selectedWebhookForDeliveries) void fetchDeliveries(selectedWebhookForDeliveries); }}
+                            isRetrying={loadingDeliveries}
+                        />
                     ) : deliveries.length === 0 ? (
                         <div className="py-10 text-center text-faint-fg">
                             <Clock className="mx-auto mb-2 h-10 w-10 opacity-20" />

@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
-import { toast } from "react-hot-toast";
+import { notify } from "@/lib/notify";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 import { Activity, ChevronLeft, ChevronRight, Filter, RotateCw, ShieldCheck } from "lucide-react";
 
 const methodOptions = ["GET", "POST", "PUT", "PATCH", "DELETE"];
@@ -104,15 +105,20 @@ export default function AuditEventsPage() {
     const [applied, setApplied] = useState<AuditEventFilterParams>({});
     const [page, setPage] = useState(0);
     const [total, setTotal] = useState(0);
+    const [loadError, setLoadError] = useState<unknown>(null);
 
     const fetchEvents = async (params: AuditEventFilterParams, pageIndex: number) => {
         try {
             setIsLoading(true);
+            setLoadError(null);
             const result = await auditEventService.getPage(params, pageIndex);
             setEvents(result.items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
             setTotal(result.total);
         } catch (error) {
-            toast.error("Failed to load audit events");
+            // A failed page used to toast and then render "No events match your
+            // filter - try broadening your criteria", which sends the user off
+            // to edit filters that were never the problem.
+            setLoadError(error);
             console.error(error);
         } finally {
             setIsLoading(false);
@@ -166,7 +172,10 @@ export default function AuditEventsPage() {
             const item = await auditEventService.get(id);
             setSelectedEvent(item);
         } catch (error) {
-            toast.error("Failed to load event details");
+            // Stays a toast on purpose: nothing renders when this fails - the
+            // detail panel simply does not open - so there is no region to put
+            // an inline message in, and silence would look like a dead click.
+            notify.error("We couldn't open that event's details. Try again.");
             console.error(error);
         }
     };
@@ -246,6 +255,15 @@ export default function AuditEventsPage() {
                 <CardContent className="p-0">
                     {isLoading ? (
                         <div className="flex h-40 items-center justify-center text-muted-fg">Loading events...</div>
+                    ) : loadError ? (
+                        <div className="p-4">
+                            <DataErrorState
+                                what="the audit event stream"
+                                error={loadError}
+                                onRetry={() => fetchEvents(applied, page)}
+                                isRetrying={isLoading}
+                            />
+                        </div>
                     ) : events.length === 0 ? (
                         <div className="flex h-40 flex-col items-center justify-center px-6 text-center">
                             <ShieldCheck className="mb-2 h-8 w-8 text-faint-fg" />

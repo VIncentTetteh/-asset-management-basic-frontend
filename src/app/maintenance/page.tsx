@@ -23,7 +23,7 @@ import { formatLocalDate } from "@/lib/local-date";
 
 export default function MaintenancePage() {
   const { format, baseCurrency } = useCurrency();
-  const { data: records = [], isLoading } = useMaintenanceRecords();
+  const { data: records = [], isLoading, error, refetch, isFetching } = useMaintenanceRecords();
   const master = useMaintenanceMasterData();
   const complete = useCompleteMaintenance();
   const remove = useDeleteMaintenance();
@@ -188,6 +188,10 @@ export default function MaintenancePage() {
         columns={columns}
         data={records}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your maintenance records"
         emptyTitle="No maintenance records"
         emptyDescription="Schedule preventive maintenance or log repair work for your assets."
         emptyAction={

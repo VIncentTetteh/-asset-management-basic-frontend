@@ -9,7 +9,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Activity, Server, Clock, Database, Cpu, RefreshCw, BarChart3, AlertOctagon, Zap } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 import { cn } from "@/lib/utils";
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
@@ -69,6 +69,7 @@ export default function HealthPage() {
     const [loading,         setLoading]         = useState(true);
     const [activeTab,       setActiveTab]       = useState<Tab>("overview");
     const [sortBy,          setSortBy]          = useState<"latency" | "requests" | "errorRate">("latency");
+    const [loadError,       setLoadError]       = useState<unknown>(null);
 
     const fetchAll = async () => {
         setLoading(true);
@@ -91,8 +92,13 @@ export default function HealthPage() {
             if (ep.status  === "fulfilled") setEndpointMetrics(ep.value?.endpoints ?? []);
             if (tp.status  === "fulfilled") setThroughput(tp.value?.throughput ?? []);
             if (err.status === "fulfilled") setErrorMetrics(err.value?.errors ?? []);
-        } catch {
-            toast.error("Failed to load health data");
+            // allSettled swallows every rejection, so the catch below never ran
+            // and a platform that was entirely unreachable rendered as "Global
+            // Status: UNKNOWN" with empty tabs - which on a health page reads
+            // as a measurement rather than a failure to measure.
+            setLoadError(h.status === "rejected" ? h.reason : null);
+        } catch (error) {
+            setLoadError(error);
         } finally {
             setLoading(false);
         }
@@ -140,6 +146,15 @@ export default function HealthPage() {
                     <RefreshCw className="h-4 w-4" /> Refresh
                 </Button>
             </div>
+
+            {loadError ? (
+                <DataErrorState
+                    what="the platform health data"
+                    error={loadError}
+                    onRetry={fetchAll}
+                    isRetrying={loading}
+                />
+            ) : null}
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {topCards.map(card => (

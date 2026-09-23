@@ -20,7 +20,7 @@ export default function CheckoutsPage() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkInTarget, setCheckInTarget] = useState<CheckoutRecordDto | null>(null);
 
-  const { data: records = [], isLoading } = useCheckouts(view);
+  const { data: records = [], isLoading, error, refetch, isFetching } = useCheckouts(view);
   const { hasPermission } = usePermissions();
   // Mirrors POST /checkouts/assets/{a}/employees/{e}.
   const canIssueToEmployees = hasPermission("CHECKOUT_ASSET") || hasPermission("MANAGE_EMPLOYEES");
@@ -120,7 +120,14 @@ export default function CheckoutsPage() {
           ))}
         </div>
 
-        <CheckoutTable records={filtered} isLoading={isLoading} onCheckIn={setCheckInTarget} />
+        <CheckoutTable
+          records={filtered}
+          isLoading={isLoading}
+          error={error}
+          onRetry={refetch}
+          isRetrying={isFetching}
+          onCheckIn={setCheckInTarget}
+        />
       </div>
 
       <CheckOutModal

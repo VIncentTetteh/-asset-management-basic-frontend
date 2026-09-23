@@ -37,7 +37,7 @@ export default function ExchangeRatesPage() {
   const CURRENCIES = useMemo(() => isoCurrencyCodes(availableCurrencies), [availableCurrencies]);
   const defaultSource = baseCurrency === "USD" ? "EUR" : "USD";
 
-  const { data: rates = [], isLoading } = useQuery({
+  const { data: rates = [], isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ratesKey.list(),
     queryFn: () => exchangeRateService.listAll(),
   });
@@ -284,6 +284,10 @@ export default function ExchangeRatesPage() {
           columns={columns}
           data={filtered}
           isLoading={isLoading}
+          error={error}
+          onRetry={refetch}
+          isRetrying={isFetching}
+          errorWhat="your exchange rates"
           emptyTitle="No exchange rates"
           emptyDescription="Add rates so asset values and reports can convert between currencies."
           emptyAction={

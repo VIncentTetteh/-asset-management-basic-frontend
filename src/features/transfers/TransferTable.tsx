@@ -29,6 +29,9 @@ function Movement({ dept, loc }: { dept: string; loc: string }) {
 export function TransferTable({
   transfers,
   isLoading,
+  error,
+  onRetry,
+  isRetrying,
   lookups,
   onAction,
   onCreate,
@@ -37,6 +40,10 @@ export function TransferTable({
 }: {
   transfers: AssetTransfer[];
   isLoading: boolean;
+  /** The transfer query's failure, if it failed. */
+  error?: unknown;
+  onRetry?: () => void | Promise<unknown>;
+  isRetrying?: boolean;
   lookups: TransferLookups;
   onAction: (transfer: AssetTransfer, action: TransferAction) => void;
   onCreate: () => void;
@@ -181,6 +188,10 @@ export function TransferTable({
       columns={columns}
       data={transfers}
       isLoading={isLoading}
+      error={error}
+      onRetry={onRetry}
+      isRetrying={isRetrying}
+      errorWhat="your transfers"
       emptyTitle="No transfers yet"
       emptyDescription="Move assets between departments or locations with an approval trail."
       emptyAction={

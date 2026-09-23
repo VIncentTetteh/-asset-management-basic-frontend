@@ -31,7 +31,7 @@ import {
 } from "@/features/users/hooks";
 
 export default function UsersPage() {
-  const { data: users = [], isLoading } = useUsers();
+  const { data: users = [], isLoading, error, refetch, isFetching } = useUsers();
   const master = useUserMasterData();
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
@@ -287,6 +287,10 @@ export default function UsersPage() {
         columns={columns}
         data={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your users"
         emptyTitle="No users provisioned"
         emptyDescription="Give teammates access to the platform; asset custodians without logins live under Employees."
         emptyAction={

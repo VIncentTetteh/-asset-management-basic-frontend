@@ -38,7 +38,7 @@ export default function DepartmentsPage() {
   const queryClient = useQueryClient();
   const departmentsKey = qk.module("departments");
 
-  const { data: departments = [], isLoading } = useQuery({
+  const { data: departments = [], isLoading, error, refetch, isFetching } = useQuery({
     queryKey: departmentsKey.list(),
     queryFn: () => departmentService.getAll(),
   });
@@ -252,6 +252,10 @@ export default function DepartmentsPage() {
         columns={columns}
         data={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your departments"
         emptyTitle="No departments yet"
         emptyDescription="Structure your organisation into departments with codes and cost centers."
         emptyAction={canManageDepartments ? (

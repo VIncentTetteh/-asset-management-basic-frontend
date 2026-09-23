@@ -85,7 +85,7 @@ function ComplianceRing({ pct }: { pct: number }) {
 
 export default function BogReportPage() {
   const { data: report, isLoading: reportLoading, refetch } = useBogReport();
-  const { data: controls = [], isLoading: controlsLoading } = useBogControlsList();
+  const { data: controls = [], isLoading: controlsLoading, error: controlsError, refetch: refetchControls, isFetching: controlsFetching } = useBogControlsList();
   const upsertControl = useUpsertBogControl();
   const updateStatus = useUpdateBogControlStatus();
 
@@ -324,6 +324,10 @@ export default function BogReportPage() {
           columns={columns}
           data={controls}
           isLoading={controlsLoading}
+          error={controlsError}
+          onRetry={refetchControls}
+          isRetrying={controlsFetching}
+          errorWhat="your BoG controls"
           emptyTitle="No controls recorded yet"
           emptyDescription="Add BoG directive controls to start tracking implementation status."
           emptyAction={

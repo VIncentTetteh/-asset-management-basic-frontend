@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { User, UserDto, MfaSetupResponse } from "@/types";
 import { userService } from "@/services/userService";
@@ -18,6 +18,7 @@ import { Modal } from "@/components/ui/modal";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSpinner } from "@/components/ui/spinner";
 import { toast } from "react-hot-toast";
+import { DataErrorState } from "@/components/patterns/DataErrorState";
 import { useForm } from "react-hook-form";
 import { UserCircle, Mail, Phone, Building, Briefcase, Shield, Save, ShieldCheck, ShieldOff } from "lucide-react";
 import { buildPatchPayload } from "@/lib/patch";
@@ -51,6 +52,7 @@ const mfaCodeErrorMessage = (error: unknown, fallback: string): string =>
 export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState<unknown>(null);
     const [organisatonName, setOrganisationName] = useState<string>("Loading...");
     const [departmentName, setDepartmentName] = useState<string>("");
     const [roleName, setRoleName] = useState<string>("");
@@ -116,8 +118,10 @@ export default function ProfilePage() {
         }
     };
 
-    useEffect(() => {
-        const loadUserAndOrg = async () => {
+    const loadUserAndOrg = useCallback(
+        async () => {
+            setIsLoading(true);
+            setLoadError(null);
             try {
                 // Always fetch fresh profile from the API — localStorage never contains mfaEnabled
                 const freshUser = await userService.getMe();
@@ -154,15 +158,22 @@ export default function ProfilePage() {
                     setRoleName(roleResult.value.name);
                 }
             } catch (error) {
+                // This used to toast and then fall through to "Profile Not
+                // Found — please ensure you are logged in correctly", which
+                // tells a user with a flaky connection that their account is
+                // the problem.
                 console.error("Error loading profile:", error);
-                toast.error("Failed to load user profile");
+                setLoadError(error);
             } finally {
                 setIsLoading(false);
             }
-        };
+        },
+        [reset],
+    );
 
-        loadUserAndOrg();
-    }, [reset]);
+    useEffect(() => {
+        void loadUserAndOrg();
+    }, [loadUserAndOrg]);
 
     // Deep link from the "set up two-factor" toast: the card only exists once the
     // profile has loaded, so the browser's own hash scroll fires too early.
@@ -212,6 +223,19 @@ export default function ProfilePage() {
         return (
             <div className="flex h-full items-center justify-center">
                 <PageSpinner />
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="mx-auto max-w-lg p-6">
+                <DataErrorState
+                    what="your profile"
+                    error={loadError}
+                    onRetry={loadUserAndOrg}
+                    isRetrying={isLoading}
+                />
             </div>
         );
     }

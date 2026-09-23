@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "react-hot-toast";
+import { notify } from "@/lib/notify";
+import { Alert } from "@/components/ui/alert";
 import {
     AlertTriangle,
     ArrowUpRight,
@@ -192,7 +193,10 @@ export default function AnalyticsPage() {
             setLastUpdated(new Date());
 
         } catch {
-            toast.error("Failed to load analytics");
+            // Defensive only: every request above is inside allSettled, so this
+            // runs for a bug in this function, not for a failed request. The
+            // per-section Alert above is what reports a failed request.
+            notify.error("Something went wrong while building this page.");
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -423,14 +427,42 @@ export default function AnalyticsPage() {
                             </div>
                         </div>
 
-                        <div className="rounded-panel border border-edge-subtle bg-surface-muted p-4">
-                            <p className="text-sm font-semibold text-foreground">Data availability</p>
-                            <p className="mt-1 text-sm text-muted-fg">
-                                {unavailableSections.length === 0
-                                    ? "All configured analytics services responded successfully."
-                                    : `Unavailable right now: ${unavailableSections.join(", ")}.`}
-                            </p>
-                        </div>
+                        {/*
+                          This page already told the truth about a partial
+                          failure - it is the only one in the app that did. What
+                          it lacked was a way to act on it: the notice was a
+                          neutral grey box with no retry, so an "unavailable"
+                          section stayed unavailable until the user thought to
+                          reload. It is now an Alert when something is missing
+                          (tone + icon, so it does not read as a caption) and
+                          stays a plain line when everything responded.
+                        */}
+                        {unavailableSections.length === 0 ? (
+                            <div className="rounded-panel border border-edge-subtle bg-surface-muted p-4">
+                                <p className="text-sm font-semibold text-foreground">Data availability</p>
+                                <p className="mt-1 text-sm text-muted-fg">
+                                    All configured analytics services responded successfully.
+                                </p>
+                            </div>
+                        ) : (
+                            <Alert
+                                tone="warn"
+                                title="Some analytics could not be loaded"
+                                action={
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        isLoading={refreshing || loading}
+                                        onClick={() => void fetchData(true)}
+                                    >
+                                        Try again
+                                    </Button>
+                                }
+                            >
+                                {`Unavailable right now: ${unavailableSections.join(", ")}. Everything else on this page is up to date.`}
+                            </Alert>
+                        )}
                     </CardContent>
                 </Card>
             </div>

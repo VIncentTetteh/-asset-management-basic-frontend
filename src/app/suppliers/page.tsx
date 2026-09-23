@@ -33,7 +33,7 @@ const suppliers = makeCrudHooks<Supplier, SupplierDto>(
 const L = FIELD_LIMITS.supplier;
 
 export default function SuppliersPage() {
-  const { data: rows = [], isLoading } = suppliers.useList();
+  const { data: rows = [], isLoading, error, refetch, isFetching } = suppliers.useList();
   const save = suppliers.useSave();
   const remove = suppliers.useDelete();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -216,6 +216,10 @@ export default function SuppliersPage() {
         columns={columns}
         data={rows}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your suppliers"
         emptyTitle="No suppliers yet"
         emptyDescription="Vendors you procure from — linked to purchase orders, contracts, and reviews."
         emptyAction={

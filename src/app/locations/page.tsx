@@ -35,7 +35,7 @@ const locations = makeCrudHooks<Location, LocationDto>(
 );
 
 export default function LocationsPage() {
-  const { data: rows = [], isLoading } = locations.useList();
+  const { data: rows = [], isLoading, error, refetch, isFetching } = locations.useList();
   const save = locations.useSave();
   const remove = locations.useDelete();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -201,6 +201,10 @@ export default function LocationsPage() {
         columns={columns}
         data={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat="your locations"
         emptyTitle="No locations yet"
         emptyDescription="Track sites, buildings, and rooms — nest them to mirror your physical footprint."
         emptyAction={

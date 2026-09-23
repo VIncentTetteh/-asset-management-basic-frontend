@@ -169,7 +169,7 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [moduleKey],
   );
-  const { data: rows = [], isLoading } = hooks.useList();
+  const { data: rows = [], isLoading, error, refetch, isFetching } = hooks.useList();
   const save = hooks.useSave();
   const remove = hooks.useDelete();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -316,6 +316,10 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
         columns={tableColumns}
         data={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        errorWhat={`your ${entityPlural.toLowerCase()}`}
         emptyTitle={`No ${entityPlural.toLowerCase()} yet`}
         emptyDescription={emptyDescription}
         emptyAction={
