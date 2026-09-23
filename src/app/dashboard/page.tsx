@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useDashboardData } from "@/features/dashboard/hooks";
 import { MissingRatesNotice } from "@/components/currency/MissingRatesNotice";
+import { OnboardingChecklist } from "@/features/onboarding/OnboardingChecklist";
 import {
   KpiRow,
   AssetHealthCard,
@@ -78,6 +79,11 @@ export default function DashboardPage() {
           </>
         }
       />
+
+      {/* First-run checklist. Renders nothing once the organisation has
+          dismissed it or finished it — and nothing at all if it failed to
+          load, because a broken nicety must not displace the dashboard. */}
+      <OnboardingChecklist />
 
       <MissingRatesNotice
         incomplete={data.completeness.incomplete}

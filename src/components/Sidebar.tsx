@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
     Building2,
+    Rocket,
     LayoutGrid,
     Layers,
     Hexagon,
@@ -177,6 +178,7 @@ export function Sidebar() {
             items: [
                 { href: "/organisations", label: "Organisations", icon: Building2, active: pathname.startsWith("/organisations"), permission: "MANAGE_ORGANIZATION_SETTINGS" },
                 { href: "/locations", label: "Locations", icon: MapPin, active: pathname.startsWith("/locations"), permission: "VIEW_LOCATIONS" },
+                { href: "/settings/setup", label: "Workspace Setup", icon: Rocket, active: pathname.startsWith("/settings/setup") },
                 { href: "/sso-configuration", label: "SSO", icon: KeyRound, active: pathname.startsWith("/sso-configuration"), permission: "MANAGE_ORGANIZATION_SETTINGS" },
                 { href: "/settings/storage", label: "Storage", icon: Cloud, active: pathname.startsWith("/settings/storage"), permission: "MANAGE_ORGANIZATION_SETTINGS" },
                 ...(commercialFeatures.outboundWebhooks ? [{ href: "/webhooks", label: "Webhooks", icon: Webhook, active: pathname.startsWith("/webhooks"), permission: "MANAGE_ORGANIZATION_SETTINGS" }] : []),

@@ -68,6 +68,18 @@ export const authService = {
         return response.data;
     },
 
+    /**
+     * POST /auth/resend-verification — a fresh confirmation link.
+     *
+     * The API answers identically whether or not the address exists or is
+     * already verified (the same user-enumeration defence as forgot-password),
+     * so the caller must show its message rather than claim an email was sent.
+     */
+    resendVerification: async (data: { email: string }): Promise<{ message: string }> => {
+        const response = await api.post("/auth/resend-verification", data);
+        return response.data;
+    },
+
     /** POST /auth/reset-password */
     resetPassword: async (data: { token: string; newPassword: string }): Promise<{ message: string }> => {
         const response = await api.post("/auth/reset-password", data);
