@@ -19,6 +19,7 @@ import { PASSWORD_INPUT_PROPS, passwordRules } from "@/lib/password-policy";
 import { MfaStatus } from "@/features/users/MfaStatus";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
+import { InvitationsSection } from "@/features/invitations/InvitationsSection";
 
 const L = FIELD_LIMITS.user;
 import {
@@ -39,6 +40,9 @@ export default function UsersPage() {
   const { hasPermission } = usePermissions();
   // Mirrors the API: every user write takes MANAGE_USERS, EDIT_USER or DELETE_USER.
   const canManage = hasPermission("MANAGE_USERS") || hasPermission("EDIT_USER") || hasPermission("DELETE_USER");
+  // Inviting is its own authority on the API: MANAGE_USERS (or an admin role),
+  // not the broader set that merely allows editing an existing profile.
+  const canInvite = hasPermission("MANAGE_USERS");
   const resetMfa = useResetMfa();
   const { confirm, ConfirmDialog } = useConfirm();
 
@@ -300,6 +304,12 @@ export default function UsersPage() {
             </Button>
           ) : undefined
         }
+      />
+
+      <InvitationsSection
+        roles={master.roles.map((r) => ({ id: r.id!, name: r.name }))}
+        departments={master.departments.map((d) => ({ id: d.id!, name: d.name }))}
+        canManage={canInvite}
       />
 
       <Modal
