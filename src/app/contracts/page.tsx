@@ -21,6 +21,8 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { applyApiFieldErrors, reportFormErrors } from "@/lib/api-validation";
+import { formPickersReady } from "@/lib/form-pickers";
+import { PageSpinner } from "@/components/ui/spinner";
 import { buildContractPayload, type ContractForm } from "@/features/finance/payloads";
 import { useConfirm } from "@/hooks/useConfirm";
 import { useCurrency } from "@/contexts/CurrencyContext";
@@ -65,17 +67,22 @@ export default function ContractsPage() {
   const remove = contracts.useDelete();
   const { confirm, ConfirmDialog } = useConfirm();
 
-  const { data: suppliers = [] } = useQuery({
+  const suppliersQuery = useQuery({
     queryKey: qk.module("suppliers").list(),
     queryFn: () => supplierService.getAll(),
     staleTime: 300_000,
   });
+  const { data: suppliers = [] } = suppliersQuery;
 
-  const { data: assets = [] } = useQuery({
+  const assetsQuery = useQuery({
     queryKey: qk.module("assets-all").list(),
     queryFn: () => assetService.getAll(),
     staleTime: 300_000,
   });
+  const { data: assets = [] } = assetsQuery;
+
+  // The supplier and asset pickers must exist before the form prefills itself.
+  const pickersReady = formPickersReady(suppliersQuery, assetsQuery);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<Contract | null>(null);
@@ -83,7 +90,7 @@ export default function ContractsPage() {
   const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<ContractForm>();
 
   useEffect(() => {
-    if (!isModalOpen) return;
+    if (!isModalOpen || !pickersReady) return;
     reset(
       editing
         ? {
@@ -119,7 +126,7 @@ export default function ContractsPage() {
             notes: "",
           },
     );
-  }, [isModalOpen, editing, reset, baseCurrency]);
+  }, [isModalOpen, editing, reset, baseCurrency, pickersReady]);
 
   const supplierName = useMemo(() => {
     const map = new Map(suppliers.map((s) => [s.id, s.name]));
@@ -325,6 +332,9 @@ export default function ContractsPage() {
         title={editing ? "Edit contract" : "New contract"}
         description="Supplier agreements with lifecycle and value tracking."
       >
+        {!pickersReady ? (
+          <PageSpinner label="Loading suppliers…" />
+        ) : (
         <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2 space-y-2">
@@ -460,6 +470,7 @@ export default function ContractsPage() {
             </Button>
           </div>
         </form>
+        )}
       </Modal>
       {ConfirmDialog}
     </ListPageTemplate>

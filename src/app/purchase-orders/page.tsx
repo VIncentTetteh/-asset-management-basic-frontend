@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
 import { reportApiError, reportFormErrors } from "@/lib/api-validation";
+import { formPickersReady } from "@/lib/form-pickers";
 import { FieldError } from "@/components/ui/field-error";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { formatLocalDate } from "@/lib/local-date";
@@ -72,28 +73,37 @@ function PurchaseOrdersContent() {
     queryKey: ordersKey.list(),
     queryFn: () => purchaseOrderService.getAll(),
   });
-  const { data: suppliers = [] } = useQuery({
+  const suppliersQuery = useQuery({
     queryKey: qk.module("suppliers").list(),
     queryFn: () => supplierService.getAll(),
     staleTime: 300_000,
   });
-  const { data: departments = [] } = useQuery({
+  const { data: suppliers = [] } = suppliersQuery;
+  const departmentsQuery = useQuery({
     queryKey: qk.module("departments").list(),
     queryFn: () => departmentService.getAll(),
     staleTime: 300_000,
   });
+  const { data: departments = [] } = departmentsQuery;
 
-  const { data: categories = [] } = useQuery({
+  const categoriesQuery = useQuery({
     queryKey: qk.module("categories").list(),
     queryFn: () => categoryService.getAll(),
     staleTime: 300_000,
   });
+  const { data: categories = [] } = categoriesQuery;
 
-  const { data: budgets = [] } = useQuery({
+  const budgetsQuery = useQuery({
     queryKey: qk.module("budgets").list(),
     queryFn: () => budgetService.getAll(),
     staleTime: 60_000,
   });
+  const { data: budgets = [] } = budgetsQuery;
+
+  // The form's four pickers. It must not prefill itself before they have loaded:
+  // a <select> cannot hold a value it has no <option> for, and nothing re-applies
+  // one that the browser dropped. See lib/form-pickers.
+  const pickersReady = formPickersReady(suppliersQuery, departmentsQuery, categoriesQuery, budgetsQuery);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ordersKey.all });
@@ -131,7 +141,7 @@ function PurchaseOrdersContent() {
   const { register, handleSubmit, reset, setError, watch, control, formState: { errors } } = useForm<PurchaseOrderForm>();
 
   useEffect(() => {
-    if (!isModalOpen) return;
+    if (!isModalOpen || !pickersReady) return;
     reset(
       editing
         ? {
@@ -164,7 +174,7 @@ function PurchaseOrdersContent() {
             lineItems: [],
           },
     );
-  }, [isModalOpen, editing, reset, baseCurrency]);
+  }, [isModalOpen, editing, reset, baseCurrency, pickersReady]);
 
   const lookups = useMemo(() => {
     const supplierMap = new Map(suppliers.map((s) => [s.id, s.name]));
@@ -454,6 +464,11 @@ function PurchaseOrdersContent() {
         title={editing ? "Edit purchase order" : "New purchase order"}
         description="Orders start as drafts. Submit from the row actions; a different user approves, which commits the amount against the linked budget."
       >
+        {/* Held back until the pickers can hold their values — an unprefilled form
+            would silently lose the order's supplier, department or budget. */}
+        {!pickersReady ? (
+          <PageSpinner label="Loading suppliers and departments…" />
+        ) : (
         <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="max-h-[70vh] space-y-4 overflow-y-auto px-1">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -575,6 +590,7 @@ function PurchaseOrdersContent() {
             </Button>
           </div>
         </form>
+        )}
       </Modal>
       <PurchaseOrderLinesModal
         order={viewingLines}

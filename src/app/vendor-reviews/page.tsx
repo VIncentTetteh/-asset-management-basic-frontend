@@ -24,6 +24,8 @@ import { formatLocalDate } from "@/lib/local-date";
 import { FIELD_LIMITS, limitInputProps, limitRules } from "@/lib/field-limits";
 import { FieldError } from "@/components/ui/field-error";
 import { reportApiError, reportFormErrors } from "@/lib/api-validation";
+import { formPickersReady } from "@/lib/form-pickers";
+import { PageSpinner } from "@/components/ui/spinner";
 import { buildVendorReviewPayload, vendorReviewRating, type VendorReviewForm } from "@/features/finance/payloads";
 
 const SCORE_FIELDS = ["qualityScore", "deliveryScore", "supportScore"] as const;
@@ -57,11 +59,14 @@ export default function VendorReviewsPage() {
     queryKey: [...reviewsKey.list(), selectedSupplierId],
     queryFn: () => vendorReviewService.getAll(selectedSupplierId || undefined),
   });
-  const { data: suppliers = [] } = useQuery({
+  const suppliersQuery = useQuery({
     queryKey: qk.module("suppliers").list(),
     queryFn: () => supplierService.getAll(),
     staleTime: 300_000,
   });
+  const { data: suppliers = [] } = suppliersQuery;
+  // The supplier picker must exist before the form prefills itself.
+  const pickersReady = formPickersReady(suppliersQuery);
   const { data: summary } = useQuery({
     queryKey: [...reviewsKey.all, "summary", selectedSupplierId],
     queryFn: () => vendorReviewService.getSupplierSummary(selectedSupplierId),
@@ -96,7 +101,7 @@ export default function VendorReviewsPage() {
   );
 
   useEffect(() => {
-    if (!isModalOpen) return;
+    if (!isModalOpen || !pickersReady) return;
     reset(
       editingReview
         ? {
@@ -118,7 +123,7 @@ export default function VendorReviewsPage() {
             periodEnd: "",
           },
     );
-  }, [isModalOpen, editingReview, selectedSupplierId, reset]);
+  }, [isModalOpen, editingReview, selectedSupplierId, reset, pickersReady]);
 
   const supplierName = useMemo(() => {
     const map = new Map(suppliers.map((s) => [s.id, s.name]));
@@ -298,6 +303,9 @@ export default function VendorReviewsPage() {
         title={editingReview ? "Edit review" : "Add review"}
         description="The overall rating is the average of the three scores."
       >
+        {!pickersReady ? (
+          <PageSpinner label="Loading suppliers…" />
+        ) : (
         <form onSubmit={handleSubmit(onSubmit, reportFormErrors)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="vr-supplier">Supplier <span className="text-danger">*</span></Label>
@@ -368,6 +376,7 @@ export default function VendorReviewsPage() {
             </Button>
           </div>
         </form>
+        )}
       </Modal>
       {ConfirmDialog}
     </ListPageTemplate>

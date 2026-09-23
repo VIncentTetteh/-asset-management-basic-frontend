@@ -20,9 +20,8 @@ const purchaseOrders = vi.hoisted(() => ({
 }));
 vi.mock("@/services/purchaseOrderService", () => ({ purchaseOrderService: purchaseOrders }));
 vi.mock("@/services/budgetService", () => ({ budgetService: { getAll: vi.fn().mockResolvedValue([]) } }));
-vi.mock("@/services/supplierService", () => ({
-    supplierService: { getAll: vi.fn().mockResolvedValue([{ id: "sup-1", name: "Acme Supplies" }]) },
-}));
+const suppliersSvc = vi.hoisted(() => ({ getAll: vi.fn() }));
+vi.mock("@/services/supplierService", () => ({ supplierService: suppliersSvc }));
 vi.mock("@/services/departmentService", () => ({
     departmentService: { getAll: vi.fn().mockResolvedValue([{ id: "dep-1", name: "Finance" }]) },
 }));
@@ -53,6 +52,8 @@ vi.mock("react-hot-toast", () => ({ toast: toastFns, default: toastFns }));
 afterEach(cleanup);
 beforeEach(() => {
     // The hoisted mocks live for the whole file; each test starts from zero calls.
+    suppliersSvc.getAll.mockReset();
+    suppliersSvc.getAll.mockResolvedValue([{ id: "sup-1", name: "Acme Supplies" }]);
     purchaseOrders.create.mockReset();
     purchaseOrders.replace.mockReset();
     toastFns.error.mockClear();
@@ -131,5 +132,47 @@ describe("purchase order form", () => {
         await waitFor(() => expect(toastFns.error).toHaveBeenCalled());
         expect(String(toastFns.error.mock.calls[0][0])).toMatch(/PO number/i);
         expect(purchaseOrders.create).not.toHaveBeenCalled();
+    });
+
+    it("waits for the supplier list before prefilling, so reopening an order keeps its supplier", async () => {
+        // The order arrives before the suppliers do — the exact ordering staging
+        // served (GET /purchase-orders answered first, GET /suppliers last). A form
+        // prefilled in that window leaves the <select> on its placeholder for good,
+        // because a select cannot hold a value it has no <option> for.
+        let releaseSuppliers: (value: unknown) => void = () => undefined;
+        suppliersSvc.getAll.mockReturnValue(new Promise((resolve) => { releaseSuppliers = resolve; }));
+        purchaseOrders.getAll.mockResolvedValue([{
+            id: "po-9",
+            poNumber: "PO-2026-009",
+            totalAmount: 2400,
+            currency: "USD",
+            status: "DRAFT",
+            supplierId: "sup-1",
+            departmentId: "dep-1",
+            lineItems: [{ description: "Dell Latitude 5450", quantity: 2, unitPrice: 1200 }],
+        }]);
+        purchaseOrders.replace.mockResolvedValue({ id: "po-9" });
+
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        render(
+            <QueryClientProvider client={client}>
+                <PurchaseOrdersPage />
+            </QueryClientProvider>,
+        );
+
+        fireEvent.click(await screen.findByRole("button", { name: /^Edit purchase order$/i }));
+        releaseSuppliers([{ id: "sup-1", name: "Acme Supplies" }]);
+
+        const supplier = (await screen.findByLabelText(/Supplier/)) as HTMLSelectElement;
+        await waitFor(() => expect(supplier.value).toBe("sup-1"));
+        expect(supplier.selectedOptions[0].text).toBe("Acme Supplies");
+
+        // And the save carries it, rather than being refused as "Supplier is required".
+        fireEvent.submit(
+            (screen.getByRole("button", { name: /^Save changes$/ }).closest("form")) as HTMLFormElement,
+        );
+        await waitFor(() => expect(purchaseOrders.replace).toHaveBeenCalledTimes(1));
+        expect(purchaseOrders.replace.mock.calls[0][1]).toMatchObject({ supplierId: "sup-1", departmentId: "dep-1" });
+        expect(toastFns.error).not.toHaveBeenCalled();
     });
 });
