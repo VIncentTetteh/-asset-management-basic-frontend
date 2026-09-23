@@ -5,13 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invitationService } from "@/services/invitationService";
 import { qk } from "@/lib/queryClient";
 import { extractErrorMessage } from "@/lib/error";
-import { isPlanLimitError } from "@/lib/plan-limit";
 import type { InvitationStatus, InviteUserRequest } from "@/types/invitations";
 
 const invitationsKey = qk.module("invitations");
-
-/** Query key for one page of invitations, so a mutation can invalidate the lot. */
-export const invitationQueryKeys = invitationsKey;
 
 export function useInvitations(params: { status?: InvitationStatus; limit?: number; offset?: number }) {
     return useQuery({
@@ -59,7 +55,7 @@ export function useRevokeInvitation() {
  * `Retry-After` is the only part of a rate-limit response a user can act on:
  * without it "try again later" is advice with no content.
  */
-export function retryAfterSeconds(error: unknown): number | null {
+function retryAfterSeconds(error: unknown): number | null {
     if (!axios.isAxiosError(error) || error.response?.status !== 429) return null;
     const header = error.response.headers?.["retry-after"] ?? error.response.headers?.["Retry-After"];
     const seconds = Number(header);
@@ -86,14 +82,4 @@ export function describeInvitationError(error: unknown, fallback: string): strin
         return extractErrorMessage(error, "Too many invitations have been sent just now. Try again shortly.");
     }
     return extractErrorMessage(error, fallback);
-}
-
-/**
- * True when the failure was a seat/plan limit, which the axios interceptor has
- * already announced with an Upgrade link. The form still says what happened —
- * it is the reason the save did not go through — but it does not duplicate the
- * link.
- */
-export function isSeatLimitError(error: unknown): boolean {
-    return isPlanLimitError(error);
 }
