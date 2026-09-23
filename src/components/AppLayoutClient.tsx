@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { matchesRoute } from "@/lib/route-path";
+import { matchesRoute, PUBLIC_PATHS } from "@/lib/route-path";
 import { loginPathWithNext } from "@/lib/safe-next";
 import { PageSpinner } from "@/components/ui/spinner";
 import { Sidebar } from "@/components/Sidebar";
@@ -90,8 +90,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     const { loading: permLoading, hasPermission } = usePermissions();
     const { isAuthenticated, isReady } = useAuth();
 
-    const publicPaths = ["/", "/login", "/register", "/register-tenant", "/forgot-password", "/reset-password"];
-    const isPublicPage = matchesRoute(pathname, publicPaths);
+    const isPublicPage = matchesRoute(pathname, [...PUBLIC_PATHS]);
     const breadcrumb = pathname.split("/").filter(Boolean).join(" / ") || "home";
     const requiresOrgBootstrap =
         typeof window !== "undefined"

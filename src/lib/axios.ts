@@ -49,6 +49,10 @@ const isPublicAuthEndpoint = (url?: string): boolean =>
         || url?.includes("/auth/reset-password")
         || url?.includes("/mfa/challenge")
         || url?.includes("/auth/sso/public")
+        // Redeeming an invitation: the caller has no account and no tenant yet.
+        // The invitation token in the body is the whole credential.
+        || url?.includes("/invitations/lookup")
+        || url?.includes("/invitations/accept")
     );
 
 const shouldSkipOrganisationHeader = (url?: string): boolean =>
@@ -149,7 +153,10 @@ api.interceptors.response.use((response) => response, async (error) => {
     if (error.response?.status === 401) {
         if (typeof window !== "undefined"
             && !window.location.pathname.startsWith("/login")
-            && !window.location.pathname.startsWith("/register")) {
+            && !window.location.pathname.startsWith("/register")
+            // An invitee has no session by definition; bouncing them to login
+            // would throw away the token they arrived with.
+            && !window.location.pathname.startsWith("/accept-invite")) {
             clearAuthState();
             // Carry the current page so the user lands back on it (e.g. a scanned
             // asset label) after signing in; login validates it again.

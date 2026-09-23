@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { matchesRoute } from "@/lib/route-path";
+import { matchesRoute, PUBLIC_PATHS } from "@/lib/route-path";
 import api from "@/lib/axios";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -46,8 +46,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
     const { isAuthenticated, isReady } = useAuth();
     const [permissions, setPermissions] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
-    const publicPaths = ["/", "/login", "/login/sso-callback", "/register", "/register-tenant", "/forgot-password", "/reset-password"];
-    const isPublicPage = matchesRoute(pathname, publicPaths);
+    const isPublicPage = matchesRoute(pathname, [...PUBLIC_PATHS]);
 
     const fetchPermissions = useCallback(async () => {
         if (isPublicPage || !isReady || !isAuthenticated) {

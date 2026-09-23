@@ -24,6 +24,30 @@ export function normalisePath(pathname: string | null | undefined): string {
     return trimmed === "" ? "/" : trimmed;
 }
 
+/**
+ * Every route that renders without a session.
+ *
+ * One list, because there were three — in `AuthContext`, `PermissionContext`
+ * and `AppLayoutClient` — and they had already drifted: two knew about
+ * `/login/sso-callback` and the third did not. A page missing from any one of
+ * them gets the authenticated shell's treatment (a profile fetch, a permission
+ * fetch, and a redirect to login), which for a public page is wrong in three
+ * different ways.
+ *
+ * `/accept-invite` belongs here for the sharpest version of that reason: the
+ * visitor has no account yet, which is the entire point of the page.
+ */
+export const PUBLIC_PATHS = [
+    "/",
+    "/login",
+    "/login/sso-callback",
+    "/register",
+    "/register-tenant",
+    "/forgot-password",
+    "/reset-password",
+    "/accept-invite",
+] as const;
+
 /** True when `pathname` matches one of `routes`, ignoring any trailing slash on either side. */
 export function matchesRoute(pathname: string | null | undefined, routes: string[]): boolean {
     const target = normalisePath(pathname);

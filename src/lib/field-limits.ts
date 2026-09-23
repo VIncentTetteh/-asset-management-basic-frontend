@@ -274,6 +274,23 @@ export const FIELD_LIMITS = {
         phone: { ...text(255), format: "phone" },
         taxId: text(255),
     },
+    /** InviteUserRequest — tighter than `user` because the DTO is tighter. */
+    invitation: {
+        email: { ...text(255, true), format: "email" },
+        roleId: REQUIRED,
+        firstName: text(100),
+        lastName: text(100),
+        jobTitle: text(150),
+        note: text(500),
+    },
+    /** AcceptInvitationRequest — what an invitee supplies for themselves. */
+    invitationAccept: {
+        firstName: text(100, true),
+        lastName: text(100, true),
+        password: { required: true, minLength: PASSWORD_MIN_LENGTH, maxLength: PASSWORD_MAX_BYTES },
+        phone: { ...text(40), format: "phone" },
+        jobTitle: text(150),
+    },
     user: {
         firstName: text(255, true),
         lastName: text(255, true),

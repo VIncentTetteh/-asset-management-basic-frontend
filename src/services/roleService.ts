@@ -1,5 +1,6 @@
 import api from "@/lib/axios";
 import { Role, RoleDto } from "@/types";
+import type { PermissionDescription, RoleEffectivePermissions } from "@/types/invitations";
 import { extractList } from "@/services/responseUtils";
 import { getOrganisationIdFromStorage } from "@/lib/authContext";
 import { invalidateRequestCache, withRequestCache } from "@/services/requestCache";
@@ -77,5 +78,27 @@ export const roleService = {
             const response = await api.get<string[]>("/roles/permissions");
             return Array.isArray(response.data) ? response.data : [];
         }, 10 * 60_000);
+    },
+
+    /**
+     * GET /roles/permissions/catalogue — every permission, described in plain
+     * language, grouped by area of the product, and honest about which ones
+     * gate nothing today (`enforced: false`).
+     *
+     * This replaces the hand-maintained group/label tables the roles page used
+     * to carry: a second source of truth that had already drifted from the
+     * backend enum it was copying.
+     */
+    getPermissionCatalogue: async (): Promise<PermissionDescription[]> => {
+        return withRequestCache("roles:permissions:catalogue", async () => {
+            const response = await api.get<PermissionDescription[]>("/roles/permissions/catalogue");
+            return Array.isArray(response.data) ? response.data : [];
+        }, 10 * 60_000);
+    },
+
+    /** GET /roles/{id}/effective-permissions — what a holder can actually do. */
+    getEffectivePermissions: async (id: string): Promise<RoleEffectivePermissions> => {
+        const response = await api.get<RoleEffectivePermissions>(`/roles/${id}/effective-permissions`);
+        return response.data;
     },
 };
