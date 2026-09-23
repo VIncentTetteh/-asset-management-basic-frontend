@@ -192,26 +192,32 @@ export function DisposalFormModal({
           </div>
         </div>
 
-        {/* The stored reference is carried through untouched so a legacy link or
-            certificate number is never cleared by the switch to uploads. */}
-        {attachments.enabled ? <input type="hidden" {...register("complianceDocumentUrl")} /> : null}
+        {/*
+          Both, not either/or. Alone among the nine document fields this one is
+          "a link or a reference" — the API marks it @HttpUrl(allowPlainText),
+          the other eight reject anything that is not an http(s) link. A
+          certificate of destruction is often a paper original, so its number is
+          the only record there is, and an uploader cannot take a number. A user
+          may attach a scan, record the reference, or do both.
+        */}
+        <div className="space-y-2">
+          <Label htmlFor="dp-doc">Compliance document (link or reference)</Label>
+          <Input
+            id="dp-doc"
+            maxLength={DISPOSAL_DOC_MAX_LENGTH}
+            placeholder="https://… or certificate of destruction #12345"
+            {...register("complianceDocumentUrl", limitRules<DisposalForm, "complianceDocumentUrl">(L.complianceDocumentUrl, "Compliance document"))}
+          />
+          <FieldError error={errors.complianceDocumentUrl} />
+          <p className="text-[11px] text-faint-fg">
+            A link to the certificate, or the reference of a physical one. Attach a scan below as well if you have one.
+          </p>
+        </div>
+
         <AttachmentField
           state={attachments}
-          label="Compliance document"
-          hint="Certificate of destruction, weighbridge ticket or recycler receipt."
-          legacyUrl={editingDisposal?.complianceDocumentUrl}
-          fallback={
-            <div className="space-y-2">
-              <Label htmlFor="dp-doc">Compliance document (link or reference)</Label>
-              <Input
-                id="dp-doc"
-                maxLength={DISPOSAL_DOC_MAX_LENGTH}
-                placeholder="https://… or certificate of destruction #12345"
-                {...register("complianceDocumentUrl", limitRules<DisposalForm, "complianceDocumentUrl">(L.complianceDocumentUrl, "Compliance document"))}
-              />
-              <FieldError error={errors.complianceDocumentUrl} />
-            </div>
-          }
+          label="Attach the certificate"
+          hint="A scan of the certificate of destruction, weighbridge ticket or recycler receipt."
         />
 
         <div className="flex justify-end gap-2 pt-2">

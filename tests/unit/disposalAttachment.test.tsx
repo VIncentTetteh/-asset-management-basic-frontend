@@ -132,17 +132,59 @@ describe("disposal compliance document attachment", () => {
         });
     });
 
-    it("keeps a stored certificate reference that was never a URL", async () => {
+    it("shows a stored certificate reference in an input the user can still edit", async () => {
         renderModal(existing({ complianceDocumentUrl: "certificate of destruction #12345" }));
 
-        // Not a link — shown as plain text rather than an href that cannot resolve.
-        expect(await screen.findByText(/certificate of destruction #12345/)).toBeTruthy();
-        expect(screen.getByText(/Currently linked/i)).toBeTruthy();
+        // The reference lives in a real input, not a read-only "currently linked"
+        // line: a paper certificate's number is the only record there is, so it
+        // has to stay enterable once uploads exist.
+        const input = await screen.findByLabelText(/^Compliance document \(link or reference\)$/);
+        expect((input as HTMLInputElement).value).toBe("certificate of destruction #12345");
 
+        fireEvent.change(input, { target: { value: "certificate of destruction #67890" } });
         fireEvent.click(screen.getByRole("button", { name: /^Save changes$/ }));
         await waitFor(() => expect(disposals.replace).toHaveBeenCalled());
         expect(disposals.replace.mock.calls[0][1]).toMatchObject({
+            complianceDocumentUrl: "certificate of destruction #67890",
+        });
+    });
+
+    it("records a reference for a paper certificate with no file attached at all", async () => {
+        renderModal();
+        fireEvent.change(screen.getByLabelText(/^Primary reason/), { target: { value: "Irreparable" } });
+        fireEvent.change(screen.getByLabelText(/^Compliance document \(link or reference\)$/), {
+            target: { value: "certificate of destruction #12345" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: /^Pick asset$/ }));
+        fireEvent.click(screen.getByRole("button", { name: /^Request disposal$/ }));
+
+        await waitFor(() => expect(disposals.create).toHaveBeenCalled());
+        expect(disposals.create.mock.calls[0][0]).toMatchObject({
             complianceDocumentUrl: "certificate of destruction #12345",
         });
+        // Nothing was chosen, so nothing is uploaded and nothing claims to be.
+        expect(mockedApi.post).not.toHaveBeenCalled();
+    });
+
+    it("takes a scan and a reference together, not one or the other", async () => {
+        mockedApi.post.mockResolvedValue({ data: { id: "doc-3", originalName: "scan.pdf" } });
+        renderModal();
+        fireEvent.change(screen.getByLabelText(/^Primary reason/), { target: { value: "Irreparable" } });
+        fireEvent.change(screen.getByLabelText(/^Compliance document \(link or reference\)$/), {
+            target: { value: "certificate of destruction #12345" },
+        });
+        fireEvent.change(filePicker(), { target: { files: [pdf("scan.pdf")] } });
+        fireEvent.click(screen.getByRole("button", { name: /^Pick asset$/ }));
+        fireEvent.click(screen.getByRole("button", { name: /^Request disposal$/ }));
+
+        await waitFor(() => expect(disposals.create).toHaveBeenCalled());
+        expect(disposals.create.mock.calls[0][0]).toMatchObject({
+            complianceDocumentUrl: "certificate of destruction #12345",
+        });
+        await waitFor(() => expect(mockedApi.post).toHaveBeenCalledWith(
+            "/documents",
+            expect.any(FormData),
+            expect.objectContaining({ params: { entityType: "DISPOSAL_RECORD", entityId: DISPOSAL_ID } }),
+        ));
     });
 });
