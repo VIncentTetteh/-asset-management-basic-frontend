@@ -20,7 +20,7 @@ import { clearVerifiedOrganisationId, setStoredUser } from "@/lib/authContext";
 import { Eye, EyeOff, Smartphone } from "lucide-react";
 import { extractErrorMessage } from "@/lib/error";
 import { nextFromSearch } from "@/lib/safe-next";
-import { organisationChoicesFromError, type LoginOrganisationChoice } from "@/lib/login-organisations";
+import { organisationChoicesFromError, organisationFromSearch, type LoginOrganisationChoice } from "@/lib/login-organisations";
 import { reportFormErrors } from "@/lib/api-validation";
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -47,10 +47,25 @@ export default function LoginPage() {
     const [orgChoices, setOrgChoices] = useState<LoginOrganisationChoice[] | null>(null);
     const [organisationId, setOrganisationId] = useState("");
 
+    /**
+     * `/login?org=…&email=…`, as an invitation acceptance hands over. Accepting
+     * issues no session, and the same address may exist in several tenants — so
+     * without the organisation the API would answer 409 and ask the new joiner
+     * a question they have no way to answer. Both values are read once, on
+     * mount; `org` only counts when it is a well-formed id.
+     */
+    const [invitedFrom] = useState(() =>
+        typeof window === "undefined"
+            ? { organisationId: "", email: "" }
+            : {
+                organisationId: organisationFromSearch(window.location.search),
+                email: new URLSearchParams(window.location.search).get("email")?.trim() ?? "",
+            });
+
     const { register, handleSubmit, getValues, formState: { errors } } = useForm<{
         email: string;
         password: string;
-    }>();
+    }>({ defaultValues: { email: invitedFrom.email, password: "" } });
 
     // ── SSO Discovery ─────────────────────────────────────────────────────────
     const onEmailBlur = async () => {
@@ -91,9 +106,10 @@ export default function LoginPage() {
     const onSubmit = async (data: { email: string; password: string }) => {
         setIsLoading(true);
         try {
+            const chosenOrganisation = (orgChoices && organisationId) || invitedFrom.organisationId;
             const response = await authService.login({
                 ...data,
-                ...(orgChoices && organisationId ? { organisationId } : {}),
+                ...(chosenOrganisation ? { organisationId: chosenOrganisation } : {}),
             });
 
             // ── MFA required: backend returned 202 with a challenge token ─────
@@ -228,7 +244,9 @@ export default function LoginPage() {
                     </div>
                     <CardTitle className="text-3xl font-bold tracking-tight">Welcome Back</CardTitle>
                     <CardDescription>
-                        Sign in to your Enterprise Asset Management account
+                        {invitedFrom.organisationId
+                            ? "Your account is ready. Sign in with the password you just chose."
+                            : "Sign in to your Enterprise Asset Management account"}
                     </CardDescription>
                 </CardHeader>
                 <form onSubmit={handleSubmit(onSubmit, reportFormErrors)}>
