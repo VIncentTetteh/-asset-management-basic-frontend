@@ -69,3 +69,22 @@ export async function organisationIdOf(page: Page): Promise<string> {
     }
     throw new Error("No verifiedOrganisationId in the saved session");
 }
+
+/** A DRAFT contract for a year, for tests that need one to attach documents to. */
+export async function createContract(
+    api: ApiClient,
+    title: string,
+    extra: Record<string, unknown> = {},
+): Promise<Created> {
+    return api.post<Created>("/contracts", {
+        title,
+        contractType: "MAINTENANCE",
+        status: "DRAFT",
+        startDate: isoDate(0),
+        endDate: isoDate(365),
+        ...extra,
+    });
+}
+
+/** Best-effort contract delete (the prefix marks anything the API refuses to remove). */
+export const dropContract = (api: ApiClient, id?: string) => (id ? api.tryDelete(`/contracts/${id}`) : undefined);
