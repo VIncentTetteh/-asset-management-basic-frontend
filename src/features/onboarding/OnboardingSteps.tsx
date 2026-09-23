@@ -36,7 +36,10 @@ function StepRow({ step }: { step: OnboardingStep }) {
     });
 
     return (
-        <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:gap-3">
+        // Wraps rather than stacking: a column at phone width put the tick on a
+        // line of its own above the title, so the one glyph that says whether a
+        // step is done stopped reading as part of the step. Seen at 400px.
+        <li className="flex flex-wrap items-start gap-x-3 gap-y-2 py-3">
             <span className="mt-0.5 shrink-0" aria-hidden="true">
                 {step.done ? (
                     <Check className="h-4 w-4 text-ok" />
@@ -57,20 +60,21 @@ function StepRow({ step }: { step: OnboardingStep }) {
                     </p>
                 ) : null}
             </div>
-            {step.done ? null : route ? (
-                <Button asChild size="sm" variant="outline" className="shrink-0 self-start">
-                    <Link href={route.href}>{route.cta}</Link>
-                </Button>
-            ) : step.key === "verify_email" ? (
-                <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 self-start"
-                    onClick={() => resend.mutate()}
-                    isLoading={resend.isPending}
-                >
-                    <Mail aria-hidden="true" className="mr-2 h-3.5 w-3.5" /> Send a new link
-                </Button>
+            {step.done ? null : route || step.key === "verify_email" ? (
+                // Full width below sm so it wraps onto its own line instead of
+                // squeezing the step text into a four-word column at 400px, and
+                // indented to line up with that text when it does.
+                <div className="ml-7 w-full shrink-0 sm:ml-0 sm:w-auto">
+                    {route ? (
+                        <Button asChild size="sm" variant="outline">
+                            <Link href={route.href}>{route.cta}</Link>
+                        </Button>
+                    ) : (
+                        <Button size="sm" variant="outline" onClick={() => resend.mutate()} isLoading={resend.isPending}>
+                            <Mail aria-hidden="true" className="mr-2 h-3.5 w-3.5" /> Send a new link
+                        </Button>
+                    )}
+                </div>
             ) : null}
         </li>
     );

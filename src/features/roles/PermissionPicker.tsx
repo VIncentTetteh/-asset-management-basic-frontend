@@ -89,12 +89,15 @@ export function PermissionPicker({
                                             className="cursor-pointer text-[13px] leading-tight font-medium"
                                         >
                                             {permission.label}
-                                            {!permission.enforced ? (
-                                                <span className="ml-1.5 rounded border border-warn/40 bg-warn-soft px-1 py-px text-[10px] font-semibold text-warn">
-                                                    Not enforced yet
-                                                </span>
-                                            ) : null}
                                         </Label>
+                                        {/* Its own line, and nowrap: inline after the
+                                            label it broke across two lines and the
+                                            badge's border split down the middle. */}
+                                        {!permission.enforced ? (
+                                            <span className="mt-0.5 inline-block whitespace-nowrap rounded border border-warn/40 bg-warn-soft px-1 py-px text-[10px] font-semibold text-warn">
+                                                Not enforced yet
+                                            </span>
+                                        ) : null}
                                         <p id={`perm-${permission.key}-summary`} className="text-[11px] leading-snug text-muted-fg">
                                             {permission.enforced
                                                 ? permission.summary

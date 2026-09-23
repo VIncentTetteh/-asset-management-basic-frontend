@@ -230,9 +230,14 @@ export default function RolesPage() {
                                             DISPOSE_ASSET. The words are the backend's own. */}
                                         <ul className="space-y-0.5 text-[11px] text-muted-fg">
                                             {parsePermissions(role.permissions).slice(0, 4).map(p => (
-                                                <li key={p} className="truncate" title={describe(p)}>
+                                                // No truncation: the "not enforced yet" marker was
+                                                // being cut off mid-word at card width, which turned
+                                                // the one caveat that matters into "(not enforc…".
+                                                <li key={p} title={describe(p)}>
                                                     · {describe(p)}
-                                                    {!isEnforced(p) ? <span className="ml-1 text-warn">(not enforced yet)</span> : null}
+                                                    {!isEnforced(p) ? (
+                                                        <span className="block pl-2 text-warn">not enforced yet</span>
+                                                    ) : null}
                                                 </li>
                                             ))}
                                             {parsePermissions(role.permissions).length > 4 && (
@@ -256,15 +261,18 @@ export default function RolesPage() {
                                     >
                                         <ShieldAlert className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> What it allows
                                     </Button>
+                                    {/* The icon pair wraps as one unit. Left to wrap
+                                        individually, a narrow card put Edit beside the
+                                        wide button and Delete alone on the next line. */}
                                     {role.systemRole || !canManage ? null : (
-                                        <>
+                                        <div className="flex shrink-0 items-center gap-2">
                                             <Button variant="outline" size="sm" onClick={() => handleOpenEdit(role)} className="h-8 w-8 p-0" aria-label={`Edit role ${role.name}`} title="Edit role">
                                                 <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                                             </Button>
                                             <Button variant="ghost" size="sm" onClick={() => handleDelete(role)} className="h-8 w-8 p-0 text-danger" aria-label={`Delete role ${role.name}`} title="Delete role">
                                                 <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                                             </Button>
-                                        </>
+                                        </div>
                                     )}
                                 </div>
                             </CardContent>

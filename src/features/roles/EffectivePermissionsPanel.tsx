@@ -38,6 +38,9 @@ export function EffectivePermissionsPanel({ roleId }: { roleId: string }) {
     }
 
     const enforced = data.permissions.filter((permission) => permission.enforced);
+    const label = (key: string) =>
+        data.permissions.find((permission) => permission.key === key)?.label
+        ?? key.replace(/_/g, " ").toLowerCase();
     const groups = groupPermissions(enforced);
 
     return (
@@ -57,7 +60,10 @@ export function EffectivePermissionsPanel({ roleId }: { roleId: string }) {
 
             {data.unenforced.length > 0 ? (
                 <Alert tone="warn" title="Granted, but not enforced anywhere yet" live={false}>
-                    {data.unenforced.join(", ").replace(/_/g, " ").toLowerCase()} — no part of the product checks{" "}
+                    {/* Named the way the rest of the screen names them. Printing the
+                        raw key here ("regenerate qr") was the one place this page
+                        still leaked an authority string at the reader. */}
+                    {data.unenforced.map((key) => label(key)).join(", ")} — no part of the product checks{" "}
                     {data.unenforced.length === 1 ? "this one" : "these"} today, so {data.unenforced.length === 1 ? "it does" : "they do"} not
                     change what this person can do. {data.unenforced.length === 1 ? "It is" : "They are"} listed here rather than hidden so the role
                     is not quietly different from what was saved.

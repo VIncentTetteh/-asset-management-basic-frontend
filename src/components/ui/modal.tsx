@@ -32,15 +32,18 @@ export function Modal({ isOpen, onClose, title, description, size = "default", c
     return createPortal(
         <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center overflow-y-auto p-4 animate-in fade-in duration-200">
             <div className={`flex max-h-[85vh] w-full ${SIZES[size]} flex-col overflow-hidden rounded-panel border border-edge bg-surface text-foreground shadow-lg animate-in zoom-in-95 duration-200`}>
-                <div className="flex shrink-0 items-center justify-between border-b border-edge-subtle px-6 py-4">
-                    <div>
+                {/* min-w-0 + gap: without them a long description ran under the
+                    close button at phone width, which was visible on the role
+                    permissions modal at 400px. */}
+                <div className="flex shrink-0 items-start justify-between gap-3 border-b border-edge-subtle px-6 py-4">
+                    <div className="min-w-0">
                         <h3 className="text-lg font-bold text-foreground">{title}</h3>
                         {description && (
                             <p className="mt-1 text-sm text-muted-fg">{description}</p>
                         )}
                     </div>
-                    <Button variant="ghost" size="icon" onClick={onClose}>
-                        <X className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="-mt-1 shrink-0" onClick={onClose} aria-label="Close">
+                        <X className="h-4 w-4" aria-hidden="true" />
                     </Button>
                 </div>
                 <div className="overflow-y-auto p-6">{children}</div>
