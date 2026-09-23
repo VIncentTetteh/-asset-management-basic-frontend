@@ -180,7 +180,8 @@ export default function RolesPage() {
                 <DataErrorState what="your roles" error={rolesError} onRetry={refetchRoles} isRetrying={isFetching} />
             ) : null}
 
-            <div className={`grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4${rolesError ? " hidden" : ""}`}>
+            {rolesError ? null : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? (
                     <div className="col-span-full h-64 flex items-center justify-center">
                         <PageSpinner />
@@ -280,6 +281,7 @@ export default function RolesPage() {
                     ))
                 )}
             </div>
+            )}
 
             <Modal
                 isOpen={isModalOpen}
