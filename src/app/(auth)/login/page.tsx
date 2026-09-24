@@ -1,7 +1,7 @@
 "use client";
 
 import { FORMATS } from "@/lib/field-limits";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -19,6 +19,7 @@ import { ssoAuthService } from "@/services/ssoAuthService";
 import { clearVerifiedOrganisationId, setStoredUser } from "@/lib/authContext";
 import { Eye, EyeOff, Smartphone } from "lucide-react";
 import { extractErrorMessage } from "@/lib/error";
+import { describeSignInFailure, type SignInFailure } from "@/lib/sign-in-error";
 import { nextFromSearch } from "@/lib/safe-next";
 import { organisationChoicesFromError, organisationFromSearch, type LoginOrganisationChoice } from "@/lib/login-organisations";
 import { reportFormErrors } from "@/lib/api-validation";
@@ -28,6 +29,13 @@ import { reportFormErrors } from "@/lib/api-validation";
 export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+
+    // Why the sign-in failed, kept on the page rather than in a toast: the
+    // blocked user has to read it, and may have to act on it.
+    const [failure, setFailure] = useState<SignInFailure | null>(null);
+    const [resending, setResending] = useState(false);
+    const [resendNote, setResendNote] = useState<string | null>(null);
+    const alertRef = useRef<HTMLDivElement | null>(null);
 
     // SSO discovery state
     const [ssoDiscovery, setSsoDiscovery] = useState<{
@@ -67,6 +75,31 @@ export default function LoginPage() {
         password: string;
     }>({ defaultValues: { email: invitedFrom.email, password: "" } });
 
+    // The alert is announced by role="alert"; moving focus to it as well means a
+    // keyboard or screen-reader user lands on the reason, and on the resend
+    // button beside it, instead of hunting back up the form for it.
+    useEffect(() => {
+        if (failure) alertRef.current?.focus();
+    }, [failure]);
+
+    const onResendVerification = async () => {
+        const email = (getValues("email") ?? "").trim();
+        if (!email) return;
+        setResending(true);
+        setResendNote(null);
+        try {
+            const result = await authService.resendVerification({ email });
+            // Deliberately ambiguous server-side so the endpoint cannot be used to
+            // discover which addresses are registered. Repeat what it said; do not
+            // upgrade it to "sent!".
+            setResendNote(result?.message?.trim() || "If that address needs verification, a new link is on its way.");
+        } catch (error: unknown) {
+            setResendNote(extractErrorMessage(error, "We could not request a new link. Please try again."));
+        } finally {
+            setResending(false);
+        }
+    };
+
     // ── SSO Discovery ─────────────────────────────────────────────────────────
     const onEmailBlur = async () => {
         const email = (getValues("email") ?? "").trim();
@@ -105,6 +138,8 @@ export default function LoginPage() {
     // ── Password Login ─────────────────────────────────────────────────────────
     const onSubmit = async (data: { email: string; password: string }) => {
         setIsLoading(true);
+        setFailure(null);
+        setResendNote(null);
         try {
             const chosenOrganisation = (orgChoices && organisationId) || invitedFrom.organisationId;
             const response = await authService.login({
@@ -144,7 +179,9 @@ export default function LoginPage() {
                 toast("Choose the organisation to sign in to.");
                 return;
             }
-            toast.error(extractErrorMessage(error, "Failed to login. Please check your credentials."));
+            // Inline, not a toast: a toast slides away while the user is still
+            // reading it, and a blocked user needs the sentence to stay put.
+            setFailure(describeSignInFailure(error));
         } finally {
             setIsLoading(false);
         }
@@ -251,6 +288,35 @@ export default function LoginPage() {
                 </CardHeader>
                 <form onSubmit={handleSubmit(onSubmit, reportFormErrors)}>
                     <CardContent className="space-y-4">
+                        {failure && (
+                            <div
+                                ref={alertRef}
+                                role="alert"
+                                tabIndex={-1}
+                                id="signin-error"
+                                className={`rounded-xl border px-4 py-3 space-y-3 outline-none ${
+                                    failure.block === "invalid-credentials"
+                                        ? "border-red-200 bg-red-50"
+                                        : "border-amber-200 bg-amber-50"
+                                }`}
+                            >
+                                <p className={`text-sm ${failure.block === "invalid-credentials" ? "text-red-800" : "text-amber-900"}`}>
+                                    {failure.message}
+                                </p>
+                                {failure.canResendVerification && (
+                                    <Button
+                                        type="button"
+                                        onClick={onResendVerification}
+                                        disabled={resending}
+                                        className="w-full bg-amber-700 hover:bg-amber-800 text-white"
+                                    >
+                                        {resending ? "Sending…" : "Resend verification email"}
+                                    </Button>
+                                )}
+                                {resendNote && <p className="text-sm text-amber-900">{resendNote}</p>}
+                            </div>
+                        )}
+
                         {/* Email field */}
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
@@ -261,9 +327,10 @@ export default function LoginPage() {
                                 {...register("email", {
                                     required: "Email is required",
                                     pattern: { value: FORMATS.email.pattern, message: FORMATS.email.message("Email") },
-                                    onChange: () => { setSsoDiscovery(null); setOrgChoices(null); },
+                                    onChange: () => { setSsoDiscovery(null); setOrgChoices(null); setFailure(null); setResendNote(null); },
                                     onBlur: onEmailBlur,
                                 })}
+                                aria-describedby={failure ? "signin-error" : undefined}
                                 className={errors.email ? "border-red-500" : ""}
                             />
                             {errors.email && (
@@ -314,6 +381,7 @@ export default function LoginPage() {
                                         id="password"
                                         type={showPassword ? "text" : "password"}
                                         {...register("password", { required: "Password is required" })}
+                                        aria-describedby={failure ? "signin-error" : undefined}
                                         className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
                                     />
                                     <button
