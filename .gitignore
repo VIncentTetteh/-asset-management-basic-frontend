@@ -37,6 +37,12 @@ yarn-error.log*
 # env files — keep the sanitized template tracked
 .env*
 !.env.example
+# .env.production holds only NEXT_PUBLIC_ feature flags, which are compiled into
+# the client bundle and so are public by definition. It is tracked deliberately:
+# leaving these to whatever a deploy command happened to set is how the AI
+# assistant shipped enabled on the server and invisible in the UI. No secret
+# belongs in this file — anything secret goes to Secrets Manager.
+!.env.production
 
 # vercel
 .vercel

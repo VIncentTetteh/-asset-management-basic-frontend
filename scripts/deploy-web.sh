@@ -31,6 +31,15 @@ OUT="${1:-out}"
 [ -d "$OUT" ] || { echo "no build directory at $OUT — run 'npm run build' first" >&2; exit 1; }
 [ -f "$OUT/index.html" ] || { echo "$OUT has no index.html; is it a finished export?" >&2; exit 1; }
 
+# Feature flags are compiled into the bundle, so a build made without them
+# silently ships a UI with features missing — the AI assistant was live on the
+# API and absent from the menu for a full deploy because of exactly that. The
+# flags live in .env.production (tracked); warn if this build predates it.
+if [ -f .env.production ] && [ .env.production -nt "$OUT/index.html" ]; then
+  echo "WARNING: .env.production is newer than the build in $OUT." >&2
+  echo "         Rebuild before deploying, or the flags in it are not in the bundle." >&2
+fi
+
 aws_() { aws --profile "$PROFILE" --region "$REGION" "$@"; }
 
 echo "==> 1/3 immutable assets (no --delete: old chunks must outlive the deploy)"
