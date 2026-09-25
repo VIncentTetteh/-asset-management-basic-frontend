@@ -17,12 +17,14 @@ export function Footer() {
                     <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
                         <Link href="/contact" className="hover:text-white">Contact</Link>
                         <Link href="/support" className="hover:text-white">Support</Link>
+                        <Link href="/privacy" className="hover:text-white">Privacy</Link>
+                        <Link href="/terms" className="hover:text-white">Terms</Link>
                         <Link href="/register-tenant" className="hover:text-white">Create workspace</Link>
                         <Link href="/login" className="hover:text-white">Sign in</Link>
                     </nav>
                 </div>
                 <div className="mt-10 border-t border-slate-800 pt-6 text-xs">
-                    © {new Date().getFullYear()} AssetIQ. Contracted terms, privacy notices, and service levels are supplied during customer onboarding until public legal pages are approved.
+                    © {new Date().getFullYear()} AssetIQ. Where you have a signed customer agreement, its terms and service levels take precedence.
                 </div>
             </div>
         </footer>

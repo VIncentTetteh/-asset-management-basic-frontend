@@ -20,3 +20,27 @@ test.describe("Public marketing pages", () => {
     await expect(page.getByText(/Email is required/i)).toBeVisible();
   });
 });
+
+test.describe("Public legal pages", () => {
+  // The mobile app links here for store review, so a signed-out visitor must
+  // land on the page itself, not be bounced to /login.
+  for (const { path, heading } of [
+    { path: "/privacy", heading: /Privacy Policy/i },
+    { path: "/terms", heading: /Terms of Service/i },
+  ]) {
+    test(`${path} renders without signing in`, async ({ page }) => {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(200);
+      await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+      // trailingSlash: true in next.config.ts, so accept /privacy or /privacy/.
+      await expect(page).toHaveURL(new RegExp(`${path}/?$`));
+    });
+  }
+
+  test("footer links to privacy and terms", async ({ page }) => {
+    await page.goto("/");
+    const footer = page.getByRole("navigation", { name: "Footer" });
+    await expect(footer.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
+    await expect(footer.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/terms");
+  });
+});

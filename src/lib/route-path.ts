@@ -36,6 +36,10 @@ export function normalisePath(pathname: string | null | undefined): string {
  *
  * `/accept-invite` belongs here for the sharpest version of that reason: the
  * visitor has no account yet, which is the entire point of the page.
+ *
+ * The marketing and legal pages (`/contact`, `/support`, `/privacy`, `/terms`)
+ * carry no account data. `/privacy` and `/terms` in particular are linked from
+ * the mobile app for store review, so a signed-out reviewer must reach them.
  */
 export const PUBLIC_PATHS = [
     "/",
@@ -46,6 +50,10 @@ export const PUBLIC_PATHS = [
     "/forgot-password",
     "/reset-password",
     "/accept-invite",
+    "/contact",
+    "/support",
+    "/privacy",
+    "/terms",
 ] as const;
 
 /** True when `pathname` matches one of `routes`, ignoring any trailing slash on either side. */
