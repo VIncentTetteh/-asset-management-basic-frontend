@@ -15,15 +15,15 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? "github" : "html",
   use: {
-    baseURL: "http://localhost:3100",
+    baseURL: "http://127.0.0.1:3100",
     trace: "on-first-retry",
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: {
-    command: "npm run start -- -p 3100",
-    url: "http://localhost:3100",
+    command: "npx serve out --listen tcp://127.0.0.1:3100 --no-clipboard",
+    url: "http://127.0.0.1:3100",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {

@@ -29,7 +29,6 @@ export function Navbar() {
 
                 <div className="hidden items-center gap-8 md:flex">
                     <Link href="#features" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">Features</Link>
-                    <Link href="#pricing" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">Pricing</Link>
                     <Link href="/#contact-info" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">Support</Link>
                     <Link href="/#contact-info" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">Contact</Link>
                 </div>
@@ -38,7 +37,7 @@ export function Navbar() {
                     <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
                         Login
                     </Link>
-                    <Button asChild className="bg-teal-600 hover:bg-teal-700 shadow-md shadow-teal-900/20">
+                    <Button asChild className="bg-teal-700 hover:bg-teal-800 shadow-md shadow-teal-900/20">
                         <Link href="/register-tenant">Get Started</Link>
                     </Button>
                 </div>
@@ -55,12 +54,11 @@ export function Navbar() {
             {mobileOpen && (
                 <div className="md:hidden glass-dark border-t border-white/10 px-6 py-4 space-y-1">
                     <Link href="#features" className="block text-sm font-medium text-slate-300 hover:text-white py-2.5" onClick={() => setMobileOpen(false)}>Features</Link>
-                    <Link href="#pricing" className="block text-sm font-medium text-slate-300 hover:text-white py-2.5" onClick={() => setMobileOpen(false)}>Pricing</Link>
                     <Link href="/#contact-info" className="block text-sm font-medium text-slate-300 hover:text-white py-2.5" onClick={() => setMobileOpen(false)}>Support</Link>
                     <Link href="/#contact-info" className="block text-sm font-medium text-slate-300 hover:text-white py-2.5" onClick={() => setMobileOpen(false)}>Contact</Link>
                     <div className="pt-3 flex flex-col gap-3 border-t border-white/10">
                         <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white py-1">Login</Link>
-                        <Button asChild className="bg-teal-600 hover:bg-teal-700 w-full">
+                        <Button asChild className="bg-teal-700 hover:bg-teal-800 w-full">
                             <Link href="/register-tenant">Get Started</Link>
                         </Button>
                     </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -11,20 +10,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { authService } from "@/services/authService";
+import { extractErrorMessage } from "@/lib/error";
 
 export default function ForgotPasswordPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
-    const { register, handleSubmit, formState: { errors } } = useForm();
+    const { register, handleSubmit, formState: { errors } } = useForm<{ email: string }>();
 
-    const onSubmit = async (data: any) => {
+    const onSubmit = async (data: { email: string }) => {
         setIsLoading(true);
         try {
             const response = await authService.forgotPassword(data);
             toast.success(response.message || "Password reset instructions sent to email");
             setIsSubmitted(true);
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || "Failed to process request. Please try again.");
+        } catch (error: unknown) {
+            toast.error(extractErrorMessage(error, "Failed to process request. Please try again."));
         } finally {
             setIsLoading(false);
         }
@@ -79,8 +79,8 @@ export default function ForgotPasswordPage() {
                 ) : (
                     <CardContent className="space-y-4 py-6">
                         <div className="text-center text-sm space-y-4">
-                            <p>We've sent an email with instructions to reset your password.</p>
-                            <p className="text-gray-500">If you don't see it, check your spam folder.</p>
+                            <p>We&apos;ve sent an email with instructions to reset your password.</p>
+                            <p className="text-gray-500">If you don&apos;t see it, check your spam folder.</p>
                             <div className="pt-4 border-t mt-6">
                                 <Link href="/login" className="font-semibold text-emerald-600 hover:underline">
                                     Return to login

@@ -36,6 +36,27 @@ const getFriendlyAuditAction = (event: AuditEvent) => {
     
     if (p.includes("/auth/login")) return "User Login";
     if (p.includes("/auth/logout")) return "User Logout";
+
+    // Match workflow endpoints before generic resource fragments. Checkout
+    // routes include both `/assets` and `/users`, so generic matching used to
+    // mislabel an asset checkout as "Created User" in the compliance timeline.
+    if (p.includes("/checkouts")) {
+        if (p.endsWith("/checkin")) return "Checked In Asset";
+        if (method === "POST") return "Checked Out Asset";
+        return "Viewed Asset Checkouts";
+    }
+    if (p.includes("/asset-transfers")) {
+        if (p.endsWith("/approve")) return "Approved Asset Transfer";
+        if (p.endsWith("/reject")) return "Rejected Asset Transfer";
+        if (method === "POST") return "Requested Asset Transfer";
+        return "Viewed Asset Transfers";
+    }
+    if (p.includes("/suppliers")) {
+        if (method === "POST") return "Created Supplier";
+        if (method === "PATCH" || method === "PUT") return "Updated Supplier";
+        if (method === "DELETE") return "Deleted Supplier";
+        return "Viewed Suppliers";
+    }
     
     if (p.includes("/users")) {
         if (method === "GET") return handler?.includes("list") ? "Viewed User List" : "Viewed User Details";
@@ -66,7 +87,10 @@ const getFriendlyAuditAction = (event: AuditEvent) => {
     if (p.includes("/reports")) return "Generated System Report";
     if (p.includes("/audit-events")) return "Viewed Audit Logs";
 
-    return handler?.split(".").pop()?.replace(/([A-Z])/g, " $1").trim() || `${method} ${path}`;
+    const handlerAction = handler?.split(".").pop()?.replace(/([A-Z])/g, " $1").trim();
+    return handlerAction
+        ? handlerAction.charAt(0).toUpperCase() + handlerAction.slice(1)
+        : `${method} ${path}`;
 };
 
 export default function AuditEventsPage() {

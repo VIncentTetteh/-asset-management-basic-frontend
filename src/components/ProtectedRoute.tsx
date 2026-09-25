@@ -36,7 +36,7 @@ export function ProtectedRoute({
     requireAny = false,
 }: ProtectedRouteProps) {
     const router = useRouter();
-    const { isAuthenticated, isReady, hasPermission, hasAnyPermission, hasAllPermissions } = useAuth();
+    const { isAuthenticated, isReady, hasAnyPermission, hasAllPermissions } = useAuth();
 
     // Still fetching the profile — render nothing to prevent a flash of unauthorized content
     if (!isReady) {

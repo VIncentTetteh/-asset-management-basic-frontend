@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -18,11 +17,11 @@ import { orgSsoService } from "@/services/orgSsoService";
 import { ssoAuthService } from "@/services/ssoAuthService";
 import { clearVerifiedOrganisationId, setStoredUser } from "@/lib/authContext";
 import { Eye, EyeOff, Smartphone } from "lucide-react";
+import { extractErrorMessage } from "@/lib/error";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
-    const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
@@ -39,7 +38,10 @@ export default function LoginPage() {
     const [mfaCode, setMfaCode] = useState("");
     const [isMfaSubmitting, setIsMfaSubmitting] = useState(false);
 
-    const { register, handleSubmit, getValues, formState: { errors } } = useForm();
+    const { register, handleSubmit, getValues, formState: { errors } } = useForm<{
+        email: string;
+        password: string;
+    }>();
 
     // ── SSO Discovery ─────────────────────────────────────────────────────────
     const onEmailBlur = async () => {
@@ -77,7 +79,7 @@ export default function LoginPage() {
     const providerLabel = ssoDiscovery?.provider.replace(/_/g, " ") ?? "";
 
     // ── Password Login ─────────────────────────────────────────────────────────
-    const onSubmit = async (data: any) => {
+    const onSubmit = async (data: { email: string; password: string }) => {
         setIsLoading(true);
         try {
             const response = await authService.login(data);
@@ -94,12 +96,20 @@ export default function LoginPage() {
                 setStoredUser(response.user);
                 window.dispatchEvent(new Event("auth-changed"));
                 toast.success(`Welcome back, ${response.user.firstName}!`);
-                router.push("/dashboard");
+                // Hard navigation rather than router.push.
+                //
+                // Client-side routing does not complete here on the static export: the
+                // push resolves but the URL never changes, leaving the user staring at
+                // the login form after a successful login. A full load also guarantees
+                // every provider re-reads the session cookie that was just set, rather
+                // than relying on in-flight auth state being settled before the
+                // destination's guard runs.
+                window.location.assign("/dashboard");
             } else {
                 toast.error("Invalid response from server");
             }
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || error.response?.data?.message || "Failed to login. Please check your credentials.");
+        } catch (error: unknown) {
+            toast.error(extractErrorMessage(error, "Failed to login. Please check your credentials."));
         } finally {
             setIsLoading(false);
         }
@@ -120,11 +130,18 @@ export default function LoginPage() {
                 setStoredUser(res.user);
                 window.dispatchEvent(new Event("auth-changed"));
                 toast.success(`Welcome back, ${res.user.firstName}!`);
-                router.push("/dashboard");
+                // Hard navigation rather than router.push.
+                //
+                // Client-side routing does not complete here on the static export: the
+                // push resolves but the URL never changes, leaving the user staring at
+                // the login form after a successful login. A full load also guarantees
+                // every provider re-reads the session cookie that was just set, rather
+                // than relying on in-flight auth state being settled before the
+                // destination's guard runs.
+                window.location.assign("/dashboard");
             }
-        } catch (error: any) {
-            const msg = error.response?.data?.error || "Invalid authenticator code.";
-            toast.error(msg);
+        } catch (error: unknown) {
+            toast.error(extractErrorMessage(error, "Invalid authenticator code."));
             setMfaCode("");
         } finally {
             setIsMfaSubmitting(false);
@@ -232,7 +249,7 @@ export default function LoginPage() {
                                     type="button"
                                     onClick={startSso}
                                     disabled={ssoLoading}
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    className="w-full bg-emerald-700 hover:bg-emerald-800 text-white"
                                 >
                                     {ssoLoading ? "Redirecting…" : `Continue with ${providerLabel}`}
                                 </Button>
@@ -251,7 +268,7 @@ export default function LoginPage() {
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="password">Password</Label>
-                                    <Link href="/forgot-password" className="text-sm font-medium text-emerald-600 hover:underline">
+                                    <Link href="/forgot-password" className="text-sm font-medium text-emerald-700 hover:underline">
                                         Forgot password?
                                     </Link>
                                 </div>
@@ -282,7 +299,7 @@ export default function LoginPage() {
                         <CardFooter className="flex flex-col space-y-4">
                             <Button
                                 type="submit"
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white"
                                 disabled={isLoading}
                             >
                                 {isLoading ? "Signing in..." : "Sign in"}
@@ -291,13 +308,13 @@ export default function LoginPage() {
                             <div className="text-sm text-center text-gray-500 pt-4 border-t space-y-2">
                                 <div>
                                     Learn more about the platform{" "}
-                                    <Link href="/" className="font-semibold text-emerald-600 hover:underline">
+                                    <Link href="/" className="font-semibold text-emerald-700 hover:underline">
                                         View product overview
                                     </Link>
                                 </div>
                                 <div>
                                     Need to create a new workspace?{" "}
-                                    <Link href="/register-tenant" className="font-semibold text-emerald-600 hover:underline">
+                                    <Link href="/register-tenant" className="font-semibold text-emerald-700 hover:underline">
                                         Register Organization
                                     </Link>
                                 </div>

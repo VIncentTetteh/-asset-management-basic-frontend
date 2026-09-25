@@ -42,7 +42,7 @@ interface CanProps {
  * </Can>
  */
 export function Can({ do: perms, any = false, fallback = null, children }: CanProps) {
-    const { hasPermission, hasAnyPermission, hasAllPermissions, isLoading } = useAuth();
+    const { hasAnyPermission, hasAllPermissions, isLoading } = useAuth();
 
     // Don't render anything while the profile is loading to prevent flicker
     if (isLoading) return null;

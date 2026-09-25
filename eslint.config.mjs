@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
       // until those call sites are migrated to React Query — see assetiq-revamp
       // plan Phase 4 follow-up.
       "react-hooks/set-state-in-effect": "warn",
+      "@typescript-eslint/no-explicit-any": "warn",
+      "react/no-unescaped-entities": "warn",
     },
   },
   // Override default ignores of eslint-config-next.

@@ -39,7 +39,6 @@ export function DisposalFormModal({
             reason: editingDisposal.reason || "",
             disposalMethod: editingDisposal.disposalMethod || "SCRAP",
             saleValue: editingDisposal.saleValue || 0,
-            approvedById: editingDisposal.approvedById || "",
             complianceDocumentUrl: editingDisposal.complianceDocumentUrl || "",
           }
         : {
@@ -48,20 +47,12 @@ export function DisposalFormModal({
             reason: "",
             disposalMethod: "SCRAP",
             saleValue: 0,
-            approvedById: "",
             complianceDocumentUrl: "",
           },
     );
   }, [isOpen, editingDisposal, reset]);
 
   const onSubmit = async (data: DisposalsDto) => {
-    const currentUser = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("user") || "{}") : {};
-    const approvedById = editingDisposal?.approvedById || currentUser?.id;
-    if (!approvedById) {
-      toast.error("Cannot submit disposal: approver user ID is missing");
-      return;
-    }
-
     const rawSaleValue = data.saleValue as unknown;
     const hasSaleValue = rawSaleValue !== undefined && rawSaleValue !== null && String(rawSaleValue).trim() !== "";
     const saleValue = hasSaleValue ? Number(rawSaleValue) : undefined;
@@ -77,9 +68,7 @@ export function DisposalFormModal({
       disposalMethod: data.disposalMethod,
       reason: data.reason || undefined,
       saleValue,
-      approvedById,
       complianceDocumentUrl: data.complianceDocumentUrl || undefined,
-      organisationId: currentUser?.organisationId || undefined,
     };
 
     if (editingDisposal) {

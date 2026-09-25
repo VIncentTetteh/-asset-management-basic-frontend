@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { authService } from "@/services/authService";
+import { extractErrorMessage } from "@/lib/error";
 
 function ResetPasswordForm() {
     const router = useRouter();
@@ -18,9 +19,12 @@ function ResetPasswordForm() {
     const token = searchParams.get("token");
 
     const [isLoading, setIsLoading] = useState(false);
-    const { register, handleSubmit, watch, formState: { errors } } = useForm();
+    const { register, handleSubmit, watch, formState: { errors } } = useForm<{
+        newPassword: string;
+        confirmPassword: string;
+    }>();
 
-    const onSubmit = async (data: any) => {
+    const onSubmit = async (data: { newPassword: string; confirmPassword: string }) => {
         if (!token) {
             toast.error("Missing reset token");
             return;
@@ -34,8 +38,8 @@ function ResetPasswordForm() {
             });
             toast.success(response.message || "Password has been successfully reset");
             router.push("/login"); // redirect to login upon success
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || "Failed to reset password. Token may be invalid or expired.");
+        } catch (error: unknown) {
+            toast.error(extractErrorMessage(error, "Failed to reset password. Token may be invalid or expired."));
         } finally {
             setIsLoading(false);
         }

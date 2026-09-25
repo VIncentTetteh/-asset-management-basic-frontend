@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { User, UserDto, MfaSetupResponse } from "@/types";
 import { userService } from "@/services/userService";
 import { organisationService } from "@/services/organisationService";
@@ -359,9 +360,12 @@ export default function ProfilePage() {
                             </div>
                             {mfaSetupData && (
                                 <div className="flex flex-col items-center gap-4">
-                                    <img
+                                    <Image
                                         src={mfaSetupData.qrCodeImage}
                                         alt="MFA QR Code"
+                                        width={192}
+                                        height={192}
+                                        unoptimized
                                         className="h-48 w-48 rounded-card border border-edge-subtle"
                                     />
                                     <div className="text-center">

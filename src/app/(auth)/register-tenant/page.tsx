@@ -12,8 +12,8 @@ import { Label } from "@/components/ui/label";
 import { CountrySelect } from "@/components/ui/country-select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { authService, TenantRegistrationDto } from "@/services/authService";
-import { setStoredUser, setVerifiedOrganisationId } from "@/lib/authContext";
 import { Eye, EyeOff } from "lucide-react";
+import { extractErrorMessage } from "@/lib/error";
 
 export default function RegisterTenantPage() {
     const router = useRouter();
@@ -25,22 +25,10 @@ export default function RegisterTenantPage() {
         setIsLoading(true);
         try {
             const response = await authService.registerTenant(data);
-            // API returns token + user info directly — auto-login the admin.
-            // Token lives in the HttpOnly cookie set by the backend.
-            setStoredUser({
-                id: response.userId,
-                firstName: response.firstName,
-                lastName: response.lastName,
-                email: response.email,
-                role: response.role,
-                organisationId: response.organisationId,
-            });
-            setVerifiedOrganisationId(response.organisationId);
-            window.dispatchEvent(new Event("auth-changed"));
-            toast.success(`Workspace "${response.organisationName}" created! Welcome, ${response.firstName}.`);
-            router.push("/dashboard");
-        } catch (error: any) {
-            toast.error(error.response?.data?.message || "Registration failed. Please try again.");
+            toast.success(`Workspace "${response.organisationName}" created. Verify ${response.email}, then sign in.`);
+            router.push(`/login?verification=sent&email=${encodeURIComponent(response.email)}`);
+        } catch (error: unknown) {
+            toast.error(extractErrorMessage(error, "Registration failed. Please try again."));
         } finally {
             setIsLoading(false);
         }
@@ -164,19 +152,13 @@ export default function RegisterTenantPage() {
                     </CardContent>
 
                     <CardFooter className="flex flex-col space-y-4 pt-4">
-                        <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isLoading}>
+                        <Button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white" disabled={isLoading}>
                             {isLoading ? "Provisioning Workspace..." : "Create Organization & Admin"}
                         </Button>
                         <div className="text-sm text-center text-gray-500 space-y-2">
                             <div>
-                                Joining an existing organization?{" "}
-                                <Link href="/register" className="font-semibold text-emerald-600 hover:underline">
-                                    Register Here
-                                </Link>
-                            </div>
-                            <div>
                                 Already have an account?{" "}
-                                <Link href="/login" className="font-semibold text-emerald-600 hover:underline">
+                                <Link href="/login" className="font-semibold text-emerald-700 hover:underline">
                                     Sign in
                                 </Link>
                             </div>

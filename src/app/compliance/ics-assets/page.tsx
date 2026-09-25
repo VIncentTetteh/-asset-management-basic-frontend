@@ -25,6 +25,23 @@ const FIELDS: FieldSpec<ICSAssetDto>[] = [
 
 const CREATE_DEFAULTS = { assetId: "", isolated: false, vendorSupportStatus: "SUPPORTED" } as const;
 
+function useIcsOptions() {
+  const { data: assets = [] } = useQuery({
+    queryKey: qk.module("assets-all").list(),
+    queryFn: () => assetService.getAll(),
+    staleTime: 300_000,
+  });
+  const { data: zones = [] } = useQuery({
+    queryKey: qk.module("security-zones").list(),
+    queryFn: () => securityZoneService.getAll(),
+    staleTime: 300_000,
+  });
+  return {
+    assetId: assets.map((a) => ({ value: a.id!, label: `${a.name} (${a.assetTag || "no tag"})` })),
+    securityZoneId: zones.map((z) => ({ value: z.id!, label: z.name })),
+  };
+}
+
 export default function IcsAssetsPage() {
   return (
     <ComplianceCrudPage<ICSAsset, ICSAssetDto>
@@ -46,22 +63,7 @@ export default function IcsAssetsPage() {
       toFormDefaults={(e) => defaultsFrom(e, FIELDS, CREATE_DEFAULTS)}
       searchKeys={["assetName", "firmwareVersion", "protocol"]}
       emptyDescription="Register PLCs, RTUs, and SCADA components with their security posture."
-      useOptions={() => {
-        const { data: assets = [] } = useQuery({
-          queryKey: qk.module("assets-all").list(),
-          queryFn: () => assetService.getAll(),
-          staleTime: 300_000,
-        });
-        const { data: zones = [] } = useQuery({
-          queryKey: qk.module("security-zones").list(),
-          queryFn: () => securityZoneService.getAll(),
-          staleTime: 300_000,
-        });
-        return {
-          assetId: assets.map((a) => ({ value: a.id!, label: `${a.name} (${a.assetTag || "no tag"})` })),
-          securityZoneId: zones.map((z) => ({ value: z.id!, label: z.name })),
-        };
-      }}
+      useOptions={useIcsOptions}
     />
   );
 }

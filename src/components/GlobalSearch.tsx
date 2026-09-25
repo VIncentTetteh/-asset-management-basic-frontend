@@ -51,16 +51,6 @@ const TYPE_CONFIG: Record<SearchResult["type"], { icon: React.ReactNode; color: 
     },
 };
 
-// Permission requirements per search category — must match Permission enum values.
-const SEARCH_PERMISSIONS: Record<SearchResult["type"], string> = {
-    asset:      "VIEW_ASSETS",
-    department: "MANAGE_ORGANIZATION_SETTINGS",
-    location:   "VIEW_LOCATIONS",
-    user:       "VIEW_USERS",
-    budget:     "VIEW_BUDGETS",
-    supplier:   "VIEW_SUPPLIERS",
-};
-
 async function runSearch(
     query: string,
     canSearch: (permission: string) => boolean,
@@ -222,36 +212,38 @@ export function GlobalSearch() {
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { hasPermission } = usePermissions();
 
+    const closeSearch = useCallback(() => {
+        setIsOpen(false);
+        setQuery("");
+        setResults([]);
+        setIsSearching(false);
+    }, []);
+
     // Keyboard shortcut Ctrl+K / Cmd+K
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && e.key === "k") {
                 e.preventDefault();
-                setIsOpen((prev) => !prev);
+                if (isOpen) closeSearch();
+                else setIsOpen(true);
             }
-            if (e.key === "Escape") setIsOpen(false);
+            if (e.key === "Escape") closeSearch();
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, []);
+    }, [closeSearch, isOpen]);
 
     useEffect(() => {
         if (isOpen) {
             setTimeout(() => inputRef.current?.focus(), 50);
-        } else {
-            setQuery("");
-            setResults([]);
         }
     }, [isOpen]);
 
     useEffect(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         if (query.trim().length < 2) {
-            setResults([]);
-            setIsSearching(false);
             return;
         }
-        setIsSearching(true);
         debounceRef.current = setTimeout(async () => {
             const found = await runSearch(query, hasPermission);
             setResults(found);
@@ -261,14 +253,24 @@ export function GlobalSearch() {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current);
         };
-    }, [query]);
+    }, [hasPermission, query]);
+
+    const handleQueryChange = (value: string) => {
+        setQuery(value);
+        if (value.trim().length < 2) {
+            setResults([]);
+            setIsSearching(false);
+        } else {
+            setIsSearching(true);
+        }
+    };
 
     const handleSelect = useCallback(
         (result: SearchResult) => {
-            setIsOpen(false);
+            closeSearch();
             router.push(result.href);
         },
-        [router]
+        [closeSearch, router]
     );
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -310,7 +312,7 @@ export function GlobalSearch() {
             {isOpen && (
                 <div
                     className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-start justify-center pt-[10vh] px-4"
-                    onClick={() => setIsOpen(false)}
+                    onClick={closeSearch}
                 >
                     <div
                         className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
@@ -327,7 +329,7 @@ export function GlobalSearch() {
                                 ref={inputRef}
                                 type="text"
                                 value={query}
-                                onChange={(e) => setQuery(e.target.value)}
+                                onChange={(e) => handleQueryChange(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Search assets, departments, users, budgets…"
                                 className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 outline-none"
@@ -335,7 +337,7 @@ export function GlobalSearch() {
                             />
                             {query && (
                                 <button
-                                    onClick={() => setQuery("")}
+                                    onClick={() => handleQueryChange("")}
                                     className="text-slate-400 hover:text-slate-600 transition-colors"
                                 >
                                     <X className="h-4 w-4" />
@@ -347,7 +349,7 @@ export function GlobalSearch() {
                         <div className="max-h-[60vh] overflow-y-auto">
                             {query.trim().length >= 2 && !isSearching && results.length === 0 && (
                                 <div className="py-12 text-center">
-                                    <p className="text-sm text-slate-500">No results for <span className="font-medium text-slate-700">"{query}"</span></p>
+                                    <p className="text-sm text-slate-500">No results for <span className="font-medium text-slate-700">&quot;{query}&quot;</span></p>
                                 </div>
                             )}
                             {results.length > 0 && (
@@ -411,7 +413,7 @@ export function GlobalSearch() {
                                             {quickItems.map((item) => (
                                                 <button
                                                     key={item.href}
-                                                    onClick={() => { setIsOpen(false); router.push(item.href); }}
+                                                    onClick={() => { closeSearch(); router.push(item.href); }}
                                                     className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                                                 >
                                                     <span className={item.color}>{item.icon}</span>

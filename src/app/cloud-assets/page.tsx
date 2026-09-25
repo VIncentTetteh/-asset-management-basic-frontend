@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { CloudAsset, CloudAssetDto, CloudCostSummary, CloudMonthlyCostDto } from "@/types";
 import { cloudAssetService } from "@/services/cloudAssetService";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,7 @@ export default function CloudAssetsPage() {
     const costForm = useForm<CloudMonthlyCostDto>();
     const { confirm, ConfirmDialog } = useConfirm();
 
-    const fetchAll = async (p = 0) => {
+    const fetchAll = useCallback(async (p = 0) => {
         try {
             setIsLoading(true);
             const [assetsResult, summaryResult] = await Promise.allSettled([
@@ -83,9 +83,9 @@ export default function CloudAssetsPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [filterEnvironment, filterProvider]);
 
-    useEffect(() => { fetchAll(page); }, [page, filterProvider, filterEnvironment]);
+    useEffect(() => { void fetchAll(page); }, [fetchAll, page]);
 
     const handleOpenCreate = () => {
         setEditingAsset(null);

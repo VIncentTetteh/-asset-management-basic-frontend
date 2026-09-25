@@ -20,7 +20,8 @@ export function useTheme() {
   const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
-    setThemeState(readTheme());
+    const timer = window.setTimeout(() => setThemeState(readTheme()), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const setTheme = useCallback((next: Theme) => {

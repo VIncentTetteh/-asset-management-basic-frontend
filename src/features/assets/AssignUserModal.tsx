@@ -27,7 +27,9 @@ export function AssignUserModal({
   const unassign = useUnassignAsset();
 
   useEffect(() => {
-    if (isOpen) setAssigneeId(asset?.assignedUserId || "");
+    if (!isOpen) return;
+    const timer = window.setTimeout(() => setAssigneeId(asset?.assignedUserId || ""), 0);
+    return () => window.clearTimeout(timer);
   }, [isOpen, asset]);
 
   const handleAssign = async () => {

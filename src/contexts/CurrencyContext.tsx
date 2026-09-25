@@ -1,13 +1,14 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { exchangeRateService } from "@/services/exchangeRateService";
 
 export type SupportedCurrency = "USD" | "GHS";
 
 interface CurrencyContextValue {
     currency: SupportedCurrency;
     setCurrency: (c: SupportedCurrency) => void;
-    rate: number;           // GHS per 1 USD
+    rate: number | null;    // governed GHS per 1 USD; null when unavailable
     rateLoading: boolean;
     rateLastUpdated: Date | null;
     convert: (amount: number, fromCurrency?: string) => number;
@@ -15,13 +16,12 @@ interface CurrencyContextValue {
     symbol: string;
 }
 
-const FALLBACK_RATE = 15.5; // approximate GHS/USD fallback
 const SYMBOLS: Record<SupportedCurrency, string> = { USD: "$", GHS: "₵" };
 
 const CurrencyContext = createContext<CurrencyContextValue>({
     currency: "USD",
     setCurrency: () => {},
-    rate: FALLBACK_RATE,
+    rate: null,
     rateLoading: false,
     rateLastUpdated: null,
     convert: (a) => a,
@@ -31,7 +31,7 @@ const CurrencyContext = createContext<CurrencyContextValue>({
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
     const [currency, setCurrencyState] = useState<SupportedCurrency>("USD");
-    const [rate, setRate] = useState(FALLBACK_RATE);
+    const [rate, setRate] = useState<number | null>(null);
     const [rateLoading, setRateLoading] = useState(false);
     const [rateLastUpdated, setRateLastUpdated] = useState<Date | null>(null);
 
@@ -41,21 +41,25 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         if (saved === "USD" || saved === "GHS") setCurrencyState(saved);
     }, []);
 
-    // Fetch live USD→GHS rate from our server-side cached endpoint (no direct
-    // browser dependency on the external FX provider — see /api/fx/usd-ghs).
+    // Only tenant-governed, dated server rates may drive display conversion.
     useEffect(() => {
         const fetchRate = async () => {
             setRateLoading(true);
             try {
-                const res = await fetch("/api/fx/usd-ghs");
-                if (!res.ok) throw new Error();
-                const data = await res.json();
-                if (typeof data?.rate === "number" && data.rate > 0) {
-                    setRate(data.rate);
-                    setRateLastUpdated(data.updatedAt ? new Date(data.updatedAt) : null);
+                const rates = await exchangeRateService.listAll();
+                const direct = rates
+                    .filter(r => r.baseCurrency === "USD" && r.targetCurrency === "GHS" && (r.rate ?? 0) > 0)
+                    .sort((a, b) => (b.effectiveDate ?? "").localeCompare(a.effectiveDate ?? ""))[0];
+                const inverse = rates
+                    .filter(r => r.baseCurrency === "GHS" && r.targetCurrency === "USD" && (r.rate ?? 0) > 0)
+                    .sort((a, b) => (b.effectiveDate ?? "").localeCompare(a.effectiveDate ?? ""))[0];
+                const governed = direct?.rate ?? (inverse?.rate ? 1 / inverse.rate : null);
+                if (governed != null && Number.isFinite(governed)) {
+                    setRate(governed);
+                    setRateLastUpdated(new Date());
                 }
             } catch {
-                // silently keep fallback
+                setRate(null);
             } finally {
                 setRateLoading(false);
             }
@@ -71,18 +75,21 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     const convert = useCallback((amount: number, fromCurrency?: string): number => {
         const from = ((fromCurrency ?? "USD").toUpperCase()) as SupportedCurrency;
         if (from === currency) return amount;
-        if (from === "USD" && currency === "GHS") return amount * rate;
-        if (from === "GHS" && currency === "USD") return amount / rate;
-        return amount;
+        if (rate != null && from === "USD" && currency === "GHS") return amount * rate;
+        if (rate != null && from === "GHS" && currency === "USD") return amount / rate;
+        return Number.NaN;
     }, [currency, rate]);
 
     const format = useCallback((amount: number | null | undefined, fromCurrency?: string): string => {
         if (amount == null) return "—";
-        const converted = convert(amount, fromCurrency ?? "USD");
-        return `${SYMBOLS[currency]}${converted.toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        })}`;
+        const source = ((fromCurrency ?? "GHS").toUpperCase()) as SupportedCurrency;
+        const converted = convert(amount, source);
+        const displayCurrency = Number.isFinite(converted) ? currency : source;
+        const displayAmount = Number.isFinite(converted) ? converted : amount;
+        return new Intl.NumberFormat("en-US", {
+            style: "currency", currency: displayCurrency,
+            minimumFractionDigits: 2, maximumFractionDigits: 2,
+        }).format(displayAmount);
     }, [convert, currency]);
 
     return (

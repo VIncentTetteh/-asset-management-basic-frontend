@@ -15,7 +15,7 @@
  * In cloud mode this component renders null and adds zero overhead.
  */
 
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
     CheckCircle,
     Key,
@@ -419,9 +419,9 @@ export function LicenseSetupWizard() {
                 {/* Footer */}
                 <div className="border-t border-slate-100 bg-slate-50 px-6 py-3 flex items-center justify-between">
                     <span className="text-xs text-slate-400">Step {step} of 3</span>
-                    {step === 1 && (
+                    {step === 1 && process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim() && (
                         <a
-                            href="mailto:support@assetiq.io"
+                            href={`mailto:${process.env.NEXT_PUBLIC_SUPPORT_EMAIL.trim()}`}
                             className="text-xs text-teal-600 hover:underline"
                         >
                             Need help? Contact support

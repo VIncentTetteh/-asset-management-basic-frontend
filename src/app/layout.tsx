@@ -1,27 +1,8 @@
 import type { Metadata } from "next";
-import { Manrope, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { AppLayoutClient } from "@/components/AppLayoutClient";
 import { AuthProvider } from "@/contexts/AuthContext";
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-manrope",
-  weight: ["600", "700", "800"],
-});
-
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  variable: "--font-plex",
-  weight: ["400", "500", "600"],
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  variable: "--font-plex-mono",
-  weight: ["400", "500", "600"],
-});
 
 export const metadata: Metadata = {
   title: "AssetIQ — Enterprise Asset Management",
@@ -52,7 +33,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
-      <body className={`${manrope.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}>
+      <body>
         {/* AuthProvider wraps the entire app — provides useAuth() and <Can> everywhere */}
         <AuthProvider>
           <AppLayoutClient>

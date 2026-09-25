@@ -116,6 +116,9 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
   emptyDescription,
   useOptions,
 }: ComplianceCrudPageProps<T, TDto>) {
+  const entityPlural = entity.endsWith("y")
+    ? `${entity.slice(0, -1)}ies`
+    : `${entity}s`;
   const dynamicOptions = useOptions?.() ?? {};
   const hooks = useMemo(
     () =>
@@ -235,10 +238,10 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
   return (
     <ListPageTemplate
       title={title}
-      subtitle={isLoading ? `Loading ${entity.toLowerCase()}s…` : `${rows.length} records`}
+      subtitle={isLoading ? `Loading ${entityPlural.toLowerCase()}…` : `${rows.length} records`}
       actions={
         <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> New {entity.toLowerCase()}
+          <Plus className="mr-2 h-4 w-4" /> New {entity}
         </Button>
       }
       toolbar={
@@ -252,11 +255,11 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
         columns={tableColumns}
         data={filtered}
         isLoading={isLoading}
-        emptyTitle={`No ${entity.toLowerCase()}s yet`}
+        emptyTitle={`No ${entityPlural.toLowerCase()} yet`}
         emptyDescription={emptyDescription}
         emptyAction={
           <Button size="sm" onClick={openCreate}>
-            <Icon className="mr-1.5 h-4 w-4" /> New {entity.toLowerCase()}
+            <Icon className="mr-1.5 h-4 w-4" /> New {entity}
           </Button>
         }
       />
@@ -264,7 +267,7 @@ export function ComplianceCrudPage<T extends { id?: string }, TDto extends Field
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editing ? `Edit ${entity.toLowerCase()}` : `New ${entity.toLowerCase()}`}
+        title={editing ? `Edit ${entity}` : `New ${entity}`}
         description={description}
       >
         <form onSubmit={handleSubmit(onSubmit)} className="max-h-[70vh] overflow-y-auto px-1">

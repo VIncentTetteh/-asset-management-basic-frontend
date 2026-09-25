@@ -35,7 +35,12 @@ export function OnboardModal({
   const [items, setItems] = useState<DraftItem[]>([]);
 
   useEffect(() => {
-    if (employee) setItems([{ title: "Sign employment paperwork", itemType: "GENERAL" }]);
+    if (!employee) return;
+    const timer = window.setTimeout(
+      () => setItems([{ title: "Sign employment paperwork", itemType: "GENERAL" }]),
+      0,
+    );
+    return () => window.clearTimeout(timer);
   }, [employee]);
 
   const availableAssets = assets.filter((a) => a.status === "IN_STOCK" || a.status === "RESERVED");

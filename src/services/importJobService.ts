@@ -1,4 +1,5 @@
 import api from "@/lib/axios";
+import type { AxiosRequestConfig } from "axios";
 
 export interface ImportJobError {
     row?: number;
@@ -29,19 +30,16 @@ export const importJobService = {
         const formData = new FormData();
         formData.append("file", file);
 
-        const config: any = {
-            headers: {
-                "Content-Type": "multipart/form-data"
-            },
-            params: {}
-        };
+        const headers: Record<string, string> = { "Content-Type": "multipart/form-data" };
+        const params: { dryRun?: boolean } = {};
+        const config: AxiosRequestConfig = { headers, params };
 
         if (options?.dryRun !== undefined) {
-            config.params.dryRun = options.dryRun;
+            params.dryRun = options.dryRun;
         }
 
         if (options?.idempotencyKey) {
-            config.headers["Idempotency-Key"] = options.idempotencyKey;
+            headers["Idempotency-Key"] = options.idempotencyKey;
         }
 
         const response = await api.post<ImportJobResponse>("/import-jobs/assets", formData, config);

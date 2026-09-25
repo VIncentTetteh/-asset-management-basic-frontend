@@ -52,3 +52,9 @@ next-env.d.ts
 # planning docs (keep out of repo)
 *.docx
 .gstack/
+
+# Static export output (next build with output: "export")
+/out/
+
+# Local IDE run artefacts
+/.run/

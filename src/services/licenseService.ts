@@ -10,16 +10,17 @@ const withOrgParams = (params?: Record<string, string | number | boolean | undef
     organisationId: getOrgId(),
 });
 
-const normalizeLicense = (license: any): SoftwareLicense => {
-    if (!license) return license as SoftwareLicense;
+type LicenseApiRecord = SoftwareLicense & { name?: string };
+
+const normalizeLicense = (license: LicenseApiRecord): SoftwareLicense => {
     return {
         ...license,
         productName: license.productName ?? license.name ?? "",
-    } as SoftwareLicense;
+    };
 };
 
-const normalizeLicenseList = (data: any): SoftwareLicense[] => {
-    const list = extractList<SoftwareLicense>(data);
+const normalizeLicenseList = (data: unknown): SoftwareLicense[] => {
+    const list = extractList<LicenseApiRecord>(data);
     return list.map(normalizeLicense);
 };
 

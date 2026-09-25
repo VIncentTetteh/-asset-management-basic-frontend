@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useCurrency, SupportedCurrency } from "@/contexts/CurrencyContext";
 import { BillingPlan } from "@/types";
 import { filterAndOrderPlans } from "@/lib/plan-filter";
 
@@ -20,7 +19,7 @@ const FALLBACK_PLANS: BillingPlan[] = [
         maxAssets: 50,
         maxEmployees: 5,
         analyticsEnabled: false,
-        auditRetentionDays: 7,
+        auditRetentionDays: 30,
     },
     {
         code: "BASIC",
@@ -32,7 +31,7 @@ const FALLBACK_PLANS: BillingPlan[] = [
         maxAssets: 250,
         maxEmployees: 10,
         analyticsEnabled: false,
-        auditRetentionDays: 30,
+        auditRetentionDays: 90,
     },
     {
         code: "BUSINESS",
@@ -56,7 +55,7 @@ const FALLBACK_PLANS: BillingPlan[] = [
         maxAssets: 999999,
         maxEmployees: 999999,
         analyticsEnabled: true,
-        auditRetentionDays: 365,
+        auditRetentionDays: 3_650,
     },
 ];
 
@@ -85,7 +84,6 @@ function isEnterprise(plan: BillingPlan): boolean {
 }
 
 export function PricingSection() {
-    const { currency, setCurrency, convert, rate, rateLastUpdated } = useCurrency();
     const [plans, setPlans] = useState<BillingPlan[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -119,66 +117,25 @@ export function PricingSection() {
         if (isEnterprise(plan)) return "Custom";
         if (plan.amountMinor === 0) return "Free";
         const priceInPlanCurrency = plan.amountMinor / 100;
-        const converted = convert(priceInPlanCurrency, plan.currency);
-        return Math.round(converted).toLocaleString("en-US");
+        return Math.round(priceInPlanCurrency).toLocaleString("en-US");
     };
 
     const altPrice = (plan: BillingPlan): string | null => {
         if (isEnterprise(plan) || plan.amountMinor === 0) return null;
-        const priceInPlanCurrency = plan.amountMinor / 100;
-        if (currency === "GHS") {
-            const inUSD = plan.currency === "USD"
-                ? priceInPlanCurrency
-                : priceInPlanCurrency / rate;
-            return `≈ $${Math.round(inUSD).toLocaleString("en-US")}/mo USD`;
-        } else {
-            const inGHS = plan.currency === "GHS"
-                ? priceInPlanCurrency
-                : priceInPlanCurrency * rate;
-            return `≈ ₵${Math.round(inGHS).toLocaleString("en-US")}/mo GHS`;
-        }
+        return null;
     };
-
-    const symbol = currency === "GHS" ? "₵" : "$";
 
     return (
         <section id="pricing" className="py-24 bg-slate-900/20">
             <div className="container mx-auto px-6">
                 <div className="mb-16 text-center">
-                    <span className="text-xs font-bold uppercase tracking-widest text-teal-500">Pricing</span>
+                    <span className="text-xs font-bold uppercase tracking-widest text-teal-300">Pricing</span>
                     <h2 className="mt-3 text-3xl font-bold text-white md:text-4xl">Simple, scalable pricing.</h2>
                     <p className="mx-auto mt-4 max-w-2xl text-slate-400">
                         Choose the plan that fits your organisation&apos;s current scale. Upgrade as you grow — no surprises.
                     </p>
 
-                    {/* Currency toggle */}
-                    <div className="mt-8 inline-flex flex-col items-center gap-2">
-                        <div className="flex items-center rounded-xl border border-slate-700 bg-slate-900 p-1">
-                            {(["USD", "GHS"] as SupportedCurrency[]).map(c => (
-                                <button
-                                    key={c}
-                                    onClick={() => setCurrency(c)}
-                                    className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
-                                        currency === c
-                                            ? "bg-teal-600 text-white shadow-md"
-                                            : "text-slate-400 hover:text-slate-200"
-                                    }`}
-                                >
-                                    {c === "USD" ? "$ USD" : "₵ GHS"}
-                                </button>
-                            ))}
-                        </div>
-                        {currency === "GHS" && (
-                            <p className="text-xs text-slate-500">
-                                Live rate: 1 USD = ₵{rate.toFixed(2)}
-                                {rateLastUpdated && (
-                                    <span className="ml-1 text-slate-600">
-                                        · updated {rateLastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                    </span>
-                                )}
-                            </p>
-                        )}
-                    </div>
+                    <p className="mt-6 text-xs text-slate-300">Prices are shown in each plan&apos;s billing currency.</p>
                 </div>
 
                 {loading ? (
@@ -197,6 +154,7 @@ export function PricingSection() {
                             const displayPrice = formatPrice(plan);
                             const alt = altPrice(plan);
                             const showSymbol = !enterprise && plan.amountMinor !== 0;
+                            const symbol = plan.currency === "GHS" ? "₵" : "$";
 
                             return (
                                 <div
@@ -208,7 +166,7 @@ export function PricingSection() {
                                     }`}
                                 >
                                     {highlight && (
-                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-teal-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white whitespace-nowrap">
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-teal-700 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white whitespace-nowrap">
                                             Most Popular
                                         </div>
                                     )}
@@ -228,7 +186,7 @@ export function PricingSection() {
                                                 <span className="text-4xl font-extrabold text-white">{displayPrice}</span>
                                             </div>
                                             {alt && (
-                                                <p className="mt-1.5 text-xs text-slate-500">{alt}</p>
+                                                <p className="mt-1.5 text-xs text-slate-300">{alt}</p>
                                             )}
                                         </div>
                                     </div>
@@ -247,7 +205,7 @@ export function PricingSection() {
                                         variant="ghost"
                                         className={`w-full h-11 text-sm font-semibold transition-all ${
                                             highlight
-                                                ? "bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-900/40"
+                                                ? "bg-teal-700 hover:bg-teal-800 text-white shadow-lg shadow-teal-900/40"
                                                 : "bg-transparent border border-slate-700 text-white hover:bg-slate-800 hover:text-white"
                                         }`}
                                     >
@@ -261,7 +219,7 @@ export function PricingSection() {
                     </div>
                 )}
 
-                <p className="mt-10 text-center text-xs text-slate-500">
+                <p className="mt-10 text-center text-xs text-slate-300">
                     Freemium is available without a credit card. Enterprise packages are handled by our sales team.
                 </p>
             </div>

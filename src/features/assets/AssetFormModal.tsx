@@ -38,6 +38,7 @@ function emptyForm(): AssetDto {
     locationId: "",
     departmentId: "",
     supplierId: "",
+    purchaseOrderId: "",
     assignedUserId: "",
   } as AssetDto;
 }
@@ -65,6 +66,7 @@ function formFromAsset(asset: Asset): AssetDto {
     locationId: asset.locationId || "",
     departmentId: asset.departmentId || "",
     supplierId: asset.supplierId || "",
+    purchaseOrderId: asset.purchaseOrderId || "",
     assignedUserId: asset.assignedUserId || "",
   } as AssetDto;
 }

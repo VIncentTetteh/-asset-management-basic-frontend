@@ -125,6 +125,10 @@ function AssetsPageInner() {
           }}
           onDelete={handleDelete}
           onCreate={openCreate}
+          onImport={() => setIsImportOpen(true)}
+          // Derived from the org-wide stats rather than the current page, so a filter
+          // that happens to match nothing is never mistaken for an empty tenant.
+          isFirstRun={stats?.total === 0}
           canCreate
         />
       </div>

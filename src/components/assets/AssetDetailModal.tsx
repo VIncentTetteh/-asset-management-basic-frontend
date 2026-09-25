@@ -1,23 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-    Asset, AssetHistory, AssetCustomField, AssetCustomFieldDto,
-    Department, Organisation, Category, Location, User
-} from "@/types";
+import Image from "next/image";
+import { Asset, AssetHistory, Department, Organisation, Category, Location, User } from "@/types";
 import { assetService } from "@/services/assetService";
-import { assetCustomFieldService } from "@/services/assetCustomFieldService";
 import { normalizeAssetHistoryEntry } from "@/lib/assetHistory";
 import { formatRelativeTime } from "@/lib/time";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-    History, Tags, QrCode, Info,
-    Plus, Trash2, Loader2, Download, Clock, User as UserIcon
+    History, QrCode, Info, Loader2, Download, Clock, User as UserIcon
 } from "lucide-react";
-import toast from "react-hot-toast";
 
 interface Props {
     isOpen: boolean;
@@ -30,18 +23,30 @@ interface Props {
     organisations?: Organisation[];
 }
 
-type Tab = "overview" | "history" | "custom_fields" | "qrcode";
+type Tab = "overview" | "history" | "qrcode";
+
+const resolveQrPayload = (payload: Blob | Record<string, unknown> | string): string => {
+    if (payload instanceof Blob) {
+        return URL.createObjectURL(payload);
+    }
+    if (typeof payload === "string") {
+        const trimmed = payload.trim().replace(/^"+|"+$/g, "");
+        if (trimmed.startsWith("data:image") || /^https?:\/\//i.test(trimmed)) return trimmed;
+        if (/^[A-Za-z0-9+/=\s]+$/.test(trimmed) && trimmed.length > 100) {
+            return `data:image/png;base64,${trimmed.replace(/\s/g, "")}`;
+        }
+        return "";
+    }
+
+    const candidates = [payload.data, payload.qrCode, payload.image, payload.imageUrl, payload.content, payload.bytes, payload.payload, payload.base64];
+    const first = candidates.find((value) => typeof value === "string" && value.trim());
+    return first ? resolveQrPayload(String(first)) : "";
+};
 
 export function AssetDetailModal({ isOpen, onClose, asset, departments, locations, categories, users, organisations = [] }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>("overview");
     const [history, setHistory] = useState<AssetHistory[]>([]);
-    const [customFields, setCustomFields] = useState<AssetCustomField[]>([]);
     const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
-    const [isLoading, setIsLoading] = useState(false);
-    const [isSavingField, setIsSavingField] = useState(false);
-    
-    const [newFieldName, setNewFieldName] = useState("");
-    const [newFieldValue, setNewFieldValue] = useState("");
 
     const deptMap = new Map(departments.map(d => [d.id, d.name]));
     const locMap = new Map(locations.map(l => [l.id, l.name]));
@@ -49,100 +54,40 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
     const userMap = new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`]));
     const orgMap = new Map(organisations.map(o => [o.id, o.name]));
 
-    const resolveQrPayload = (payload: Blob | Record<string, unknown> | string): string => {
-        if (payload instanceof Blob) {
-            return URL.createObjectURL(payload);
-        }
-        if (typeof payload === "string") {
-            const trimmed = payload.trim().replace(/^"+|"+$/g, "");
-            if (trimmed.startsWith("data:image") || /^https?:\/\//i.test(trimmed)) return trimmed;
-            if (/^[A-Za-z0-9+/=\s]+$/.test(trimmed) && trimmed.length > 100) {
-                return `data:image/png;base64,${trimmed.replace(/\s/g, "")}`;
-            }
-            return "";
-        }
-
-        const candidates = [payload.data, payload.qrCode, payload.image, payload.imageUrl, payload.content, payload.bytes, payload.payload, payload.base64];
-        const first = candidates.find((value) => typeof value === "string" && value.trim());
-        return first ? resolveQrPayload(String(first)) : "";
-    };
-
     useEffect(() => {
-        if (isOpen && asset?.id) {
-            setActiveTab("overview");
-            loadHistory();
-            loadCustomFields();
-            loadQrCode();
-        }
+        if (!isOpen || !asset?.id) return;
+
+        let cancelled = false;
+        const assetId = asset.id;
+        void assetService.getHistory(assetId)
+            .then((data) => {
+                if (!cancelled) setHistory(data.map(normalizeAssetHistoryEntry));
+            })
+            .catch((error: unknown) => console.error("Failed to load history", error));
+
+        void assetService.getQrCode(assetId)
+            .then((payload) => {
+                if (!cancelled) setQrCodeUrl(resolveQrPayload(payload));
+            })
+            .catch((error: unknown) => console.error("Failed to load QR code", error));
+
+        return () => {
+            cancelled = true;
+        };
     }, [isOpen, asset?.id]);
 
-    const loadHistory = async () => {
-        if (!asset?.id) return;
-        try {
-            const data = await assetService.getHistory(asset.id);
-            const normalized = data.map(normalizeAssetHistoryEntry);
-            setHistory(normalized);
-        } catch (err) {
-            console.error("Failed to load history", err);
-        }
-    };
+    useEffect(() => () => {
+        if (qrCodeUrl.startsWith("blob:")) URL.revokeObjectURL(qrCodeUrl);
+    }, [qrCodeUrl]);
 
-    const loadCustomFields = async () => {
-        if (!asset?.id) return;
-        try {
-            const data = await assetCustomFieldService.getFields(asset.id);
-            setCustomFields(data);
-        } catch (err) {
-            console.error("Failed to load custom fields", err);
-        }
-    };
-
-    const loadQrCode = async () => {
-        if (!asset?.id) return;
-        try {
-            const payload = await assetService.getQrCode(asset.id);
-            setQrCodeUrl(resolveQrPayload(payload));
-        } catch (err) {
-            console.error("Failed to load QR code", err);
-        }
-    };
-
-    const handleAddField = async () => {
-        if (!asset?.id || !newFieldName) return;
-        setIsSavingField(true);
-        try {
-            await assetCustomFieldService.createField(asset.id, { 
-                fieldName: newFieldName,
-                fieldValue: newFieldValue,
-                name: newFieldName,
-                value: newFieldValue,
-                dataType: "TEXT",
-            });
-            toast.success("Custom field added");
-            setNewFieldName("");
-            setNewFieldValue("");
-            loadCustomFields();
-        } catch {
-            toast.error("Failed to add field");
-        } finally {
-            setIsSavingField(false);
-        }
-    };
-
-    const handleDeleteField = async (fieldId: string) => {
-        if (!asset?.id) return;
-        try {
-            await assetCustomFieldService.deleteField(asset.id, fieldId);
-            toast.success("Field deleted");
-            loadCustomFields();
-        } catch {
-            toast.error("Failed to delete field");
-        }
+    const handleClose = () => {
+        setActiveTab("overview");
+        onClose();
     };
 
     const getFriendlyAction = (h: AssetHistory) => {
         const type = (h.eventType || h.action || "").toUpperCase();
-        const path = (h as any).path || "";
+        const path = h.path || "";
         
         if (type === "API_ACTION" || !type) {
             if (path.includes("assign-user")) return "User Assigned";
@@ -151,9 +96,9 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
             if (path.includes("maintenance")) return "Maintenance Activity";
             if (path.includes("qrcode")) return "QR Code Generated";
             
-            if ((h as any).httpMethod === "POST") return "Asset Created";
-            if ((h as any).httpMethod === "PATCH" || (h as any).httpMethod === "PUT") return "Asset Updated";
-            if ((h as any).httpMethod === "DELETE") return "Asset Deleted";
+            if (h.httpMethod === "POST") return "Asset Created";
+            if (h.httpMethod === "PATCH" || h.httpMethod === "PUT") return "Asset Updated";
+            if (h.httpMethod === "DELETE") return "Asset Deleted";
             
             return "System Action";
         }
@@ -182,7 +127,6 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
 
     const tabs = [
         { id: "overview", label: "Overview", icon: Info },
-        { id: "custom_fields", label: "Custom Fields", icon: Tags },
         { id: "history", label: "History", icon: History },
         { id: "qrcode", label: "QR Code", icon: QrCode },
     ];
@@ -190,7 +134,7 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
     return (
         <Modal 
             isOpen={isOpen} 
-            onClose={onClose} 
+            onClose={handleClose} 
             title={asset.name} 
             description={`Asset Tag: ${asset.assetTag || 'N/A'}`}
         >
@@ -233,70 +177,10 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                                 <div className="space-y-1">
                                     <p className="text-xs font-semibold text-slate-500 uppercase">Description</p>
                                     <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">
-                                        "{asset.description}"
+                                        &ldquo;{asset.description}&rdquo;
                                     </p>
                                 </div>
                             )}
-                        </div>
-                    )}
-
-                    {activeTab === "custom_fields" && (
-                        <div className="space-y-6">
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                <p className="text-xs font-bold text-slate-700 uppercase mb-3 px-1">Add New Field</p>
-                                <div className="flex gap-2">
-                                    <div className="flex-1 space-y-1">
-                                        <Input 
-                                            placeholder="Label (e.g. CPU)" 
-                                            value={newFieldName} 
-                                            onChange={e => setNewFieldName(e.target.value)}
-                                            className="h-9 text-sm"
-                                        />
-                                    </div>
-                                    <div className="flex-[2] space-y-1">
-                                        <Input 
-                                            placeholder="Value (e.g. Core i9)" 
-                                            value={newFieldValue} 
-                                            onChange={e => setNewFieldValue(e.target.value)}
-                                            className="h-9 text-sm"
-                                        />
-                                    </div>
-                                    <Button 
-                                        onClick={handleAddField} 
-                                        disabled={!newFieldName || isSavingField}
-                                        size="sm"
-                                        className="bg-indigo-600 hover:bg-indigo-700 h-9"
-                                    >
-                                        <Plus className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                {customFields.length === 0 ? (
-                                    <div className="text-center py-10 text-slate-400">
-                                        <Tags className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                                        <p className="text-sm italic">No custom fields defined for this asset.</p>
-                                    </div>
-                                ) : (
-                                    customFields.map(field => (
-                                        <div key={field.id} className="group flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/30 transition-all">
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-tight">{field.fieldName || field.name || field.label || field.key}</span>
-                                                <span className="text-sm font-medium text-slate-900">{String(field.fieldValue ?? field.value ?? '—')}</span>
-                                            </div>
-                                            <Button
-                                                variant="ghost" 
-                                                size="sm" 
-                                                onClick={() => handleDeleteField(field.id)}
-                                                className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
                         </div>
                     )}
 
@@ -331,8 +215,8 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{h.fieldName || h.summary}</p>
                                                     {(h.oldValue || h.newValue) && (
                                                         <p className="text-xs text-slate-700 font-medium">
-                                                            <span className="line-through opacity-40 mr-2">"{h.oldValue || 'none'}"</span>
-                                                            <span className="text-indigo-600">"{h.newValue || 'updated'}"</span>
+                                                            <span className="line-through opacity-40 mr-2">&ldquo;{h.oldValue || 'none'}&rdquo;</span>
+                                                            <span className="text-indigo-600">&ldquo;{h.newValue || 'updated'}&rdquo;</span>
                                                         </p>
                                                     )}
                                                 </div>
@@ -349,7 +233,7 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
                         <div className="flex flex-col items-center justify-center space-y-6 py-8">
                             <div className="p-8 bg-white rounded-3xl shadow-xl border-8 border-slate-50 group hover:border-indigo-50 transition-all duration-500">
                                 {qrCodeUrl ? (
-                                    <img src={qrCodeUrl} alt="Asset QR Code" className="w-48 h-48" />
+                                    <Image src={qrCodeUrl} alt="Asset QR Code" width={192} height={192} unoptimized className="h-48 w-48" />
                                 ) : (
                                     <div className="w-48 h-48 flex items-center justify-center bg-slate-50 animate-pulse rounded-lg">
                                         <Loader2 className="h-10 w-10 text-slate-200 animate-spin" />
@@ -382,7 +266,7 @@ export function AssetDetailModal({ isOpen, onClose, asset, departments, location
 
                 {/* Footer Actions */}
                 <div className="flex shrink-0 justify-end pt-4 border-t mt-4 border-slate-200">
-                    <Button variant="outline" onClick={onClose} className="px-8 font-semibold tracking-wide border-slate-300 hover:bg-slate-50">
+                    <Button variant="outline" onClick={handleClose} className="px-8 font-semibold tracking-wide border-slate-300 hover:bg-slate-50">
                         Close
                     </Button>
                 </div>

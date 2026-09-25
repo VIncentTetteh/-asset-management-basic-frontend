@@ -12,7 +12,10 @@ import { clearVerifiedOrganisationId, getOrganisationIdFromStorage } from "@/lib
  * Web sessions no longer read or persist JWTs in localStorage.
  */
 const api = axios.create({
-    baseURL: "/api/v1",
+    // Hosted/static deployments keep the same-origin `/api/v1` path behind
+    // CloudFront or nginx. Local and customer-managed environments can point
+    // directly at their API without requiring a Next.js proxy.
+    baseURL: process.env.NEXT_PUBLIC_API_URL?.trim() || "/api/v1",
     withCredentials: true,   // F-1: send HttpOnly cookie on every request
     headers: {
         "Content-Type": "application/json",
@@ -100,13 +103,13 @@ api.interceptors.response.use((response) => response, async (error) => {
             return Promise.reject(error);
         }
 
-        // Auto-refresh on 403 — only retry once
-        if (!originalRequest._permissionsRetried) {
-            originalRequest._permissionsRetried = true;
-            const refreshed = await refreshToken();
-            if (refreshed) {
-                return api(originalRequest);
-            }
+    }
+
+    const isRefreshRequest = String(originalRequest?.url ?? "").includes("/auth/refresh");
+    if (error.response?.status === 401 && !isRefreshRequest && !originalRequest?._authRetried) {
+        originalRequest._authRetried = true;
+        if (await refreshToken()) {
+            return api(originalRequest);
         }
     }
 

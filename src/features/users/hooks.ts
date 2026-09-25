@@ -56,6 +56,7 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: async ({ existing, data }: { existing: User; data: UserDto }) => {
       const { password: _password, roleId, ...profileData } = data;
+      void _password;
       const patch = buildPatchPayload<UserDto>(existing as unknown as Partial<UserDto>, profileData);
       if (Object.keys(patch).length > 0) {
         await userService.update(existing.id!, patch);

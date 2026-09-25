@@ -1,4 +1,5 @@
 import api from "@/lib/axios";
+import { isAxiosError } from "axios";
 
 export interface OrgStorageConfig {
     id?:            string;
@@ -14,8 +15,8 @@ export const storageConfigService = {
         try {
             const r = await api.get<OrgStorageConfig>(`/organisations/${orgId}/storage-config`);
             return r.data;
-        } catch (e: any) {
-            if (e?.response?.status === 404) return null;
+        } catch (e: unknown) {
+            if (isAxiosError(e) && e.response?.status === 404) return null;
             throw e;
         }
     },
